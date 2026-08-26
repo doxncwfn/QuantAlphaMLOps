@@ -26,7 +26,7 @@ $f_{k,t+5} = \prod_{s=1}^{5}(1+f_{k,t+s})-1$.
 The Volatility factor is constructed as the return differential between the bottom and top quintiles of trailing 60-day realized volatility, computed point-in-time. Exposures ($\hat{\beta}$) are estimated using strictly data from $t-126$ to $t$.
 
 The target is then cross-sectionally z-scored per date $t$:  
-$\tilde{y}_{i,t} = \frac{y_{i,t} - \mu_t}{\sigma_t}$.
+$$\tilde{y}_{i,t} = \frac{y_{i,t} - \mu_t}{\sigma_t}$$.
 
 **Architecture Specifications:**  
 The network accepts input tensors of shape $[Batch\_Dates, 413, 60, 15]$. The LSTM is applied independently per stock, treating the stock dimension as part of the batch; no cross-sectional information enters the network until the Transformer layer.
