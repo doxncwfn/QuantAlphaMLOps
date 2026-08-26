@@ -1,0 +1,569 @@
+\documentclass[twoside,final]{hcmut-report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[protrusion=false]{microtype}
+
+\usepackage{graphicx, caption}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{multirow,multicol}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{tcolorbox}
+\usepackage{lastpage}
+
+\definecolor{keywordcolor}{rgb}{0.13,0.13,1} % Blue keywords
+\definecolor{stringcolor}{rgb}{0.7,0.13,0.13} % Dark red strings
+\definecolor{commentcolor}{rgb}{0.25,0.5,0.35} % Green comments
+\definecolor{backgroundcolor}{rgb}{0.97,0.97,0.97} % Light background
+\definecolor{numbercolor}{rgb}{0.85,0.65,0.13} % Numbers
+
+\lstdefinelanguage{Python}{
+  morekeywords={
+    and, as, assert, async, await, break, class, continue, def, del, elif, else, except,
+    False, finally, for, from, global, if, import, in, is, lambda, None, nonlocal, not, 
+    or, pass, raise, return, True, try, while, with, yield
+  },
+  keywordstyle=\color{keywordcolor}\bfseries,
+  morekeywords=[2]{bool, bytes, bytearray, complex, dict, float, frozenset, int, list, object, set, str, tuple},
+  keywordstyle=[2]\color{blue}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=true,
+  comment=[l]{\#},
+  morecomment=[s]{'''}{'''}, 
+  morecomment=[s]{"""}{"""},
+  commentstyle=\color{commentcolor}\ttfamily,
+  stringstyle=\color{stringcolor}\ttfamily,
+  morestring=[b]',
+  morestring=[b]",
+  % Highlight numbers
+  literate=
+    *{0}{{{\color{numbercolor}0}}}1
+    {1}{{{\color{numbercolor}1}}}1
+    {2}{{{\color{numbercolor}2}}}1
+    {3}{{{\color{numbercolor}3}}}1
+    {4}{{{\color{numbercolor}4}}}1
+    {5}{{{\color{numbercolor}5}}}1
+    {6}{{{\color{numbercolor}6}}}1
+    {7}{{{\color{numbercolor}7}}}1
+    {8}{{{\color{numbercolor}8}}}1
+    {9}{{{\color{numbercolor}9}}}1
+    {.0}{{{\color{numbercolor}.0}}}2
+    {.1}{{{\color{numbercolor}.1}}}2
+    {.2}{{{\color{numbercolor}.2}}}2
+    {.3}{{{\color{numbercolor}.3}}}2
+    {.4}{{{\color{numbercolor}.4}}}2
+    {.5}{{{\color{numbercolor}.5}}}2
+    {.6}{{{\color{numbercolor}.6}}}2
+    {.7}{{{\color{numbercolor}.7}}}2
+    {.8}{{{\color{numbercolor}.8}}}2
+    {.9}{{{\color{numbercolor}.9}}}2
+    {e+}{{{\color{numbercolor}e+}}}2
+    {e-}{{{\color{numbercolor}e-}}}2
+    {\#\#NUMSTART\#\#}{}{0}
+    {\#\#NUMEND\#\#}{}{0},
+}
+\lstset{
+  language=Python,
+  backgroundcolor=\color{backgroundcolor},
+  basicstyle=\ttfamily\small,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=10pt,
+  tabsize=2,
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  frame=single,
+}
+
+\lstdefinelanguage{TypeScript}{
+  keywords={abstract, as, boolean, break, case, catch, class, continue, const, constructor, debugger, declare, default, delete, do, else, enum, export, extends, false, finally, for, from, function, get, if, implements, import, in, infer, instanceof, interface, is, keyof, let, module, namespace, never, new, null, number, object, of, package, private, protected, public, readonly, require, global, return, set, static, string, super, switch, symbol, this, throw, true, try, type, typeof, undefined, unique, unknown, var, void, while, with, yield, async, await},
+  keywordstyle=\color{keywordcolor}\bfseries,
+  ndkeywords={string, number, boolean, Promise, any, void},
+  ndkeywordstyle=\color{blue}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{commentcolor}\ttfamily,
+  stringstyle=\color{stringcolor}\ttfamily,
+  morestring=[b]',
+  morestring=[b]",
+}
+
+\lstset{
+  language=TypeScript,
+  backgroundcolor=\color{backgroundcolor},
+  basicstyle=\ttfamily\small,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=10pt,
+  tabsize=2,
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  frame=single,
+}
+\lstdefinelanguage{EnvCustom}{
+  keywords={VITE_APP_API_URL, DATABASE_URL, DB_HOST, DB_USER, DB_PASSWORD, DB_PORT, DB_NAME, JWT_SECRET},
+  keywordstyle=\color{blue}\bfseries,
+  sensitive=true,
+  comment=[l]{\#},
+  commentstyle=\color{gray}\ttfamily,
+  morestring=[b]',
+  morestring=[b]",
+  stringstyle=\color{red}\ttfamily,
+  identifierstyle=\color{black}
+}
+
+\lstdefinelanguage{JavaScriptCustom}{
+  keywords={
+    break, case, catch, class, const, continue, debugger, default, delete, do, else, export,
+    extends, finally, for, function, if, import, in, instanceof, let, new, return, super, 
+    switch, this, throw, try, typeof, var, void, while, with, yield, await, async,
+    mysql, dotenv, process, config, createPool, getConnection, release
+  },
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={true, false, null, undefined, NaN, Infinity},
+  ndkeywordstyle=\color{teal}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]"
+}
+
+
+\lstdefinelanguage{SQL}
+{
+  keywords={SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER, BY, CREATE, PROCEDURE, FUNCTION, TRIGGER, BEGIN, END, DECLARE, IF, ELSE, RETURN, SET, INSERT, UPDATE, DELETE, INTO, VALUES, SIGNAL, JOIN, ON, AND, IN, GROUP, AS, RETURNS, DETERMINISTIC, COUNT, IFNULL, SQL, DATA, READS, THEN, AFTER, FOR, EACH, ROW, OLD, NEW, ROUND, CONSTRAINT, FOREIGN, KEY, REFERENCES, PRIMARY, CHECK, TABLE, DEFAULT, DESC, UNION, ALL, OVER, WHILE, DO, LEAVE, EXISTS, BEFORE, OR, IDENTIFIED, GRANT, TO, LEFT, RIGHT},
+  keywordstyle=\color{blue}\bfseries,
+  morekeywords=[2]{INT, CHAR, VARCHAR, BOOLEAN, DATE, DECIMAL, ENUM, TIME, CASCADE, NULL, NOT, USER, PRIVILEGES, TRUE},
+  keywordstyle=[2]\color{red}\bfseries,
+  comment=[l]{--},
+  commentstyle=\color{gray}\ttfamily,
+  morestring=[b]',
+  stringstyle=\color{teal},
+  basicstyle=\ttfamily\small,
+  showstringspaces=false,
+  breaklines=true
+}
+
+\lstset
+{
+  language=SQL,
+  frame=single,
+  breaklines=true,
+  columns=flexible,
+  keepspaces=true,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  backgroundcolor=\color{white}
+}
+\newcommand{\sql}[1]
+{
+  \begin{lstlisting}[language=sql]
+    #1
+  \end{lstlisting}
+}
+\newcommand{\python}[1]
+{
+  \begin{lstlisting}[language=python]
+    #1
+  \end{lstlisting}
+}
+\AtBeginDocument{\counterwithin{lstlisting}{section}}
+
+\begin{document}
+\fancyfoot{}
+\coverpage\clearpage
+
+\tableofcontents\clearpage
+% \listoffigures\clearpage
+\setcounter{page}{1}
+\fancyfoot[L]{\scriptsize \ttfamily Specialized Project\\1$^{\texttt{st}}$ Semester -- Academic year 2026-2027}
+\fancyfoot[R]{\scriptsize \ttfamily Page {\thepage}/\pageref{LastPage}}
+
+% \section{Motivation and Limitations}
+
+% While deep learning architectures show theoretical promise in equity forecasting, transitioning these models to deployable pipelines requires robust MLOps frameworks, ranking-aware objectives, and strict validation protocols. This project develops an end-to-end engineering pipeline to evaluate a hybrid temporal-attention model under rigid computational constraints.
+
+% \textbf{Explicit Limitations:}\\
+% The data universe is the intersection of 413 S\&P 500 equities possessing complete, continuous daily split- and dividend-adjusted OHLCV history from 2020-01-01 onward. No attempt is made to reconstruct delisted or merged names; therefore, a structural survivorship bias is present and acknowledged. Intra-series missing bars or trading suspensions are strictly forward-filled to prevent look-ahead bias. Additionally, sector definitions rely on static, current GICS Level 1 assignments, acting as an acknowledged approximation.
+
+% Consequently, all financial metrics serve solely to validate mechanical pipeline health and must not be interpreted as deployable alpha. The data layer is decoupled, allowing a survivorship-free point-in-time database to be substituted without altering the core pipeline code.
+
+% \section{Phase 1: Signal Generation and MLOps Validation}
+
+% This phase establishes a point-in-time data pipeline, trains the hybrid architecture against strict baselines, and utilizes Explainable AI to characterize logic shifts across volatility regimes.
+
+% \textbf{Target Residualization \& Z-Scoring:}\\
+% The target is a 5-day forward excess return residualized against a multi-factor risk model to isolate asset-specific price-volume dynamics:
+
+% \begin{equation}
+%   y_{i,t} = r_{i,t+5} - \sum_{k} \hat{\beta}_{i,k,t} f_{k,t+5}
+% \end{equation}
+
+% Returns ($r$) are total returns adjusted for splits and dividends. Daily Fama-French factor returns (Market, SMB, HML) are obtained from the Kenneth French Data Library. The 5-day forward factor returns are compounded daily:\\
+% \[
+%   f_{k,t+5} = \prod_{s=1}^{5}(1+f_{k,t+s})-1
+% \]
+
+% The Volatility factor is constructed as the return differential between the bottom and top quintiles of trailing 60-day realized volatility, computed point-in-time. Exposures ($\hat{\beta}$) are estimated using strictly data from $t-126$ to $t$.
+
+% The target is then cross-sectionally z-scored per date $t$:\\
+% \[
+%   \tilde{y}_{i,t} = \frac{y_{i,t} - \mu_t}{\sigma_t}
+% \]
+
+% \textbf{Architecture Specifications:}\\
+% The network accepts input tensors of shape $[Batch\_Dates, 413, 60, 15]$. The LSTM is applied independently per stock, treating the stock dimension as part of the batch; no cross-sectional information enters the network until the Transformer layer.
+
+% The 2-layer LSTM's final hidden state is concatenated with a learned 32-dimensional static Stock ID embedding. This feeds a 2-layer, 4-head Transformer encoder (feedforward dimension 128) operating across the cross-section.
+
+% \begin{quote}
+%   \textbf{Note:} The performance difference between models with and without the Stock ID embedding will be reported as a primary ablation finding to explicitly monitor for survivor-universe memorization.
+% \end{quote}
+
+% \textbf{Training \& Capacity Ablation:}\\
+% The optimizer is AdamW with a cosine learning rate schedule and a batch size of 32 dates. The current experimental baseline uses hidden size 256; the formal capacity ablation searches over $\{64, 128, 256\}$ within the nested validation loop. Dropout is treated as a continuous hyperparameter searched over $[0.1, 0.5]$ (with an exploratory run initialization of 0.1912).
+
+% \textbf{Hybrid AlphaLoss Formulation:}\\
+% The objective function combines MSE with a pairwise hinge loss penalizing rank inversions. Let $P_t$ and $Q_t$ represent the top and bottom 10\% of predicted scores on date $t$. The ranking loss is computed separately for each date $t$ and averaged across dates (deciles are never pooled across dates):
+
+% \begin{equation}
+%   L_{\text{rank},t} = \frac{1}{\vert P_t \vert \vert Q_t \vert} \sum_{i \in P_t} \sum_{j \in Q_t} \max\left(0,\; \alpha - (\tilde{y}_{i,t} - \tilde{y}_{j,t})\right)
+% \end{equation}
+
+% The margin $\alpha \in \{0.1, 0.25\}$ is in z-score units. The total loss is $L_{\text{total},t} = L_{\text{rank},t} + \lambda L_{\text{MSE},t}$, with $\lambda \in \{0.1, 0.5, 1.0\}$ selected in the inner walk-forward loop.
+
+% \textbf{Validation Protocol:}\\
+% Evaluation utilizes an expanding 5-fold Purged Walk-Forward (approx. 12-month test windows, 5-day purge, 20-day embargo). Optuna hyperparameter optimization is performed exclusively on the inner training folds. The outer test folds remain completely untouched until after the architecture and hyperparameters are firmly locked.
+
+% \textbf{Regime-Conditioned XAI Diagnostics:}\\
+% Data is segmented into High/Low regimes based on the trailing 60-day median of market-wide realized volatility, computed point-in-time. PyTorch Integrated Gradients are computed on a 5000-sample subset. LightGBM surrogate fidelity is evaluated via Spearman rank correlation between neural network and surrogate outputs. Attributions are interpreted strictly as descriptive logic shifts.
+
+% \section{Phase 2: Constrained Portfolio Construction}
+
+% This phase translates the out-of-sample predictions from the locked final walk-forward test folds of Phase 1 into a simulated portfolio using convex optimization.
+
+% \textbf{Convex Optimization Engine:}\\
+% Out-of-sample predictions drive a single convex objective utilizing Ledoit-Wolf covariance shrinkage ($\Sigma$):
+
+% \begin{equation}
+%   \max_{w} w^T\alpha - \lambda w^T\Sigma w - \gamma TC(w, w_{\text{prev}})
+% \end{equation}
+
+% \textbf{Transaction Costs (TCA) \& Constraints:}\\
+% To accurately capture non-linear scale dynamics, transaction costs integrate both a linear spread term and a quadratic market impact term:
+
+% \begin{equation}
+%   TC(w,w_{\text{prev}}) = \sum_i \left[ c_{\text{spread},i} \left\lvert \Delta w_i \right\rvert + c_{\text{impact},i} \left(\frac{\Delta w_i}{ADV_i}\right)^2 \right]
+% \end{equation}
+
+% An explicit turnover constraint $\Vert w - w_{\text{prev}} \Vert_1 \leq \tau$ is enforced.
+
+% \textbf{Strict Risk Neutralization:}
+% \begin{itemize}
+%   \item Dollar neutrality is enforced as a hard equality constraint ($\sum_i w_i = 0$).
+%   \item Gross leverage bounds ($\Vert w \Vert_1 \leq 2.0$) and individual position limits ($-0.05 \leq w_i \leq 0.05$) are applied.
+%   \item Factor neutrality uses inequality constraints ($\vert X^T w \vert \leq 0.1$) for the exact Fama-French factors (Market, SMB, HML) and the Volatility factor defined in Phase 1.
+%   \item Sector constraints utilize static GICS Level 1 dummy variables.
+% \end{itemize}
+
+% \textbf{Engineering Validation (Paper Trading):}\\
+% The end-to-end pipeline is deployed to a brokerage API. Paper trading results are entirely excluded from financial conclusions, acting solely as validation of order routing and system orchestration.
+
+% \section{Engineering KPIs and Secondary / Non-Inferential Diagnostics}
+
+% All statistical diagnostics are reported as Mean $\pm$ Standard Deviation across the five outer test folds. Baseline models (Naive Momentum, ElasticNet, LightGBM, Pure MLP, Pure LSTM, Pure Transformer) are evaluated on exactly the same folds and dates.
+
+% \textbf{Engineering Targets:}
+% \begin{itemize}
+%   \item Feature computation throughput $< 180$ seconds for the full 6-year panel
+%   \item Inference latency $< 50$ms per 413-stock batch
+%   \item Fully versioned experiment tracking with pinned dependencies and seed control (acknowledging standard GPU nondeterminism)
+% \end{itemize}
+
+% \textbf{Statistical Diagnostics:}
+% \begin{itemize}
+%   \item Out-of-Sample Purged Mean IC
+%   \item IC Information Ratio (ICIR)
+%   \item \% positive IC periods
+%   \item Newey-West adjusted t-statistics
+%   \item A Deflated Sharpe Ratio (or Probability of Backtest Overfitting) will be reported to rigorously control for multiple testing bias
+% \end{itemize}
+
+% \textbf{Secondary / Non-Inferential Economic Diagnostics:}\\
+% Acknowledging the strict limitations of the dataset, these metrics serve only to proxy execution friction mechanics:
+% \begin{itemize}
+%   \item Long-short decile spread monotonicity
+%   \item Annualized turnover
+%   \item Post-cost Sharpe Ratio
+%   \item The impact of turnover/spread costs on net returns
+% \end{itemize}
+\section{Motivation, Research Gaps, and Research Questions}
+
+\subsection{Context and Motivation}
+
+Deep learning architectures show immense theoretical promise in equity forecasting. Models such as LSTMs and Transformers can effectively capture nonlinear structures and complex dependencies embedded in financial time series, increasingly outperforming shallow machine learning models in asset return prediction~\cite{Ellery2025}. However, transitioning these highly parameterized models from theoretical environments to deployable pipelines requires robust MLOps frameworks, ranking-aware objectives, and strict validation protocols.
+
+The current intersection of deep learning and quantitative finance faces a severe deployment gap. While academic literature frequently demonstrates superior theoretical precision in capturing temporal dependencies, real-world alpha generation requires modeling continuous cross-sectional dynamics rather than isolated time series. Furthermore, the true engineering challenge lies not in architectural complexity, but in strictly controlling for data constraints, mitigating data leakage, and constructing resilient pipelines capable of interacting with live convex optimization engines. Building this infrastructure under strict computational constraints is a critical engineering requirement.
+
+\subsection{Research Gaps}
+
+\textbf{Gap 1 -- The disconnection between pointwise forecasting and ranking-aware portfolio construction.} The vast majority of deep learning financial forecasting models optimize pointwise losses (such as Mean Squared Error), treating each asset's return prediction independently. However, cross-sectional strategies generate alpha by trading assets against each other -- buying the top decile and selling the bottom decile. As demonstrated by Poh et al.~\cite{Poh2020}, utilizing Learning-to-Rank (LTR) algorithms and pairwise losses over pointwise losses substantially improves the trading performance of cross-sectional strategies by capturing the relational listwise structure of the instruments. Despite this, there is a lack of end-to-end MLOps architectures that natively integrate hybrid ranking loss formulations (e.g., combining MSE with pairwise hinge loss) directly inside strict walk-forward validation loops.
+
+\textbf{Gap 2 -- Engineering validation under data constraints and multiple-testing bias.} Much of the existing literature abstracts away the mechanical friction of the market, assuming frictionless execution and perfect point-in-time data. Furthermore, the advent of high-performance computing allows analysts to test millions of hyperparameter configurations, inevitably leading to backtest overfitting. As established by Bailey and L\'opez de Prado~\cite{BaileyLopezdePrado2014}, failing to control for the number of trials leads to overly optimistic performance expectations. There is a critical engineering need for pipelines that natively default to deflated statistical metrics (such as the Deflated Sharpe Ratio) to strictly separate legitimate algorithmic edges from statistical flukes generated by hyperparameter optimization sweeps.
+
+\subsection{Research Questions}
+
+\textbf{Central Research Question:}\\
+Can an end-to-end MLOps pipeline successfully engineer, validate, and constrain a hybrid temporal-attention (LSTM-Transformer) architecture for cross-sectional equity ranking, and accurately translate its out-of-sample predictions into a strictly risk-neutralized portfolio under rigid computational and data constraints?
+
+\textbf{Phase 1 Research Questions (Signal Generation and MLOps Validation):}
+\begin{itemize}
+  \item RQ1.1: How does a hybrid AlphaLoss formulation -- combining standard MSE with a pairwise hinge loss penalizing rank inversions -- improve the monotonic separation of predicted deciles compared to a pure pointwise MSE objective?
+  \item RQ1.2: What is the quantitative impact of concatenating a learned 32-dimensional static Stock ID embedding to the LSTM's hidden state prior to the cross-sectional Transformer encoder, and does this specific ablation indicate structural survivorship-universe memorization?
+\end{itemize}
+
+\textbf{Phase 2 Research Questions (Constrained Portfolio Construction and Analytics):}
+\begin{itemize}
+  \item RQ2.1: When transitioning from raw signals to a convex optimization engine utilizing Ledoit-Wolf covariance shrinkage, how much do modeled transaction costs (integrating both a linear spread term and a quadratic market impact term) degrade the idealized portfolio performance?
+  \item RQ2.2: Following an expanding 5-fold Purged Walk-Forward evaluation regime, to what degree does the application of the Deflated Sharpe Ratio mathematically reduce the perceived out-of-sample performance by strictly controlling for the multiple-testing bias inherent in the Optuna optimization sweeps?
+\end{itemize}
+
+\subsection{Scope and Limitations}
+
+\textbf{Data Universe Constraints:} The analysis is strictly constrained to the intersection of 413 S\&P 500 equities possessing complete, continuous daily split- and dividend-adjusted OHLCV history from 2020-01-01 onward.
+
+\textbf{Structural Bias Acknowledgment:} No attempt is made to reconstruct delisted or merged names; therefore, a structural survivorship bias is present and explicitly acknowledged. Additionally, sector definitions rely on static, current GICS Level 1 assignments, acting as an acknowledged approximation.
+
+\textbf{Leakage Prevention:} Intra-series missing bars or trading suspensions are strictly forward-filled to prevent look-ahead bias.
+
+\textbf{Nature of Results:} All financial metrics serve solely to validate mechanical pipeline health and must not be interpreted as deployable alpha.
+
+\textbf{System Validation vs. Inferential Claims:} The pipeline will be deployed to a brokerage API for engineering validation (paper trading); however, these paper trading results are entirely excluded from financial conclusions, acting solely as validation of order routing and system orchestration.
+
+\textbf{Decoupled Architecture:} The data layer is intentionally decoupled; this design ensures that a survivorship-free point-in-time database can be substituted in the future without altering the core pipeline code.
+\section{Phase 1 (Specialized Project): Signal Generation, Hybrid AlphaLoss, and MLOps Validation Pipeline}
+
+\textbf{Description:} \\
+Phase 1 builds the core predictive layer of the entire system: an end-to-end MLOps pipeline that transforms raw OHLCV time series and factor data into strictly validated cross-sectional equity rankings. The architectural principle throughout is to enforce rigorous chronological integrity; the data layer is completely decoupled, ensuring strict forward-filling of intra-series missing bars to prevent look-ahead bias. The pipeline is organized into five functional layers:
+\begin{enumerate}
+  \item \textbf{Target Residualization \& Cross-Sectional Z-Scoring:} Extracts a 5-day forward excess return residualized against a multi-factor risk model (Fama-French Market, SMB, HML, and Volatility factors) to isolate asset-specific price-volume dynamics. According to Fama and French~\cite{FamaFrench1993}, extracting common risk factor exposures is necessary to isolate true idiosyncratic returns (alpha) from systematic market betas.
+  \item \textbf{Tensor Construction:} Formulates structured temporal-cross-sectional input tensors of shape $[\text{Batch\_Dates}, 413, 60, 15]$.
+  \item \textbf{Hybrid Temporal-Attention Architecture:} Applies a 2-layer LSTM independently per stock, concatenates a 32-dimensional static Stock ID embedding, and feeds the resulting states into a 2-layer, 4-head Transformer encoder operating across the cross-section.
+  \item \textbf{Model Training \& AlphaLoss Formulation:} Optimizes a custom objective function combining Mean Squared Error (MSE) with a pairwise hinge loss penalizing rank inversions between the top and bottom 10\% of predictions.
+  \item \textbf{Validation \& Explainability:} Executes an expanding 5-fold Purged Walk-Forward validation to prevent serial correlation leakage, followed by regime-conditioned Explainable AI (XAI) mapping.
+\end{enumerate}
+
+The most important data product of Phase 1 is the locked sequence of out-of-sample predictions across the walk-forward test folds, along with the ablation results isolating the effect of the static Stock ID embedding; this is a mandatory input for Phase 2 optimization.
+
+\vspace{0.5em}
+\textbf{Tasks:}
+\begin{itemize}
+  \item \textbf{Task 1.1 -- Point-in-Time Data Gateway and Target Residualization.} Survey and filter the S\&P 500 universe to the 413 equities possessing complete, continuous OHLCV history from 2020-01-01. Construct the 5-day forward target return:
+        \[
+          y_{i,t} = r_{i,t+5} - \sum_{k}\hat{\beta}_{i,k,t}f_{k,t+5}
+        \]
+        strictly utilizing data from $t-126$ to $t$ for exposure estimation. Cross-sectionally z-score the target per date $t$. Establish the Fama-French factor ingestion pipeline from the Kenneth French Data Library and dynamically compute the Volatility factor based on the trailing 60-day realized volatility differential.
+
+  \item \textbf{Task 1.2 -- Architecture Implementation and Hybrid AlphaLoss.} Implement the hybrid LSTM-Transformer network. Configure the 2-layer LSTM (treating the stock dimension as part of the batch), inject the 32-dimensional Stock ID embedding, and construct the 2-layer, 4-head cross-sectional Transformer (feedforward dimension 128). Implement the custom hybrid loss function:
+        \[
+          L_{\text{total},t} = L_{\text{rank},t} + \lambda L_{\text{MSE},t}
+        \]
+        where $L_{\text{rank},t}$ calculates the pairwise hinge loss between the top ($P_t$) and bottom ($Q_t$) deciles with margin $\alpha \in \{0.1, 0.25\}$. Ensure deciles are never pooled across dates during loss computation.
+
+  \item \textbf{Task 1.3 -- Purged Walk-Forward Validation and Capacity Ablation.} Construct the expanding 5-fold Purged Walk-Forward validation framework (approx. 12-month test windows). Implement a 5-day purge and a 20-day embargo between train and test sets. As mathematically proven by López de Prado~\cite{LopezdePrado2018}, standard k-fold cross-validation fails in finance due to serial correlation; purging and embargoing are strictly required to prevent leakage. Execute the capacity ablation loop over hidden sizes $\{64, 128, 256\}$ and dropout $[0.1, 0.5]$ exclusively on inner training folds using Optuna. Evaluate against strict baseline models (Naive Momentum, ElasticNet, LightGBM, Pure MLP, Pure LSTM, Pure Transformer) on exact matching folds.
+
+  \item \textbf{Task 1.4 -- Regime-Conditioned Explainable AI (XAI) Diagnostics.} Segment the validation data into High/Low volatility regimes based on the trailing 60-day median of market-wide realized volatility. Apply PyTorch Integrated Gradients -- an attribution method established by Sundararajan et al.~\cite{Sundararajan2017} that guarantees sensitivity and implementation invariance -- on a 5000-sample subset to characterize model logic shifts. Evaluate LightGBM surrogate fidelity via Spearman rank correlation between neural network and surrogate outputs.
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{Deliverables Phase 1:}
+\begin{enumerate}
+  \item Source code for the point-in-time data pipeline, Hybrid AlphaLoss function, and strictly embargoed model training loop, with fully versioned experiment tracking (pinning dependencies and fixing seeds).
+  \item Benchmark dataset: ``Out-of-Sample Predictions vs. Residualized Targets,'' representing the raw predictions across the 5 outer test folds.
+  \item Technical report on the capacity ablation findings, explicitly documenting the performance differential caused by the Stock ID embedding to monitor for survivor-universe memorization.
+  \item Regime-Conditioned XAI diagnostic report visualizing the shifts in Integrated Gradient feature attributions across high and low volatility periods.
+\end{enumerate}
+
+
+\section{Phase 2 (Graduation Project): Constrained Portfolio Construction and Engineering Validation}
+
+\textbf{Description:} \\
+Phase 2 transitions the engineering focus from raw signal generation to execution mechanics, translating out-of-sample predictions from the final, locked walk-forward test folds (produced in Phase 1) into a simulated, risk-neutral portfolio. The core challenge lies in the mathematically rigorous reconciliation of competing objectives: maximizing exposure to the deep learning alpha signal, strictly penalizing transaction costs, and maintaining robust risk controls via convex optimization. The process combines a core convex optimization engine with an external API orchestration layer. A single convex objective function is constructed to balance expected alpha returns against covariance risk and non-linear market impact. Crucially, this phase is designed to demonstrate that machine learning predictions retain robustness even after being subjected to realistic market frictions, which are modeled explicitly rather than assumed negligible.
+
+\vspace{0.5em}
+\textbf{Tasks:}
+\begin{itemize}
+  \item \textbf{Task 2.1 -- Convex Optimization Engine and Covariance Shrinkage.} Implement the convex portfolio objective:
+        \[
+          \max_{w} \; w^T \alpha - \lambda w^T \Sigma w - \gamma \, TC(w, w_{\text{prev}})
+        \]
+        where $\alpha$ represents alpha forecasts, $\Sigma$ is the risk covariance, and $TC(\cdot)$ the transaction cost function. Estimate $\Sigma$ using Ledoit-Wolf shrinkage~\cite{LedoitWolf2004}, which addresses high-dimensional covariance ill-conditioning by shrinking the sample matrix toward a structured estimator (e.g., constant correlation), ensuring optimizer stability and minimizing noise-induced error as theoretically proven.
+
+  \item \textbf{Task 2.2 -- Non-Linear Transaction Cost (TCA) Modeling.} To model realistic execution friction, define transaction costs as
+        \[
+          TC(w, w_{\text{prev}}) = \sum_{i} \left[ c_{\text{spread},i}|\Delta w_i| + c_{\text{impact},i} \left( \frac{\Delta w_i}{ADV_i} \right)^2 \right]
+        \]
+        with $\Delta w_i = w_i - w_{\text{prev},i}$ and $ADV_i$ the average daily dollar volume. As shown by Almgren and Chriss~\cite{AlmgrenChriss2000}, quadratic (or convex) impact penalizes excessive instantaneous liquidity demand. Explicitly impose turnover constraints: $||w - w_{\text{prev}}||_1 \le \tau$.
+
+  \item \textbf{Task 2.3 -- Strict Risk Neutralization.} Encode investment mandates into mathematically exact equality and inequality constraints for the solver:
+        \begin{itemize}
+          \item \textit{Dollar neutrality as equality:} $\sum_i w_i = 0$.
+          \item \textit{Gross leverage bounds:} $||w||_1 \leq 2.0$.
+          \item \textit{Individual position limits:} $-0.05 \leq w_i \leq 0.05$.
+          \item \textit{Factor neutrality (inequality):} $|X^T w| \leq 0.1$ for Fama-French Market, SMB, HML, and Volatility (as defined in Phase 1).
+          \item \textit{Sector constraints:} Use static GICS Level 1 dummy variables.
+        \end{itemize}
+
+  \item \textbf{Task 2.4 -- Engineering Validation (Paper Trading).} Deploy the pipeline to a brokerage API for live, forward-testing. Implement logic for real-time fill and latency tracking, order routing diagnostics, and robust state management. Paper trading results are strictly excluded from inferential conclusions, serving only to validate system orchestration and API reliability.
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{Deliverables Phase 2:}
+\begin{enumerate}
+  \item Source code for the convex optimization engine, the custom transaction cost modules, and the full brokerage API orchestration logic.
+  \item Quantitative report evaluating signal performance degradation through the transaction cost simulator (comparing pre-cost versus post-cost metrics).
+\end{enumerate}
+
+\section{Engineering KPIs and Statistical Diagnostics}
+
+To ensure the pipeline achieves production-grade standards and avoids statistical artifacts, a strict performance metric hierarchy is established. All statistical diagnostics are reported as mean $\pm$ standard deviation across the five outer test folds, and are compared directly to the predefined baselines (Naive Momentum, ElasticNet, LightGBM, Pure MLP, Pure LSTM, Pure Transformer) evaluated on the same samples.
+
+\textbf{Engineering Targets:}
+\begin{itemize}
+  \item \textbf{Throughput:} Feature computation for the complete 6-year panel finishes in under 180 seconds.
+  \item \textbf{Latency:} Inference latency below 50\,ms per 413-stock batch.
+  \item \textbf{Reproducibility:} Fully versioned experiment tracking, pinned dependencies, and fixed seeds (reproducibility maintained within the reality of GPU nondeterminism).
+\end{itemize}
+
+\textbf{Statistical Diagnostics:}
+\begin{itemize}
+  \item \textbf{Signal Power:} Out-of-sample Purged Mean IC and IC Information Ratio (ICIR). By Grinold's Fundamental Law of Active Management~\cite{Grinold1989}, the Information Coefficient (IC) -- the cross-sectional correlation between predictions and realized returns -- is the key mathematical driver of conditional strategy performance.
+  \item \textbf{Consistency:} Percentage of positive IC periods.
+  \item \textbf{Significance:} Newey-West adjusted t-statistics~\cite{NeweyWest1987} to correct for heteroskedasticity and autocorrelation. Conventional t-tests are not used as they inflate significance under time series dependence.
+  \item \textbf{Overfitting Control:} Report a Deflated Sharpe Ratio or Probability of Backtest Overfitting, rigorously controlling for multiple testing bias during hyperparameter search.
+\end{itemize}
+
+\textbf{Secondary / Non-Inferential Economic Diagnostics:}
+\begin{itemize}
+  \item Long-short decile spread monotonicity
+  \item Annualized turnover
+  \item Post-cost Sharpe Ratio
+  \item Impact of turnover and spread costs on net returns
+\end{itemize}
+
+\textit{Note:} All secondary metrics are interpreted solely as proxies for execution friction due to inherent dataset limitations (e.g., survivorship bias); they are not deployable alpha signals.
+
+\section{Risk and Mitigation}
+
+The transition of deep learning architectures from static datasets to time-series cross-sectional panels introduces severe inferential and infrastructural vulnerabilities. This section outlines the primary failure vectors inherent in financial MLOps pipelines and establishes strict engineering and statistical mitigations to ensure the integrity of the ablation studies and out-of-sample metrics.
+
+\subsection{Statistical and Inferential Risks}
+
+\textbf{Risk 1.1: Forward-Looking Data Leakage and Serial Correlation.} Financial time series are highly autocorrelated; standard $k$-fold cross-validation will inevitably leak future information into the training set, resulting in overly optimistic backtest performance. Furthermore, structural survivorship bias is present due to the static 413-stock universe constraint.
+
+\textit{Mitigation:} The pipeline strictly enforces a Purged Walk-Forward validation framework. Missing intra-series bars are strictly forward-filled. Additionally, the explicit ablation of the static Stock ID embedding serves as a diagnostic tripwire to detect whether the network is memorizing the survivor universe rather than learning generalizable cross-sectional dynamics.
+
+\textbf{Risk 1.2: Concept Drift and Non-Stationarity.} Financial markets frequently transition between distinct macroeconomic and volatility regimes. Deep learning models trained on historical distributions are highly susceptible to concept drift, where the underlying data-generating process shifts, degrading predictive accuracy~\cite{Dixon2020}.
+
+\textit{Mitigation:} The target variable is cross-sectionally z-scored per date to enforce stationarity across time. Furthermore, Phase 1 includes regime-conditioned Explainable AI (XAI) diagnostics, segmenting performance explicitly across high and low market-wide realized volatility periods. If the surrogate LightGBM model detects a total collapse in feature fidelity during regime shifts, the pipeline triggers a failure alert rather than executing trades.
+
+\subsection{Engineering and Optimization Risks}
+
+\textbf{Risk 2.1: Covariance Ill-Conditioning and Optimizer Instability.} In Phase 2, feeding deep learning predictions into a convex optimization engine frequently results in ``error maximization.'' If the sample covariance matrix is ill-conditioned, the optimizer will aggressively allocate capital to statistical noise, leading to extreme turnover and violated leverage constraints.
+
+\textit{Mitigation:} The optimizer strictly replaces the sample covariance matrix with a Ledoit-Wolf shrinkage estimator to mathematically bound the condition number. Furthermore, strict $L_1$ norm constraints (gross leverage bounds $||w||_1 \le 2.0$) and individual position limits ($-0.05 \le w_i \le 0.05$) act as hard fail-safes against unstable weight allocations.
+
+\textbf{Risk 2.2: GPU Nondeterminism and MLOps Reproducibility.} Deep learning frameworks (such as PyTorch) utilizing CUDA heavily rely on atomic operations that execute in a nondeterministic order, making exact reproducibility across different hardware clusters nearly impossible, even with fixed seeds~\cite{Picard2021}.
+
+\textit{Mitigation:} The MLOps pipeline implements strict version control of all dependencies and enforces deterministic algorithmic execution where supported by the CUDA backend (\texttt{torch.backends.cudnn.deterministic = True}). The project acknowledges standard GPU nondeterminism and mitigates its inferential impact by reporting all statistical diagnostics as Mean~$\pm$~Standard Deviation across multiple random initializations on the outer test folds.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{12}
+
+  \bibitem{AlmgrenChriss2000}
+  Almgren, R. and Chriss, N. (2000).
+  Optimal Execution of Portfolio Transactions.
+  \emph{Journal of Risk}.
+
+  \bibitem{BaileyLopezdePrado2014}
+  Bailey, D. H. and López de Prado, M. (2014).
+  The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting, and Non-Normality.
+
+  \bibitem{Dixon2020}
+  Dixon, M. F., Halperin, I., \& Bilokon, P. (2020).
+  \emph{Machine Learning in Finance: From Theory to Practice}.
+  Springer.
+
+  \bibitem{Ellery2025}
+  Ellery, C. (2025).
+  A Deep Learning-Based Model for Return Rate Prediction and Portfolio Optimization.
+  Preprints.
+
+  \bibitem{FamaFrench1993}
+  Fama, E. F. and French, K. R. (1993).
+  Common Risk Factors in the Returns on Stocks and Bonds.
+  \emph{Journal of Financial Economics}.
+
+  \bibitem{Grinold1989}
+  Grinold, R. C. (1989).
+  The Fundamental Law of Active Management.
+  \emph{The Journal of Portfolio Management}.
+
+  \bibitem{LedoitWolf2004}
+  Ledoit, O. and Wolf, M. (2004).
+  Honey, I Shrunk the Sample Covariance Matrix.
+  \emph{The Journal of Portfolio Management}.
+
+  \bibitem{LopezdePrado2018}
+  López de Prado, M. (2018).
+  \emph{Advances in Financial Machine Learning}.
+  John Wiley \& Sons.
+
+  \bibitem{NeweyWest1987}
+  Newey, W. K. and West, K. D. (1987).
+  A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix.
+  \emph{Econometrica}.
+
+  \bibitem{Picard2021}
+  Picard, D. (2021).
+  Torch.manual\_seed(3407) is all you need: On the influence of random seeds in deep learning architectures.
+  arXiv:2109.08203.
+
+  \bibitem{Poh2020}
+  Poh, D., et al. (2020).
+  Building Cross-Sectional Systematic Strategies by Learning to Rank.
+  arXiv:2012.07149.
+
+  \bibitem{Sundararajan2017}
+  Sundararajan, M., Taly, A., \& Yan, Q. (2017).
+  Axiomatic Attribution for Deep Networks.
+  Proceedings of the 34th International Conference on Machine Learning (ICML).
+
+\end{thebibliography}
+
+
+\end{document}

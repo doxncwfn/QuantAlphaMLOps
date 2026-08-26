@@ -1,0 +1,55 @@
+# Developer Environment
+.vscode/
+.venv/
+
+# Secret Environment Variables
+.env
+
+# Python Caches
+__pycache__/
+
+# Artifacts
+artifacts/
+db/
+factors/
+logs/
+metrics/
+notebooks/
+wandb/
+
+# Project References
+refs/
+
+# LaTeX 
+*.aux
+*.out
+*.log
+*.bbl
+*.blg
+*.brf
+*.fdb_latexmk
+*.fls
+*.lol
+*.lof
+*.lot
+*.lox
+*.nav
+*.snm
+*.synctex.gz
+*.toc
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.idx
+*.ilg
+*.ind
+*.ist
+*.maf
+*.mtc*
+*.bmc
+*.run.xml
+*.xdy
+# End of generated LaTeX auxiliary/output files
