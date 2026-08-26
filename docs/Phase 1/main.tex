@@ -1,0 +1,50 @@
+\documentclass[twoside,final]{hcmut-report}
+
+\begin{document}
+\fancyfoot{}
+\coverpage\clearpage
+
+\input{pre-report}
+\tableofcontents\clearpage
+\listoftables\listoffigures\clearpage
+
+\startreport
+
+\input{proposal}
+
+\newpage
+\part{Signal Generation \& MLOps Pipeline}
+
+\section{Data Processing Pipeline}
+\subsection{Raw Data Acquisition}
+\subsection{Data Transformation}
+\subsection{Feature Engineering}
+\subsection{Feature Extraction}
+\subsection{Feature Selection}
+\subsection{}
+
+\section{}
+
+\newpage
+\part{Portfolio Construction}
+
+\newpage
+\part{Appendixes}
+\section*{A. Data Ingestion Pipeline \& Data Integrity}
+\label{appendix_A}
+\subsection*{1 Data Collecting Pipeline}
+\subsection*{2 Exploratory Data Analysis}
+
+\section*{B. Evaluation Metrics Definitions}
+\label{appendix_B}
+\subsection*{1 Information Coefficient (IC)}
+\subsubsection*{1.1 Information Coefficient -- Information Ratio (IC-IR)}
+\subsection*{2 Ledoit-Wolf Shrinkage}
+\label{Ledoit-Wolf_shrinkage}
+
+\section*{C. Detail Implementation}
+
+\newpage
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
