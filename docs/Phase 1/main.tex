@@ -5,14 +5,32 @@
 \coverpage\clearpage
 
 \input{pre-report}
-\tableofcontents\clearpage
-\listoftables\listoffigures\clearpage
+\tableofcontents
+\clearpage
 
-\startreport
+\listoffigures
+\listoftables
+\part*{List of Abbreviations}
+\begin{acronym}
+    \acro{AI}{Artificial Intelligence}
+    \acro{API}{Application Programming Interface}
+    \acro{CUDA}{Compute Unified Device Architecture}
+    \acro{GICS}{Global Industry Classification Standard}
+    \acro{GPU}{Graphics Processing Unit}
+    \acro{IC}{Information Coefficient}
+    \acro{ICIR}{Information Coefficient Information Ratio}
+    \acro{LLMs}{Large Language Models}
+    \acro{LSTMs}{Long Short-Term Memory}
+    \acro{MLOps}{Machine Learning Operations}
+    % \acro{SHAP}{SHapley Additive exPlanations}
+    \acro{OHLCV}{Open-High-Low-Close-Volume}
+    \acro{XAI}{Explainable Artificial Intelligence}
+\end{acronym}
+\clearpage
 
-\input{proposal}
+\input{proposal.tex}
+\clearpage
 
-\newpage
 \part{Signal Generation \& MLOps Pipeline}
 
 \section{Data Processing Pipeline}
@@ -21,28 +39,17 @@
 \subsection{Feature Engineering}
 \subsection{Feature Extraction}
 \subsection{Feature Selection}
-\subsection{}
 
-\section{}
+\section{Model Architecture}
+\clearpage
 
-\newpage
-\part{Portfolio Construction}
+\input{performance.tex}
+\clearpage
 
-\newpage
-\part{Appendixes}
-\section*{A. Data Ingestion Pipeline \& Data Integrity}
-\label{appendix_A}
-\subsection*{1 Data Collecting Pipeline}
-\subsection*{2 Exploratory Data Analysis}
+\part{Portfolio Construction} % Phase 2
 
-\section*{B. Evaluation Metrics Definitions}
-\label{appendix_B}
-\subsection*{1 Information Coefficient (IC)}
-\subsubsection*{1.1 Information Coefficient -- Information Ratio (IC-IR)}
-\subsection*{2 Ledoit-Wolf Shrinkage}
-\label{Ledoit-Wolf_shrinkage}
-
-\section*{C. Detail Implementation}
+\clearpage
+\input{appendixes.tex}
 
 \newpage
 \bibliographystyle{plainnat}
