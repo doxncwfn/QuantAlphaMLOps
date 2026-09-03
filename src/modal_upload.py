@@ -17,7 +17,7 @@ def main():
             csv_files = list(db_dir.glob("*.csv"))
             print(f"Uploading {len(csv_files)} files from local {db_dir}...")
             for filepath in csv_files:
-                batch.put_file(filepath, f"/db/{filepath.name}")
+                batch.put_file(filepath, f"/data/{filepath.name}")
         else:
             print(f"Warning: Local directory {db_dir} not found.")
             

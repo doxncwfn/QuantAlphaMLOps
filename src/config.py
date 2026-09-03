@@ -2,8 +2,8 @@ import torch
 
 CONFIG = {
     # Local Directory
-    # 'data_dir': 'db',
-    # 'fama_french_dir': 'factors',
+    # 'data_dir': 'data/yahoo',
+    # 'fama_french_dir': 'data',
     # 'ckpt_dir': 'artifacts/checkpoints',
 
     # Modal Directory

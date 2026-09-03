@@ -10,7 +10,7 @@ __pycache__/
 
 # Artifacts
 artifacts/
-db/
+data/
 factors/
 logs/
 metrics/

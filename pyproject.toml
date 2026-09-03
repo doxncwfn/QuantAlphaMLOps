@@ -1,0 +1,44 @@
+[project]
+name = "quant-alpha-mlops"
+version = "0.1.0"
+description = "Quantitative Alpha MLOps Platform"
+requires-python = ">=3.11"
+dependencies = [
+  # Ingestion & Market Data Clients
+  "alpaca-py>=0.30.0",
+  "databento>=0.40.0",
+  "exchange-calendars>=4.5.0",
+  "pandas-datareader>=0.10.0",
+  "requests>=2.32",
+  "yfinance>=0.2.66",
+  
+  # Data Engineering & Preprocessing
+  "numpy>=1.26.0,<2",
+  "pandas>=2.2",
+  "polars>=0.20.0",
+  "pyarrow>=17.0",
+  
+  # Deep Learning Engine
+  "pytorch-lightning>=2.2.0",
+  "torch>=2.2.0",
+
+  # MLOps, Tracking, & Optimization
+  "optuna>=3.5.0",
+  "wandb>=0.16.0",
+
+  # Explainable AI (XAI) & Baselines
+  "captum>=0.7.0",
+  "lightgbm>=4.3.0",
+  "scipy>=1.12.0",
+
+  # Plotting & Visualization
+  "matplotlib>=3.8.0",
+  "seaborn>=0.13.0",
+
+  # Infrastructure & Utilities
+  "modal==1.5.3",
+  "python-dotenv>=1.0.1"
+]
+
+[tool.uv]
+default-groups = []

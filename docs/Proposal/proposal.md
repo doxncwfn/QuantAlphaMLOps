@@ -26,7 +26,7 @@ $f_{k,t+5} = \prod_{s=1}^{5}(1+f_{k,t+s})-1$.
 The Volatility factor is constructed as the return differential between the bottom and top quintiles of trailing 60-day realized volatility, computed point-in-time. Exposures ($\hat{\beta}$) are estimated using strictly data from $t-126$ to $t$.
 
 The target is then cross-sectionally z-scored per date $t$:  
-$$\tilde{y}_{i,t} = \frac{y_{i,t} - \mu_t}{\sigma_t}$$.
+$$\tilde{y}_{i,t} = \dfrac{y_{i,t} - \mu_t}{\sigma_t}$$.
 
 **Architecture Specifications:**  
 The network accepts input tensors of shape $[Batch\_Dates, 413, 60, 15]$. The LSTM is applied independently per stock, treating the stock dimension as part of the batch; no cross-sectional information enters the network until the Transformer layer.
@@ -42,7 +42,7 @@ The optimizer is AdamW with a cosine learning rate schedule and a batch size of 
 The objective function combines MSE with a pairwise hinge loss penalizing rank inversions. Let $P_t$ and $Q_t$ represent the top and bottom 10% of predicted scores on date $t$. The ranking loss is computed separately for each date $t$ and averaged across dates (deciles are never pooled across dates):
 
 $$
-L_{\text{rank},t} = \frac{1}{\vert{}P_t\vert{}\vert{}Q_t\vert{}} \sum_{i \in P_t} \sum_{j \in Q_t} \max\left(0,\; \alpha - (\tilde{y}_{i,t} - \tilde{y}_{j,t})\right)
+L_{\text{rank},t} = \dfrac{1}{\vert{}P_t\vert{}\vert{}Q_t\vert{}} \sum_{i \in P_t} \sum_{j \in Q_t} \max\left(0,\; \alpha - (\tilde{y}_{i,t} - \tilde{y}_{j,t})\right)
 $$
 
 The margin $\alpha \in \{0.1, 0.25\}$ is in z-score units. The total loss is $L_{\text{total},t} = L_{\text{rank},t} + \lambda L_{\text{MSE},t}$, with $\lambda \in \{0.1, 0.5, 1.0\}$ selected in the inner walk-forward loop.
@@ -68,7 +68,7 @@ $$
 To accurately capture non-linear scale dynamics, transaction costs integrate both a linear spread term and a quadratic market impact term:
 
 $$
-TC(w,w_{\text{prev}}) = \sum_i \left[ c_{\text{spread},i} \vert{}\Delta w_i\vert{} + c_{\text{impact},i} \left(\frac{\Delta w_i}{ADV_i}\right)^2 \right]
+TC(w,w_{\text{prev}}) = \sum_i \left[ c_{\text{spread},i} \vert{}\Delta w_i\vert{} + c_{\text{impact},i} \left(\dfrac{\Delta w_i}{ADV_i}\right)^2 \right]
 $$
 
 An explicit turnover constraint $\vert{}\vert{}w - w_{\text{prev}}\vert{}\vert{}_1 \le \tau$ is enforced.
