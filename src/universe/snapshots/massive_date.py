@@ -21,6 +21,7 @@ class MassiveThrottledManager:
         params = {
             "date": target_date,
             "active": "true",
+            "market": "stocks",
             "limit": 1000,
             "apiKey": self.api_key
         }
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     try:
         api_token = get_valid_api_key()
         manager = MassiveThrottledManager(api_key=api_token)
-        target_day = "2003-12-31"
+        target_day = "2010-03-31"
 
         print(f"Processing point-in-time assets for: {target_day}...")
         historical_tickers = manager.get_active_symbols_on_date(target_day)

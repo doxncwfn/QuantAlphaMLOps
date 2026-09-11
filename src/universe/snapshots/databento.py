@@ -1,7 +1,8 @@
+import os
 import databento as db
 import pandas as pd
 
-client = db.Historical("db-8KgbFwEw4UvynW6SBkWVubyxejLEe")
+client = db.Historical(os.getenv("DATABENTO_API_KEY", ""))
 
 start_date = "2000-01-01"
 end_date = "2023-03-30"
