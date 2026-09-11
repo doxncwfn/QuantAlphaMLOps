@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+
 import polars as pl
 import pyarrow.parquet as pq
 
@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 def generate_availability_report():
     """Generates comprehensive markdown report at report/universe/availability_episode_report.md."""
-    logger.info("Generating availability episode diagnostic report at %s...", REPORT_MD_PATH)
+    logger.info(
+        "Generating availability episode diagnostic report at %s...", REPORT_MD_PATH
+    )
 
     df_spells = pl.read_csv(SPELLS_CSV_PATH)
     df_sec = pl.read_parquet(SECURITY_MASTER_PARQUET)
@@ -38,8 +40,12 @@ def generate_availability_report():
 
     # Security categories
     n_figi = df_sec.filter(pl.col("share_class_figi").is_not_null()).height
-    n_cik = df_sec.filter(pl.col("share_class_figi").is_null() & pl.col("cik").is_not_null()).height
-    n_unres = df_sec.filter(pl.col("security_id").str.starts_with("UNRESOLVED_") & pl.col("cik").is_null()).height
+    n_cik = df_sec.filter(
+        pl.col("share_class_figi").is_null() & pl.col("cik").is_not_null()
+    ).height
+    n_unres = df_sec.filter(
+        pl.col("security_id").str.starts_with("UNRESOLVED_") & pl.col("cik").is_null()
+    ).height
     total_sec_rows = df_sec.height
 
     # Episode stats
@@ -52,7 +58,9 @@ def generate_availability_report():
     # Multi-spell consolidation
     multi_spells = df_spells.group_by("ticker").len().filter(pl.col("len") > 1)
     multi_th = df_th.join(multi_spells.select("ticker"), on="ticker")
-    multi_agg = multi_th.group_by("ticker").agg(pl.col("security_id").n_unique().alias("n_sec"))
+    multi_agg = multi_th.group_by("ticker").agg(
+        pl.col("security_id").n_unique().alias("n_sec")
+    )
     same_sec_multi = multi_agg.filter(pl.col("n_sec") == 1).height
     reused_multi = multi_agg.filter(pl.col("n_sec") > 1).height
 
@@ -61,13 +69,20 @@ def generate_availability_report():
     total_expected_rows = meta.num_rows
 
     # Quick scan of expectation states
-    df_states = pl.scan_parquet(EXPECTED_SECURITY_DATES_PARQUET).group_by("expectation_state").len().collect()
-    state_map = dict(zip(df_states["expectation_state"].to_list(), df_states["len"].to_list()))
+    df_states = (
+        pl.scan_parquet(EXPECTED_SECURITY_DATES_PARQUET)
+        .group_by("expectation_state")
+        .len()
+        .collect()
+    )
+    state_map = dict(
+        zip(df_states["expectation_state"].to_list(), df_states["len"].to_list())
+    )
     n_obs_dates = state_map.get("OBSERVED_ACTIVE", 0)
     n_inf_dates = state_map.get("INFERRED_ACTIVE", 0)
     n_unk_dates = state_map.get("UNKNOWN", 0)
 
-    report_content = f"""# Security-Level Availability Episodes & Identity Audit Report
+    report_content = rf"""# Security-Level Availability Episodes & Identity Audit Report
 
 ## Executive Summary
 
@@ -86,9 +101,9 @@ The previous phase reported 40,833 total rows in `security_master.parquet`. We s
 
 | Security Identity Category | Entity Count | Share | Status / Semantic Interpretation |
 | :--- | :---: | :---: | :--- |
-| **`FIGI_BACKED`** | **{n_figi:,}** | {n_figi/total_sec_rows*100:.1f}% | **Confirmed Real-World Securities**: Authoritative Bloomberg OpenFIGI `share_class_figi`. |
-| **`CIK_BACKED_FALLBACK`** | **{n_cik:,}** | {n_cik/total_sec_rows*100:.1f}% | **Provisional CIK Identities**: Confirmed SEC issuer CIK, but lacking specific share-class FIGI. |
-| **`UNRESOLVED_SYNTHETIC`** | **{n_unres:,}** | {n_unres/total_sec_rows*100:.1f}% | **Synthetic Bookkeeping Buckets**: Distinct `UNRESOLVED_<hash>` created per unresolved spell. |
+| **`FIGI_BACKED`** | **{n_figi:,}** | {n_figi / total_sec_rows * 100:.1f}% | **Confirmed Real-World Securities**: Authoritative Bloomberg OpenFIGI `share_class_figi`. |
+| **`CIK_BACKED_FALLBACK`** | **{n_cik:,}** | {n_cik / total_sec_rows * 100:.1f}% | **Provisional CIK Identities**: Confirmed SEC issuer CIK, but lacking specific share-class FIGI. |
+| **`UNRESOLVED_SYNTHETIC`** | **{n_unres:,}** | {n_unres / total_sec_rows * 100:.1f}% | **Synthetic Bookkeeping Buckets**: Distinct `UNRESOLVED_<hash>` created per unresolved spell. |
 | **Total Security Master Records** | **{total_sec_rows:,}** | 100.0% | Combined registry (14,048 confirmed/provisional + {n_unres:,} synthetic buckets). |
 
 > **Audit Invariant**: The {n_unres:,} unresolved items are **not** separate real-world companies; they represent individual historical observation spells for which external public registries lack point-in-time identity records.
@@ -101,10 +116,10 @@ Consolidating observation spells across supported short gaps ($\le 2$ sessions) 
 
 | Episode State | Count | Percentage | Definition & Rule |
 | :--- | :---: | :---: | :--- |
-| **`OBSERVED_ACTIVE`** | **{n_observed_only:,}** | {n_observed_only/n_episodes*100:.1f}% | Continuous observation in Massive snapshots without gaps. |
-| **`INFERRED_CONTINUOUS`** | **{n_inferred:,}** | {n_inferred/n_episodes*100:.1f}% | Multi-spell security bridged across $\le 2$ session gaps with confirmed identical FIGI/CIK. |
-| **`CONTAINS_CORRUPTED_DATES`** | **{n_corrupted:,}** | {n_corrupted/n_episodes*100:.1f}% | Episode spans across one of the 3 corrupted snapshot dates (`2009-10-29`, `2010-03-30`, `2010-03-31`). |
-| **`PROVISIONAL_UNRESOLVED`** | **{n_unres_ep:,}** | {n_unres_ep/n_episodes*100:.1f}% | Unresolved synthetic identity bucket (kept strictly isolated per spell). |
+| **`OBSERVED_ACTIVE`** | **{n_observed_only:,}** | {n_observed_only / n_episodes * 100:.1f}% | Continuous observation in Massive snapshots without gaps. |
+| **`INFERRED_CONTINUOUS`** | **{n_inferred:,}** | {n_inferred / n_episodes * 100:.1f}% | Multi-spell security bridged across $\le 2$ session gaps with confirmed identical FIGI/CIK. |
+| **`CONTAINS_CORRUPTED_DATES`** | **{n_corrupted:,}** | {n_corrupted / n_episodes * 100:.1f}% | Episode spans across one of the 3 corrupted snapshot dates (`2009-10-29`, `2010-03-30`, `2010-03-31`). |
+| **`PROVISIONAL_UNRESOLVED`** | **{n_unres_ep:,}** | {n_unres_ep / n_episodes * 100:.1f}% | Unresolved synthetic identity bucket (kept strictly isolated per spell). |
 
 ---
 
@@ -114,9 +129,9 @@ The expected universe matrix covers **{total_expected_rows:,} date-level securit
 
 | Expectation State | Total Records | Percentage | Reason / Universe Semantic |
 | :--- | :---: | :---: | :--- |
-| **`OBSERVED_ACTIVE`** | **{n_obs_dates:,}** | {n_obs_dates/total_expected_rows*100:.1f}% | `DIRECT_MASSIVE_SNAPSHOT`: Security directly present in historical snapshot. |
-| **`INFERRED_ACTIVE`** | **{n_inf_dates:,}** | {n_inf_dates/total_expected_rows*100:.1f}% | `SHORT_GAP_INFERRED_YAHOO_VERIFIED`: Inferred active across 1–2 session gap; Yahoo verified. |
-| **`UNKNOWN`** | **{n_unk_dates:,}** | {n_unk_dates/total_expected_rows*100:.1f}% | `CORRUPTED_SOURCE_SNAPSHOT`: On 2009-10-29, 2010-03-30, 2010-03-31. Not fabricated as active. |
+| **`OBSERVED_ACTIVE`** | **{n_obs_dates:,}** | {n_obs_dates / total_expected_rows * 100:.1f}% | `DIRECT_MASSIVE_SNAPSHOT`: Security directly present in historical snapshot. |
+| **`INFERRED_ACTIVE`** | **{n_inf_dates:,}** | {n_inf_dates / total_expected_rows * 100:.1f}% | `SHORT_GAP_INFERRED_YAHOO_VERIFIED`: Inferred active across 1–2 session gap; Yahoo verified. |
+| **`UNKNOWN`** | **{n_unk_dates:,}** | {n_unk_dates / total_expected_rows * 100:.1f}% | `CORRUPTED_SOURCE_SNAPSHOT`: On 2009-10-29, 2010-03-30, 2010-03-31. Not fabricated as active. |
 
 ---
 
@@ -140,7 +155,7 @@ The expected universe matrix covers **{total_expected_rows:,} date-level securit
   They formed two separate availability episodes (`EP_UNRESOLVED_ACMR_01_01` and `EP_BBG00HPSG942_01`).
 
 ### D. How many multi-spell tickers can safely be consolidated at the security level?
-- Exactly **{same_sec_multi:,} multi-spell tickers ({same_sec_multi/multi_spells.height*100:.1f}%)** have confirmed identical security identities across spells.
+- Exactly **{same_sec_multi:,} multi-spell tickers ({same_sec_multi / multi_spells.height * 100:.1f}%)** have confirmed identical security identities across spells.
 - **Flagship case**: `CMCSA` (Comcast Corporation) consolidated its 44 observation spells into **1 single continuous availability episode** (`EP_BBG001S5PXL2_01`).
 
 ### E. How should short Massive gaps be represented?

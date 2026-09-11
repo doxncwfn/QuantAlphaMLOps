@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 import polars as pl
 import requests
@@ -23,11 +22,8 @@ class PolygonProvider(BaseMarketDataProvider):
         self.session = requests.Session()
 
     def fetch_daily_bars(
-        self,
-        ticker: str,
-        start_date: str,
-        end_date: str
-    ) -> Optional[pl.DataFrame]:
+        self, ticker: str, start_date: str, end_date: str
+    ) -> pl.DataFrame | None:
         if not self.api_key:
             return None
 
@@ -53,18 +49,26 @@ class PolygonProvider(BaseMarketDataProvider):
                 # bar: {v, vw, o, c, h, l, t, n}
                 ts = bar.get("t", 0) / 1000.0
                 dt_str = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
-                records.append({
-                    "date": dt_str,
-                    "open": float(bar.get("o", 0.0)),
-                    "high": float(bar.get("h", 0.0)),
-                    "low": float(bar.get("l", 0.0)),
-                    "close": float(bar.get("c", 0.0)),
-                    "adj_close": float(bar.get("c", 0.0)),
-                    "volume": float(bar.get("v", 0.0))
-                })
+                records.append(
+                    {
+                        "date": dt_str,
+                        "open": float(bar.get("o", 0.0)),
+                        "high": float(bar.get("h", 0.0)),
+                        "low": float(bar.get("l", 0.0)),
+                        "close": float(bar.get("c", 0.0)),
+                        "adj_close": float(bar.get("c", 0.0)),
+                        "volume": float(bar.get("v", 0.0)),
+                    }
+                )
 
             return pl.DataFrame(records)
 
-        except Exception as exc:
+        except (
+            requests.RequestException,
+            json.JSONDecodeError,
+            ValueError,
+            KeyError,
+            OSError,
+        ) as exc:
             logger.debug("Polygon query for %s failed: %s", tk_clean, exc)
             return None

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import polars as pl
 
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 class BatchAcquisitionEngine:
     def __init__(self, raw_dir: Path = RAW_MARKET_DIR):
         self.raw_dir = raw_dir
-        self.providers: Dict[str, BaseMarketDataProvider] = {
+        self.providers: dict[str, BaseMarketDataProvider] = {
             "YFINANCE": YFinanceProvider(),
             "POLYGON": PolygonProvider(),
             "ALPACA": AlpacaProvider(),
@@ -36,11 +35,17 @@ class BatchAcquisitionEngine:
         ticker: str,
         start_date: str,
         end_date: str,
-        provider_preference: Optional[List[str]] = None
-    ) -> Optional[Tuple[str, pl.DataFrame]]:
+        provider_preference: list[str] | None = None,
+    ) -> tuple[str, pl.DataFrame] | None:
         """Fetches daily bars for a security across preferred providers."""
         if provider_preference is None:
-            provider_preference = ["YFINANCE", "POLYGON", "ALPACA", "STOOQ", "TWELVEDATA"]
+            provider_preference = [
+                "YFINANCE",
+                "POLYGON",
+                "ALPACA",
+                "STOOQ",
+                "TWELVEDATA",
+            ]
 
         # Check existing raw files
         for p_name in provider_preference:
@@ -50,8 +55,13 @@ class BatchAcquisitionEngine:
                     df = pl.read_parquet(raw_path)
                     if df.height > 0:
                         return p_name, df
-                except Exception:
-                    pass
+                except (
+                    OSError,
+                    pl.exceptions.PolarsError,
+                    RuntimeError,
+                    ValueError,
+                ) as err:
+                    logger.debug("Failed reading cache %s: %s", raw_path, err)
 
         # Query provider sequence
         for p_name in provider_preference:
@@ -68,7 +78,18 @@ class BatchAcquisitionEngine:
                     raw_path = save_dir / "data.parquet"
                     df.write_parquet(raw_path)
                     return p_name, df
-            except Exception as exc:
-                logger.debug("Provider %s failed for %s (%s): %s", p_name, security_id, ticker, exc)
+            except (
+                requests.RequestException,
+                OSError,
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                logger.debug(
+                    "Provider %s failed for %s (%s): %s",
+                    p_name,
+                    security_id,
+                    ticker,
+                    exc,
+                )
 
         return None

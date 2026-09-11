@@ -30,7 +30,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import polars as pl
 
@@ -38,11 +38,11 @@ from src.common.config import (
     EXPECTED_SPELLS_HASH,
     SPELLS_CSV_PATH,
 )
-from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool as ConcurrentKeyWorkerPoolV3
-from src.identity.massive.worker import MassiveWorker as MassiveWorkerChannelV3
 from src.identity.massive.telemetry import WorkerTelemetry as WorkerTelemetryV3
+from src.identity.massive.worker_pool import (
+    ConcurrentKeyWorkerPool as ConcurrentKeyWorkerPoolV3,
+)
 from src.identity.modal.modal_backfill import (
-    MANIFEST_SCHEMA,
     _flush_checkpoint,
 )
 
@@ -64,12 +64,12 @@ class TestV3ModalDeployment(unittest.TestCase):
             min_per_key_interval=0.01,
             logger=self.mock_logger,
             cache_dir=self.test_dir / "cache",
-            api_keys=mock_keys
+            api_keys=mock_keys,
         )
         self.assertEqual(len(pool.workers), 9)
         for i, w in enumerate(pool.workers):
-            self.assertEqual(w.worker_id, f"WORKER_{i+1}")
-            self.assertEqual(w._api_key, f"MOCK_KEY_SECRET_{i+1}")
+            self.assertEqual(w.worker_id, f"WORKER_{i + 1}")
+            self.assertEqual(w._api_key, f"MOCK_KEY_SECRET_{i + 1}")
 
     # 2. Key-Slot Isolation
     def test_02_key_slot_isolation(self):
@@ -78,12 +78,14 @@ class TestV3ModalDeployment(unittest.TestCase):
             min_per_key_interval=0.01,
             logger=self.mock_logger,
             cache_dir=self.test_dir / "cache",
-            api_keys=mock_keys
+            api_keys=mock_keys,
         )
         assigned_keys = [w._api_key for w in pool.workers]
-        self.assertEqual(len(set(assigned_keys)), 9, "All 9 workers must have strictly distinct keys")
+        self.assertEqual(
+            len(set(assigned_keys)), 9, "All 9 workers must have strictly distinct keys"
+        )
         for i, w in enumerate(pool.workers):
-            self.assertEqual(w._api_key, f"UNIQUE_SECRET_FOR_SLOT_{i+1}")
+            self.assertEqual(w._api_key, f"UNIQUE_SECRET_FOR_SLOT_{i + 1}")
 
     # 3. Nine-Worker Configuration
     def test_03_nine_worker_configuration(self):
@@ -92,7 +94,7 @@ class TestV3ModalDeployment(unittest.TestCase):
             pool = ConcurrentKeyWorkerPoolV3(
                 min_per_key_interval=0.01,
                 logger=self.mock_logger,
-                cache_dir=self.test_dir / "cache"
+                cache_dir=self.test_dir / "cache",
             )
             self.assertEqual(len(pool.workers), 9)
             self.assertEqual(pool.workers[0].worker_id, "WORKER_1")
@@ -105,10 +107,12 @@ class TestV3ModalDeployment(unittest.TestCase):
             min_per_key_interval=0.01,
             logger=self.mock_logger,
             cache_dir=self.test_dir / "cache",
-            api_keys=partial_keys
+            api_keys=partial_keys,
         )
         self.assertEqual(len(pool.workers), 3)
-        self.assertEqual([w.worker_id for w in pool.workers], ["WORKER_1", "WORKER_2", "WORKER_3"])
+        self.assertEqual(
+            [w.worker_id for w in pool.workers], ["WORKER_1", "WORKER_2", "WORKER_3"]
+        )
 
     # 5. Persistent Volume Path Handling
     def test_05_persistent_volume_path(self):
@@ -123,34 +127,37 @@ class TestV3ModalDeployment(unittest.TestCase):
     def test_06_checkpoint_persistence(self):
         chk_dir = self.test_dir / "checkpoints"
         chk_dir.mkdir(parents=True, exist_ok=True)
-        records = [{
-            "spell_id": f"TEST_{i}_1",
-            "ticker": f"TEST_{i}",
-            "spell_seq": 1,
-            "start_date": "2020-01-02",
-            "end_date": "2020-01-10",
-            "duration_sessions": 7,
-            "representative_date": "2020-01-06",
-            "representative_date_method": "MIDPOINT_SESSION",
-            "lookup_status": "SUCCESS",
-            "cache_status": "MISS",
-            "attempt_count": 1,
-            "worker_slot": "WORKER_1",
-            "completion_timestamp": "2026-09-09T00:00:00Z",
-            "error_category": "NONE",
-            "massive_cik": "0000000001",
-            "massive_figi": "BBG000000001",
-            "massive_composite_figi": "BBG000000002",
-            "massive_name": "Test Company",
-            "massive_type": "CS",
-            "massive_exchange": "XNYS",
-            "massive_active": True,
-            "level1_status": "SUCCESS",
-            "level2_start_status": "NOT_ATTEMPTED",
-            "level2_end_status": "NOT_ATTEMPTED",
-            "drift_detected": False,
-            "drift_details": "",
-        } for i in range(10)]
+        records = [
+            {
+                "spell_id": f"TEST_{i}_1",
+                "ticker": f"TEST_{i}",
+                "spell_seq": 1,
+                "start_date": "2020-01-02",
+                "end_date": "2020-01-10",
+                "duration_sessions": 7,
+                "representative_date": "2020-01-06",
+                "representative_date_method": "MIDPOINT_SESSION",
+                "lookup_status": "SUCCESS",
+                "cache_status": "MISS",
+                "attempt_count": 1,
+                "worker_slot": "WORKER_1",
+                "completion_timestamp": "2026-09-09T00:00:00Z",
+                "error_category": "NONE",
+                "massive_cik": "0000000001",
+                "massive_figi": "BBG000000001",
+                "massive_composite_figi": "BBG000000002",
+                "massive_name": "Test Company",
+                "massive_type": "CS",
+                "massive_exchange": "XNYS",
+                "massive_active": True,
+                "level1_status": "SUCCESS",
+                "level2_start_status": "NOT_ATTEMPTED",
+                "level2_end_status": "NOT_ATTEMPTED",
+                "drift_detected": False,
+                "drift_details": "",
+            }
+            for i in range(10)
+        ]
 
         _flush_checkpoint(records, chk_dir, 0, self.mock_logger)
         saved_file = chk_dir / "checkpoint_00000.parquet"
@@ -166,14 +173,17 @@ class TestV3ModalDeployment(unittest.TestCase):
             min_per_key_interval=0.01,
             logger=self.mock_logger,
             cache_dir=cache_dir,
-            api_keys=["KEY_1"]
+            api_keys=["KEY_1"],
         )
         target_file = cache_dir / "AAPL_2020-01-02.json"
-        payload = {"ticker": "AAPL", "results": [{"ticker": "AAPL", "cik": "0000320193"}]}
+        payload = {
+            "ticker": "AAPL",
+            "results": [{"ticker": "AAPL", "cik": "0000320193"}],
+        }
         pool._atomic_write_cache(target_file, payload)
 
         self.assertTrue(target_file.exists())
-        with open(target_file, "r", encoding="utf-8") as fp:
+        with open(target_file, encoding="utf-8") as fp:
             loaded = json.load(fp)
         self.assertEqual(loaded["results"][0]["cik"], "0000320193")
         # Ensure no residual temp files
@@ -187,12 +197,15 @@ class TestV3ModalDeployment(unittest.TestCase):
             min_per_key_interval=0.01,
             logger=self.mock_logger,
             cache_dir=cache_dir,
-            api_keys=["KEY_1"]
+            api_keys=["KEY_1"],
         )
         target_file = cache_dir / "CONCURRENT_2020-01-02.json"
 
         def write_worker(val: int):
-            payload = {"ticker": "CONCURRENT", "results": [{"ticker": "CONCURRENT", "cik": str(val).zfill(10)}]}
+            payload = {
+                "ticker": "CONCURRENT",
+                "results": [{"ticker": "CONCURRENT", "cik": str(val).zfill(10)}],
+            }
             pool._atomic_write_cache(target_file, payload)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -200,7 +213,7 @@ class TestV3ModalDeployment(unittest.TestCase):
             concurrent.futures.wait(futures)
 
         self.assertTrue(target_file.exists())
-        with open(target_file, "r", encoding="utf-8") as fp:
+        with open(target_file, encoding="utf-8") as fp:
             loaded = json.load(fp)
         self.assertEqual(loaded["ticker"], "CONCURRENT")
         self.assertTrue("cik" in loaded["results"][0])
@@ -224,7 +237,11 @@ class TestV3ModalDeployment(unittest.TestCase):
             {"ticker": "TICKER_2", "spell_seq": 1},
             {"ticker": "TICKER_3", "spell_seq": 1},
         ]
-        remaining = [s for s in input_spells if f"{s['ticker']}_{s['spell_seq']}" not in completed_map]
+        remaining = [
+            s
+            for s in input_spells
+            if f"{s['ticker']}_{s['spell_seq']}" not in completed_map
+        ]
         self.assertEqual(len(remaining), 1)
         self.assertEqual(remaining[0]["ticker"], "TICKER_3")
 
@@ -241,14 +258,18 @@ class TestV3ModalDeployment(unittest.TestCase):
 
     # 11. Production Path Isolation
     def test_11_production_path_isolation(self):
-        prod_master = Path(__file__).resolve().parent.parent / "data" / "identity" / "security_master.parquet"
+        prod_master = (
+            Path(__file__).resolve().parent.parent
+            / "data"
+            / "identity"
+            / "security_master.parquet"
+        )
         prod_spells = SPELLS_CSV_PATH
         if prod_master.exists():
             mtime_before = prod_master.stat().st_mtime
         spells_mtime_before = prod_spells.stat().st_mtime
 
         # Verify modal code references /modal_data exclusively for outputs
-        from src.identity.modal.modal_backfill import run_backfill_remote
         # Verify function annotations or defaults point to isolated volume
         self.assertEqual(prod_spells.stat().st_mtime, spells_mtime_before)
         if prod_master.exists():
@@ -262,17 +283,44 @@ class TestV3ModalDeployment(unittest.TestCase):
 
         # 3 cache hits for Worker 1
         for _ in range(3):
-            telem.record_request("WORKER_1", "S1", "AAPL", "2020-01-02", 1.0, 1.05, 200, 0, True, False, "SUCCESS")
+            telem.record_request(
+                "WORKER_1",
+                "S1",
+                "AAPL",
+                "2020-01-02",
+                1.0,
+                1.05,
+                200,
+                0,
+                True,
+                False,
+                "SUCCESS",
+            )
 
         # 2 live requests for Worker 2
         for _ in range(2):
-            telem.record_request("WORKER_2", "S2", "MSFT", "2020-01-02", 1.0, 1.80, 200, 0, False, True, "SUCCESS")
+            telem.record_request(
+                "WORKER_2",
+                "S2",
+                "MSFT",
+                "2020-01-02",
+                1.0,
+                1.80,
+                200,
+                0,
+                False,
+                True,
+                "SUCCESS",
+            )
 
         summary = telem.get_summary()
         self.assertEqual(summary["total_records"], 5)
         self.assertEqual(summary["global_cache_hits"], 3)
         self.assertEqual(summary["global_live_requests"], 2)
-        self.assertEqual(summary["total_records"], summary["global_cache_hits"] + summary["global_live_requests"])
+        self.assertEqual(
+            summary["total_records"],
+            summary["global_cache_hits"] + summary["global_live_requests"],
+        )
 
         w1_stat = next(w for w in summary["workers"] if w["worker_id"] == "WORKER_1")
         w2_stat = next(w for w in summary["workers"] if w["worker_id"] == "WORKER_2")
@@ -288,15 +336,21 @@ class TestV3ModalDeployment(unittest.TestCase):
             min_per_key_interval=0.01,
             logger=self.mock_logger,
             cache_dir=self.test_dir / "cache",
-            api_keys=[secret_val]
+            api_keys=[secret_val],
         )
         channel = pool.workers[0]
         # Query simulation
         matched, telem = pool.query("TEST", "2020-01-02", spell_id="LEAK_PROBE")
         summary = pool.telemetry.get_summary()
         summary_str = json.dumps(summary)
-        self.assertNotIn(secret_val, summary_str, "Raw API key must NEVER appear in telemetry")
-        self.assertNotIn(secret_val, str(telem), "Raw API key must NEVER appear in query telemetry dictionary")
+        self.assertNotIn(
+            secret_val, summary_str, "Raw API key must NEVER appear in telemetry"
+        )
+        self.assertNotIn(
+            secret_val,
+            str(telem),
+            "Raw API key must NEVER appear in query telemetry dictionary",
+        )
 
     # 14. Interruption and Resumption Simulation (10k -> 4k completed -> 6k remaining)
     def test_14_mock_interruption_and_restart(self):
@@ -305,8 +359,7 @@ class TestV3ModalDeployment(unittest.TestCase):
 
         # 10,000 spells total
         total_spells = [
-            {"ticker": f"SYM_{i:05d}", "spell_seq": 1}
-            for i in range(10000)
+            {"ticker": f"SYM_{i:05d}", "spell_seq": 1} for i in range(10000)
         ]
 
         # Simulate completing 4,000 spells across 4 chunks (1,000 each)
@@ -347,7 +400,7 @@ class TestV3ModalDeployment(unittest.TestCase):
         # Simulate process termination & restart
         # Scan checkpoints from disk
         completed_on_restart = {}
-        for cf in sorted(list(chk_dir.glob("checkpoint_*.parquet"))):
+        for cf in sorted(chk_dir.glob("checkpoint_*.parquet")):
             df_c = pl.read_parquet(cf)
             for r in df_c.iter_rows(named=True):
                 completed_on_restart[r["spell_id"]] = r
@@ -356,11 +409,14 @@ class TestV3ModalDeployment(unittest.TestCase):
 
         # Filter remaining spells
         remaining_spells = [
-            s for s in total_spells
+            s
+            for s in total_spells
             if f"{s['ticker']}_{s['spell_seq']}" not in completed_on_restart
         ]
 
-        self.assertEqual(len(remaining_spells), 6000, "Exactly 6,000 spells must remain eligible")
+        self.assertEqual(
+            len(remaining_spells), 6000, "Exactly 6,000 spells must remain eligible"
+        )
         self.assertEqual(remaining_spells[0]["ticker"], "SYM_04000")
         self.assertEqual(remaining_spells[-1]["ticker"], "SYM_09999")
 
@@ -376,34 +432,36 @@ class TestV3ModalDeployment(unittest.TestCase):
         # In this failure case, NO checkpoint file was written for spell_dispatched.
 
         # Sequence 2: Request returned, response persisted, checkpoint written
-        completed_record = [{
-            "spell_id": "PERSISTED_FINISHED_1",
-            "ticker": "PERSISTED_FINISHED",
-            "spell_seq": 1,
-            "start_date": "2020-01-02",
-            "end_date": "2020-01-10",
-            "duration_sessions": 7,
-            "representative_date": "2020-01-06",
-            "representative_date_method": "MIDPOINT_SESSION",
-            "lookup_status": "SUCCESS",
-            "cache_status": "MISS",
-            "attempt_count": 1,
-            "worker_slot": "WORKER_1",
-            "completion_timestamp": "2026-09-09T00:00:00Z",
-            "error_category": "NONE",
-            "massive_cik": "0000000001",
-            "massive_figi": "BBG000000001",
-            "massive_composite_figi": "BBG000000002",
-            "massive_name": "Test Company",
-            "massive_type": "CS",
-            "massive_exchange": "XNYS",
-            "massive_active": True,
-            "level1_status": "SUCCESS",
-            "level2_start_status": "NOT_ATTEMPTED",
-            "level2_end_status": "NOT_ATTEMPTED",
-            "drift_detected": False,
-            "drift_details": "",
-        }]
+        completed_record = [
+            {
+                "spell_id": "PERSISTED_FINISHED_1",
+                "ticker": "PERSISTED_FINISHED",
+                "spell_seq": 1,
+                "start_date": "2020-01-02",
+                "end_date": "2020-01-10",
+                "duration_sessions": 7,
+                "representative_date": "2020-01-06",
+                "representative_date_method": "MIDPOINT_SESSION",
+                "lookup_status": "SUCCESS",
+                "cache_status": "MISS",
+                "attempt_count": 1,
+                "worker_slot": "WORKER_1",
+                "completion_timestamp": "2026-09-09T00:00:00Z",
+                "error_category": "NONE",
+                "massive_cik": "0000000001",
+                "massive_figi": "BBG000000001",
+                "massive_composite_figi": "BBG000000002",
+                "massive_name": "Test Company",
+                "massive_type": "CS",
+                "massive_exchange": "XNYS",
+                "massive_active": True,
+                "level1_status": "SUCCESS",
+                "level2_start_status": "NOT_ATTEMPTED",
+                "level2_end_status": "NOT_ATTEMPTED",
+                "drift_detected": False,
+                "drift_details": "",
+            }
+        ]
         _flush_checkpoint(completed_record, chk_dir, 0, self.mock_logger)
 
         # On restart:

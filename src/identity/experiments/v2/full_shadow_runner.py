@@ -14,13 +14,10 @@ Processes all 43,757 ticker spells from data/universe/spells.csv in shadow mode.
 from __future__ import annotations
 
 import datetime
-import hashlib
 import json
 import logging
-import os
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import polars as pl
 
@@ -30,7 +27,6 @@ from src.identity.resolver.model import (
     UniverseStatus,
     are_names_consistent,
     classify_universe_status,
-    extract_entity_tokens,
     make_deterministic_unresolved_id,
     make_provisional_cik_id,
     normalize_security_type,
@@ -38,8 +34,19 @@ from src.identity.resolver.model import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 SPELLS_PATH = REPO_ROOT / "data" / "universe" / "spells.csv"
-SESSIONS_PATH = REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "trading_sessions.parquet"
-SEC_CACHE_PATH = REPO_ROOT / "data" / "identity" / "experiments" / "resolver_v1" / "api_cache" / "sec" / "company_tickers_exchange.json"
+SESSIONS_PATH = (
+    REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "trading_sessions.parquet"
+)
+SEC_CACHE_PATH = (
+    REPO_ROOT
+    / "data"
+    / "identity"
+    / "experiments"
+    / "resolver_v1"
+    / "api_cache"
+    / "sec"
+    / "company_tickers_exchange.json"
+)
 OPENFIGI_CACHE_PATH = REPO_ROOT / "data" / "raw" / "openfigi" / "openfigi_cache.parquet"
 
 OUT_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "full_shadow"
@@ -49,7 +56,13 @@ OUT_MD = OUT_DIR / "shadow_summary.md"
 
 CACHE_DIRS = [
     REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "cache" / "massive",
-    REPO_ROOT / "data" / "identity" / "experiments" / "resolver_v1" / "api_cache" / "massive",
+    REPO_ROOT
+    / "data"
+    / "identity"
+    / "experiments"
+    / "resolver_v1"
+    / "api_cache"
+    / "massive",
     REPO_ROOT / "data" / "identity" / "experiments" / "api_exploration" / "cache",
 ]
 
@@ -85,11 +98,13 @@ SHADOW_SCHEMA = {
     "schema_version": pl.Utf8,
 }
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("shadow_runner")
 
 
-def index_all_massive_cache() -> Dict[str, Dict[str, Any]]:
+def index_all_massive_cache() -> dict[str, dict[str, Any]]:
     """Loads and indexes all cached Massive JSON responses into memory."""
     logger.info("Indexing cached Massive responses from all experiment runs...")
     cache_index = {}
@@ -108,7 +123,7 @@ def index_all_massive_cache() -> Dict[str, Dict[str, Any]]:
                 key = f"{tk}:{dt}"
                 if key not in cache_index:
                     try:
-                        with open(f, "r", encoding="utf-8") as fp:
+                        with open(f, encoding="utf-8") as fp:
                             data = json.load(fp)
                         # Extract first result if list or dict
                         rec = None
@@ -119,19 +134,33 @@ def index_all_massive_cache() -> Dict[str, Dict[str, Any]]:
                                     rec = res[0]
                                 elif isinstance(res, dict):
                                     rec = res
-                            elif "ticker" in data or "cik" in data or "composite_figi" in data:
+                            elif (
+                                "ticker" in data
+                                or "cik" in data
+                                or "composite_figi" in data
+                            ):
                                 rec = data
                         cache_index[key] = rec
-                    except Exception:
-                        pass
-    logger.info("Indexed %d unique ticker:date cache keys from %d cache files.", len(cache_index), total_files)
+                    except (
+                        OSError,
+                        json.JSONDecodeError,
+                        UnicodeDecodeError,
+                        KeyError,
+                        IndexError,
+                    ) as err:
+                        logger.debug("Failed parsing cache file %s: %s", f, err)
+    logger.info(
+        "Indexed %d unique ticker:date cache keys from %d cache files.",
+        len(cache_index),
+        total_files,
+    )
     return cache_index
 
 
-def load_sec_mapping() -> Dict[str, Dict[str, Any]]:
+def load_sec_mapping() -> dict[str, dict[str, Any]]:
     sec_map = {}
     if SEC_CACHE_PATH.exists():
-        with open(SEC_CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(SEC_CACHE_PATH, encoding="utf-8") as f:
             d = json.load(f)
         fields = d.get("fields", [])
         rows = d.get("data", [])
@@ -140,12 +169,12 @@ def load_sec_mapping() -> Dict[str, Dict[str, Any]]:
             sec_map[tk.upper()] = {
                 "cik": str(r[fields.index("cik")]).zfill(10),
                 "name": r[fields.index("name")],
-                "exchange": r[fields.index("exchange")]
+                "exchange": r[fields.index("exchange")],
             }
     return sec_map
 
 
-def load_openfigi_mapping() -> Dict[str, Dict[str, Any]]:
+def load_openfigi_mapping() -> dict[str, dict[str, Any]]:
     figi_map = {}
     if OPENFIGI_CACHE_PATH.exists():
         df_of = pl.read_parquet(OPENFIGI_CACHE_PATH)
@@ -153,7 +182,7 @@ def load_openfigi_mapping() -> Dict[str, Dict[str, Any]]:
             figi_map[r["query_ticker"].upper()] = {
                 "share_class_figi": r.get("top_share_class_figi"),
                 "name": r.get("top_name"),
-                "sec_type": r.get("top_security_type")
+                "sec_type": r.get("top_security_type"),
             }
     return figi_map
 
@@ -176,9 +205,11 @@ def run_full_shadow():
 
     df_spells = pl.read_csv(SPELLS_PATH)
     total_spells = df_spells.height
-    logger.info("Loaded spells table with %d rows. Starting batch resolution...", total_spells)
+    logger.info(
+        "Loaded spells table with %d rows. Starting batch resolution...", total_spells
+    )
 
-    resolution_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    resolution_ts = datetime.datetime.now(datetime.UTC).isoformat()
     schema_ver = "v2.0"
 
     records = []
@@ -276,7 +307,9 @@ def run_full_shadow():
                 # Tier 2: Massive CIK + SEC/OpenFIGI Corroboration
                 corroborated = False
                 if sec_cik and sec_cik == m_cik:
-                    if are_names_consistent(m_name, of_name) or are_names_consistent(m_name, sec_name):
+                    if are_names_consistent(m_name, of_name) or are_names_consistent(
+                        m_name, sec_name
+                    ):
                         corroborated = True
 
                 if corroborated and of_figi:
@@ -285,7 +318,9 @@ def run_full_shadow():
                     id_tier = "TIER_2_CIK_CORROBORATED_FIGI"
                     id_status = IdentityStatus.CONFIRMED
                     id_conf = "HIGH"
-                    decision_reason = "Massive CIK corroborated by SEC EDGAR with OpenFIGI FIGI."
+                    decision_reason = (
+                        "Massive CIK corroborated by SEC EDGAR with OpenFIGI FIGI."
+                    )
                 else:
                     # Tier 3: Non-canonical Provisional CIK ID
                     security_id = make_provisional_cik_id(m_cik, orig_tk, s_date)
@@ -300,7 +335,9 @@ def run_full_shadow():
                         decision_reason = f"Massive CIK {m_cik} without FIGI. Assigned provisional CIK ID (is_canonical=False)."
             else:
                 # Massive response was empty of CIK and FIGI
-                security_id = make_deterministic_unresolved_id(orig_tk, seq, s_date, e_date)
+                security_id = make_deterministic_unresolved_id(
+                    orig_tk, seq, s_date, e_date
+                )
                 is_canonical = False
                 id_tier = "TIER_4_MASSIVE_EMPTY"
                 id_status = IdentityStatus.UNRESOLVED
@@ -317,43 +354,50 @@ def run_full_shadow():
             decision_reason = "MASSIVE_PIT_OFFLINE_PENDING"
             univ_status = UniverseStatus.QUARANTINE
 
-        records.append({
-            "ticker": orig_tk,
-            "spell_seq": seq,
-            "start_date": s_date,
-            "end_date": e_date,
-            "duration_sessions": dur,
-            "representative_date": rep_date,
-            "representative_date_method": rep_method,
-            "massive_cik": m_cik,
-            "massive_figi": m_figi,
-            "massive_name": m_name,
-            "massive_security_type": m_type,
-            "massive_primary_exchange": m_exch,
-            "massive_active_flag": m_act,
-            "openfigi_share_class_figi": of_figi,
-            "openfigi_security_type": of_type,
-            "openfigi_name": of_name,
-            "sec_cik": sec_cik,
-            "sec_name": sec_name,
-            "sec_exchange": sec_exch,
-            "security_id": security_id,
-            "is_canonical": is_canonical,
-            "identity_status": id_status,
-            "identity_confidence": id_conf,
-            "identity_source_hierarchy": id_tier,
-            "research_universe_status": univ_status,
-            "conflict_flag": conflict_flag,
-            "decision_reason": decision_reason,
-            "resolution_timestamp": resolution_ts,
-            "schema_version": schema_ver,
-        })
+        records.append(
+            {
+                "ticker": orig_tk,
+                "spell_seq": seq,
+                "start_date": s_date,
+                "end_date": e_date,
+                "duration_sessions": dur,
+                "representative_date": rep_date,
+                "representative_date_method": rep_method,
+                "massive_cik": m_cik,
+                "massive_figi": m_figi,
+                "massive_name": m_name,
+                "massive_security_type": m_type,
+                "massive_primary_exchange": m_exch,
+                "massive_active_flag": m_act,
+                "openfigi_share_class_figi": of_figi,
+                "openfigi_security_type": of_type,
+                "openfigi_name": of_name,
+                "sec_cik": sec_cik,
+                "sec_name": sec_name,
+                "sec_exchange": sec_exch,
+                "security_id": security_id,
+                "is_canonical": is_canonical,
+                "identity_status": id_status,
+                "identity_confidence": id_conf,
+                "identity_source_hierarchy": id_tier,
+                "research_universe_status": univ_status,
+                "conflict_flag": conflict_flag,
+                "decision_reason": decision_reason,
+                "resolution_timestamp": resolution_ts,
+                "schema_version": schema_ver,
+            }
+        )
 
         if len(records) >= chunk_size:
             chunk_file = CHECKPOINTS_DIR / f"chunk_{chunk_idx:05d}.parquet"
             df_chk = pl.DataFrame(records, schema=SHADOW_SCHEMA)
             df_chk.write_parquet(chunk_file)
-            logger.info("Saved checkpoint %d (%d spells) -> %s", chunk_idx, df_chk.height, chunk_file)
+            logger.info(
+                "Saved checkpoint %d (%d spells) -> %s",
+                chunk_idx,
+                df_chk.height,
+                chunk_file,
+            )
             chunk_idx += 1
             records = []
 
@@ -362,23 +406,46 @@ def run_full_shadow():
         chunk_file = CHECKPOINTS_DIR / f"chunk_{chunk_idx:05d}.parquet"
         df_chk = pl.DataFrame(records, schema=SHADOW_SCHEMA)
         df_chk.write_parquet(chunk_file)
-        logger.info("Saved final checkpoint %d (%d spells) -> %s", chunk_idx, df_chk.height, chunk_file)
+        logger.info(
+            "Saved final checkpoint %d (%d spells) -> %s",
+            chunk_idx,
+            df_chk.height,
+            chunk_file,
+        )
         chunk_idx += 1
 
     # Concatenate all checkpoints
-    chk_files = sorted(list(CHECKPOINTS_DIR.glob("chunk_*.parquet")))
-    logger.info("Concatenating %d checkpoint chunks into master shadow table...", len(chk_files))
+    chk_files = sorted(CHECKPOINTS_DIR.glob("chunk_*.parquet"))
+    logger.info(
+        "Concatenating %d checkpoint chunks into master shadow table...", len(chk_files)
+    )
     df_all = pl.concat([pl.read_parquet(f) for f in chk_files])
     df_all.write_parquet(OUT_PARQUET)
-    logger.info("Saved master shadow resolution table to %s (%d rows)", OUT_PARQUET, df_all.height)
+    logger.info(
+        "Saved master shadow resolution table to %s (%d rows)",
+        OUT_PARQUET,
+        df_all.height,
+    )
 
     # Generate Summary Statistics
     total_spells = df_all.height
     canonical_count = df_all.filter(pl.col("is_canonical") == True).height
     non_canonical_count = df_all.filter(pl.col("is_canonical") == False).height
-    conf_counts = df_all.group_by("identity_status").agg(pl.len().alias("count")).sort("count", descending=True)
-    tier_counts = df_all.group_by("identity_source_hierarchy").agg(pl.len().alias("count")).sort("count", descending=True)
-    univ_counts = df_all.group_by("research_universe_status").agg(pl.len().alias("count")).sort("count", descending=True)
+    conf_counts = (
+        df_all.group_by("identity_status")
+        .agg(pl.len().alias("count"))
+        .sort("count", descending=True)
+    )
+    tier_counts = (
+        df_all.group_by("identity_source_hierarchy")
+        .agg(pl.len().alias("count"))
+        .sort("count", descending=True)
+    )
+    univ_counts = (
+        df_all.group_by("research_universe_status")
+        .agg(pl.len().alias("count"))
+        .sort("count", descending=True)
+    )
     conflict_count = df_all.filter(pl.col("conflict_flag") == True).height
 
     md_content = f"""# Full-Dataset Shadow Resolution Summary (Resolver V2)
@@ -408,7 +475,12 @@ def run_full_shadow():
 | :--- | :--- | :--- | :--- |
 """
     for r in conf_counts.iter_rows(named=True):
-        can = "YES (FIGI)" if r["identity_status"] in [IdentityStatus.CONFIRMED, IdentityStatus.PROBABLE] else "NO (Provisional/Isolated)"
+        can = (
+            "YES (FIGI)"
+            if r["identity_status"]
+            in [IdentityStatus.CONFIRMED, IdentityStatus.PROBABLE]
+            else "NO (Provisional/Isolated)"
+        )
         md_content += f"| `{r['identity_status']}` | **{r['count']:,}** | {(r['count'] / total_spells * 100):.2f}% | {can} |\n"
 
     md_content += """
@@ -429,7 +501,15 @@ def run_full_shadow():
 | :--- | :--- | :--- | :--- |
 """
     for r in univ_counts.iter_rows(named=True):
-        action = "Eligible for portfolio universe" if r["research_universe_status"] == UniverseStatus.INCLUDE else ("Quarantined until manual / archival resolution" if r["research_universe_status"] == UniverseStatus.QUARANTINE else "Excluded (Derivatives / ETFs / Warrants)")
+        action = (
+            "Eligible for portfolio universe"
+            if r["research_universe_status"] == UniverseStatus.INCLUDE
+            else (
+                "Quarantined until manual / archival resolution"
+                if r["research_universe_status"] == UniverseStatus.QUARANTINE
+                else "Excluded (Derivatives / ETFs / Warrants)"
+            )
+        )
         md_content += f"| `{r['research_universe_status']}` | **{r['count']:,}** | {(r['count'] / total_spells * 100):.2f}% | {action} |\n"
 
     md_content += """

@@ -9,12 +9,11 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 
 def setup_logger(
     name: str,
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     level: int = logging.INFO,
     mode: str = "a",
 ) -> logging.Logger:

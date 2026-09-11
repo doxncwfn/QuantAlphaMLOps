@@ -13,27 +13,30 @@ Produces: data/quality/v3/live_benchmark_report.parquet and report/benchmark/v3_
 from __future__ import annotations
 
 import concurrent.futures
-import json
 import logging
 import time
-from pathlib import Path
-from typing import Any, Dict, List
 
 import polars as pl
 
 from src.common.config import QUALITY_DIR
-from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool as ConcurrentKeyWorkerPoolV3
+from src.identity.massive.worker_pool import (
+    ConcurrentKeyWorkerPool as ConcurrentKeyWorkerPoolV3,
+)
 
 OUT_PARQUET = QUALITY_DIR / "live_benchmark_report.parquet"
 OUT_MD = QUALITY_DIR / "live_benchmark_report.md"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("live_benchmark_v3")
 
 
 def run_benchmark():
     logger.info("=" * 80)
-    logger.info("STARTING V3 CONTROLLED API BENCHMARK & LATENCY RECONCILIATION (Section 30)")
+    logger.info(
+        "STARTING V3 CONTROLLED API BENCHMARK & LATENCY RECONCILIATION (Section 30)"
+    )
     logger.info("=" * 80)
 
     # -------------------------------------------------------------------------
@@ -42,9 +45,15 @@ def run_benchmark():
     logger.info("--- Benchmark 1: Cache-Only Performance ---")
     pool_cache = ConcurrentKeyWorkerPoolV3(min_per_key_interval=0.01, logger=logger)
     cache_targets = [
-        ("AAPL", "2015-05-04"), ("MSFT", "2015-05-04"), ("CAT", "2015-05-04"),
-        ("JNJ", "2015-05-04"),  ("BA", "2015-05-04"),   ("IBM", "2015-05-04"),
-        ("GE", "2015-05-04"),   ("DIS", "2015-05-04"),  ("XOM", "2015-05-04")
+        ("AAPL", "2015-05-04"),
+        ("MSFT", "2015-05-04"),
+        ("CAT", "2015-05-04"),
+        ("JNJ", "2015-05-04"),
+        ("BA", "2015-05-04"),
+        ("IBM", "2015-05-04"),
+        ("GE", "2015-05-04"),
+        ("DIS", "2015-05-04"),
+        ("XOM", "2015-05-04"),
     ]
 
     t0_cache = time.time()
@@ -57,8 +66,13 @@ def run_benchmark():
 
     elapsed_cache = time.time() - t0_cache
     cache_rps = total_cache_queries / elapsed_cache if elapsed_cache > 0 else 0.0
-    logger.info("Cache-Only: %d queries in %.3fs (%.1f req/sec, %.1f req/min)",
-                total_cache_queries, elapsed_cache, cache_rps, cache_rps * 60.0)
+    logger.info(
+        "Cache-Only: %d queries in %.3fs (%.1f req/sec, %.1f req/min)",
+        total_cache_queries,
+        elapsed_cache,
+        cache_rps,
+        cache_rps * 60.0,
+    )
 
     # -------------------------------------------------------------------------
     # Benchmark 2: Live Single-Key Performance (Worker 1)
@@ -69,7 +83,7 @@ def run_benchmark():
         ("AAPL", "2016-04-18"),
         ("MSFT", "2016-04-18"),
         ("IBM", "2016-04-18"),
-        ("CAT", "2016-04-18")
+        ("CAT", "2016-04-18"),
     ]
 
     t0_single = time.time()
@@ -77,11 +91,18 @@ def run_benchmark():
         pool_single.query(tk, dt, spell_id=f"LIVE_SINGLE_{tk}", preferred_worker_idx=0)
 
     elapsed_single = time.time() - t0_single
-    single_rpm = (len(single_targets) / elapsed_single * 60.0) if elapsed_single > 0 else 0.0
+    single_rpm = (
+        (len(single_targets) / elapsed_single * 60.0) if elapsed_single > 0 else 0.0
+    )
     single_summary = pool_single.telemetry.get_summary()
 
-    logger.info("Single-Key Live: %d queries in %.2fs (%.2f req/min, %.3f req/sec)",
-                len(single_targets), elapsed_single, single_rpm, len(single_targets) / elapsed_single)
+    logger.info(
+        "Single-Key Live: %d queries in %.2fs (%.2f req/min, %.3f req/sec)",
+        len(single_targets),
+        elapsed_single,
+        single_rpm,
+        len(single_targets) / elapsed_single,
+    )
 
     # -------------------------------------------------------------------------
     # Benchmark 3: Live 9-Key Concurrent Performance (18 queries across 9 workers)
@@ -89,42 +110,73 @@ def run_benchmark():
     logger.info("--- Benchmark 3: Live 9-Key Concurrent Performance ---")
     pool_multi = ConcurrentKeyWorkerPoolV3(min_per_key_interval=12.1, logger=logger)
     concurrent_targets = [
-        ("AAPL", "2019-03-20"), ("MSFT", "2019-03-20"), ("IBM", "2019-03-20"),
-        ("GE", "2019-03-20"),   ("CAT", "2019-03-20"),  ("JNJ", "2019-03-20"),
-        ("BA", "2019-03-20"),   ("DIS", "2019-03-20"),  ("XOM", "2019-03-20"),
-        ("AAPL", "2020-08-25"), ("MSFT", "2020-08-25"), ("IBM", "2020-08-25"),
-        ("GE", "2020-08-25"),   ("CAT", "2020-08-25"),  ("JNJ", "2020-08-25"),
-        ("BA", "2020-08-25"),   ("DIS", "2020-08-25"),  ("XOM", "2020-08-25")
+        ("AAPL", "2019-03-20"),
+        ("MSFT", "2019-03-20"),
+        ("IBM", "2019-03-20"),
+        ("GE", "2019-03-20"),
+        ("CAT", "2019-03-20"),
+        ("JNJ", "2019-03-20"),
+        ("BA", "2019-03-20"),
+        ("DIS", "2019-03-20"),
+        ("XOM", "2019-03-20"),
+        ("AAPL", "2020-08-25"),
+        ("MSFT", "2020-08-25"),
+        ("IBM", "2020-08-25"),
+        ("GE", "2020-08-25"),
+        ("CAT", "2020-08-25"),
+        ("JNJ", "2020-08-25"),
+        ("BA", "2020-08-25"),
+        ("DIS", "2020-08-25"),
+        ("XOM", "2020-08-25"),
     ]
 
     t0_multi = time.time()
+
     def dispatch_multi(item):
         idx, (tk, dt) = item
         w_idx = idx % 9
-        matched, telem = pool_multi.query(tk, dt, spell_id=f"LIVE_MULTI_{tk}_{dt}", preferred_worker_idx=w_idx)
+        matched, telem = pool_multi.query(
+            tk, dt, spell_id=f"LIVE_MULTI_{tk}_{dt}", preferred_worker_idx=w_idx
+        )
         return tk, dt, matched, telem
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=9) as executor:
-        futures = [executor.submit(dispatch_multi, (i, target)) for i, target in enumerate(concurrent_targets)]
+        futures = [
+            executor.submit(dispatch_multi, (i, target))
+            for i, target in enumerate(concurrent_targets)
+        ]
         multi_results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
     elapsed_multi = time.time() - t0_multi
-    multi_rpm = (len(concurrent_targets) / elapsed_multi * 60.0) if elapsed_multi > 0 else 0.0
+    multi_rpm = (
+        (len(concurrent_targets) / elapsed_multi * 60.0) if elapsed_multi > 0 else 0.0
+    )
     scaling_factor = (multi_rpm / single_rpm) if single_rpm > 0 else 1.0
     multi_summary = pool_multi.telemetry.get_summary()
 
-    logger.info("9-Key Concurrent Live: %d queries in %.2fs (%.2f req/min, scaling factor: %.2fx)",
-                len(concurrent_targets), elapsed_multi, multi_rpm, scaling_factor)
+    logger.info(
+        "9-Key Concurrent Live: %d queries in %.2fs (%.2f req/min, scaling factor: %.2fx)",
+        len(concurrent_targets),
+        elapsed_multi,
+        multi_rpm,
+        scaling_factor,
+    )
 
     # Save benchmark telemetry to parquet
     df_bench = pl.DataFrame(pool_multi.telemetry.records)
     OUT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     df_bench.write_parquet(OUT_PARQUET)
-    logger.info("Saved benchmark telemetry to %s (%d rows)", OUT_PARQUET, df_bench.height)
+    logger.info(
+        "Saved benchmark telemetry to %s (%d rows)", OUT_PARQUET, df_bench.height
+    )
 
     # Latency Percentiles
     live_records = df_bench.filter(pl.col("is_live") == True)
-    latencies = live_records["latency_ms"].sort().to_list() if live_records.height > 0 else [0.0]
+    latencies = (
+        live_records["latency_ms"].sort().to_list()
+        if live_records.height > 0
+        else [0.0]
+    )
     n_lat = len(latencies)
     p50 = latencies[n_lat // 2]
     p90 = latencies[int(n_lat * 0.90)] if n_lat > 0 else p50
@@ -150,7 +202,7 @@ This empirical benchmark measures the live execution performance of the **Concur
 | Execution Mode | Sample Queries | Wall-Clock Time | Measured Throughput | Mean Latency | Median (p50) | p90 Latency | p95 Latency | p99 Latency |
 | :--- | ---:| ---:| ---:| ---:| ---:| ---:| ---:| ---:|
 | **Cache-Only Hits** | {total_cache_queries} | {elapsed_cache:.3f}s | **{cache_rps:.1f} req/s** | < 0.5 ms | < 0.5 ms | < 1.0 ms | < 1.0 ms | < 1.0 ms |
-| **Live Single-Key** | {len(single_targets)} | {elapsed_single:.2f}s | **{single_rpm:.2f} req/min** | {single_summary['median_latency_ms']:.1f} ms | {single_summary['median_latency_ms']:.1f} ms | — | — | — |
+| **Live Single-Key** | {len(single_targets)} | {elapsed_single:.2f}s | **{single_rpm:.2f} req/min** | {single_summary["median_latency_ms"]:.1f} ms | {single_summary["median_latency_ms"]:.1f} ms | — | — | — |
 | **Live 9-Key Pool** | {len(concurrent_targets)} | {elapsed_multi:.2f}s | **{multi_rpm:.2f} req/min** | **{mean_lat:.1f} ms** | **{p50:.1f} ms** | **{p90:.1f} ms** | **{p95:.1f} ms** | **{p99:.1f} ms** |
 
 - **Effective Parallel Scaling Factor**: **{scaling_factor:.2f}x** over single-key live throughput.
@@ -180,7 +232,7 @@ The network latency represents a small fraction of the cycle time; rate limit pa
 | :--- | ---:| ---:| ---:| ---:| ---:| ---:| ---:|
 """
     for w in multi_summary["workers"]:
-        report_md += f"| `{w['worker_id']}` | {w['total_requests']} | {w['live_requests']} | {w['successes']} | {w['rate_limits_429']} | {w['errors']} | {w['retries']} | {w['total_latency_ms']/max(1, w['live_requests']):.1f} ms |\n"
+        report_md += f"| `{w['worker_id']}` | {w['total_requests']} | {w['live_requests']} | {w['successes']} | {w['rate_limits_429']} | {w['errors']} | {w['retries']} | {w['total_latency_ms'] / max(1, w['live_requests']):.1f} ms |\n"
 
     report_md += f"""
 ---
@@ -196,7 +248,7 @@ The network latency represents a small fraction of the cycle time; rate limit pa
 - **Total Universe Spells**: {total_spells:,}
 - **Estimated Already Cached**: ~10,757 spells (from prior exploration, validation, and V2 runs)
 - **Net Live Queries Required**: ~{queries_pending:,} queries
-- **Sustained Measured Throughput**: {multi_rpm:.2f} req/min ({multi_rpm/60.0:.2f} req/sec)
+- **Sustained Measured Throughput**: {multi_rpm:.2f} req/min ({multi_rpm / 60.0:.2f} req/sec)
 - **Unbuffered Theoretical Runtime**: `33,000 / {multi_rpm:.2f}` = **{base_hours:.1f} hours**
 
 ### Formal Production Planning Estimate (with Uncertainty Buffer)

@@ -8,8 +8,7 @@ retry pacing, and strict outcome classification.
 from __future__ import annotations
 
 import logging
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import requests
 
@@ -30,8 +29,8 @@ class MassiveClient:
         base_url: str = MASSIVE_REFERENCE_URL,
         timeout_seconds: float = REQUEST_TIMEOUT_SECONDS,
         max_retries: int = MAX_RETRIES,
-        rate_limiter: Optional[PerKeyRateLimiter] = None,
-        logger: Optional[logging.Logger] = None,
+        rate_limiter: PerKeyRateLimiter | None = None,
+        logger: logging.Logger | None = None,
     ):
         self.api_key = api_key
         self.base_url = base_url
@@ -45,7 +44,7 @@ class MassiveClient:
         self,
         ticker: str,
         date_str: str,
-    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]], str, int, int]:
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str, int, int]:
         """Queries Massive for ticker on date_str.
 
         Returns:
@@ -65,18 +64,24 @@ class MassiveClient:
         while retries <= self.max_retries:
             self.rate_limiter.wait()
             try:
-                resp = self.session.get(self.base_url, params=params, timeout=self.timeout)
+                resp = self.session.get(
+                    self.base_url, params=params, timeout=self.timeout
+                )
                 http_status = resp.status_code
 
                 if http_status == 200:
                     self.rate_limiter.reset_backoff()
                     try:
                         data = resp.json()
-                    except Exception:
+                    except (ValueError, requests.exceptions.JSONDecodeError):
                         return None, None, "INVALID_RESPONSE", 200, retries
 
                     matched = self.extract_match(data, clean_tk)
-                    if matched and (matched.get("cik") or matched.get("share_class_figi") or matched.get("composite_figi")):
+                    if matched and (
+                        matched.get("cik")
+                        or matched.get("share_class_figi")
+                        or matched.get("composite_figi")
+                    ):
                         return matched, data, "SUCCESS", 200, retries
                     return matched, data, "MASSIVE_EMPTY", 200, retries
 
@@ -95,7 +100,12 @@ class MassiveClient:
                     return None, None, "NOT_FOUND", 404, retries
 
                 elif 500 <= http_status < 600:
-                    self.logger.warning("HTTP %d from Massive API. Retrying (%d/%d)...", http_status, retries + 1, self.max_retries)
+                    self.logger.warning(
+                        "HTTP %d from Massive API. Retrying (%d/%d)...",
+                        http_status,
+                        retries + 1,
+                        self.max_retries,
+                    )
                     self.rate_limiter.handle_rate_limit()
                     retries += 1
                     continue
@@ -104,14 +114,27 @@ class MassiveClient:
                     return None, None, f"HTTP_{http_status}", http_status, retries
 
             except requests.exceptions.Timeout:
-                self.logger.warning("Request timeout for %s:%s. Retrying (%d/%d)...", clean_tk, date_str, retries + 1, self.max_retries)
+                self.logger.warning(
+                    "Request timeout for %s:%s. Retrying (%d/%d)...",
+                    clean_tk,
+                    date_str,
+                    retries + 1,
+                    self.max_retries,
+                )
                 self.rate_limiter.handle_rate_limit()
                 retries += 1
                 if retries > self.max_retries:
                     return None, None, "TIMEOUT", 0, retries
 
             except requests.exceptions.RequestException as e:
-                self.logger.warning("Network error for %s:%s: %s. Retrying (%d/%d)...", clean_tk, date_str, e, retries + 1, self.max_retries)
+                self.logger.warning(
+                    "Network error for %s:%s: %s. Retrying (%d/%d)...",
+                    clean_tk,
+                    date_str,
+                    e,
+                    retries + 1,
+                    self.max_retries,
+                )
                 self.rate_limiter.handle_rate_limit()
                 retries += 1
                 if retries > self.max_retries:
@@ -120,7 +143,9 @@ class MassiveClient:
         return None, None, "RATE_LIMITED", 429, retries
 
     @staticmethod
-    def extract_match(data: Optional[Dict[str, Any]], query_ticker: str) -> Optional[Dict[str, Any]]:
+    def extract_match(
+        data: dict[str, Any] | None, query_ticker: str
+    ) -> dict[str, Any] | None:
         """Finds the most specific matching record from Massive's results array."""
         if not data or not isinstance(data, dict):
             return None
@@ -138,7 +163,13 @@ class MassiveClient:
         alt_q = clean_q.replace(".", "") if "." in clean_q else clean_q.replace("/", "")
         for r in results:
             if isinstance(r, dict):
-                rtk = r.get("ticker", "").strip().upper().replace(".", "").replace("/", "")
+                rtk = (
+                    r.get("ticker", "")
+                    .strip()
+                    .upper()
+                    .replace(".", "")
+                    .replace("/", "")
+                )
                 if rtk == alt_q:
                     return r
 

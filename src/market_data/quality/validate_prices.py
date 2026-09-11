@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Tuple
 import polars as pl
 
 
-def validate_price_sanity(df: pl.DataFrame) -> Tuple[pl.DataFrame, pl.DataFrame]:
+def validate_price_sanity(df: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Validates price records against standard exchange envelopes.
 
     Rules:
@@ -24,10 +23,10 @@ def validate_price_sanity(df: pl.DataFrame) -> Tuple[pl.DataFrame, pl.DataFrame]
 
     # Envelope condition
     cond_positive = (
-        (pl.col("open") > 0) &
-        (pl.col("high") > 0) &
-        (pl.col("low") > 0) &
-        (pl.col("close") > 0)
+        (pl.col("open") > 0)
+        & (pl.col("high") > 0)
+        & (pl.col("low") > 0)
+        & (pl.col("close") > 0)
     )
     cond_high = (pl.col("high") >= pl.col("open")) & (pl.col("high") >= pl.col("close"))
     cond_low = (pl.col("low") <= pl.col("open")) & (pl.col("low") <= pl.col("close"))

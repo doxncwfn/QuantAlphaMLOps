@@ -1,15 +1,17 @@
-import modal
 from pathlib import Path
+
+import modal
 
 app = modal.App("quant-data-uploader")
 vol = modal.Volume.from_name("quant-data-vol", create_if_missing=True)
+
 
 @app.local_entrypoint()
 def main():
     base_dir = Path(__file__).parent.parent
     db_dir = base_dir / "db"
     factors_dir = base_dir / "factors"
-    
+
     print("Starting batch upload to Modal Volume 'quant-data-vol'...")
     with vol.batch_upload(force=True) as batch:
         # Upload DB CSVs
@@ -20,7 +22,7 @@ def main():
                 batch.put_file(filepath, f"/data/{filepath.name}")
         else:
             print(f"Warning: Local directory {db_dir} not found.")
-            
+
         # Upload Factors CSVs
         if factors_dir.exists():
             csv_files = list(factors_dir.glob("*.csv"))
@@ -43,6 +45,5 @@ def main():
         #         batch.put_file(filepath, f"/artifacts/{rel_path.as_posix()}")
         # else:
         #     print(f"Warning: Local directory {artifacts_dir} not found.")
- 
 
     print(f"Data upload complete! Files are safely stored in '{vol.name}'.")

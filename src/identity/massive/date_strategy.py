@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 import polars as pl
 
@@ -23,13 +23,13 @@ class RepresentativeDateStrategy:
 
     def __init__(
         self,
-        sessions_path: Optional[Path] = None,
-        logger: Optional[logging.Logger] = None,
+        sessions_path: Path | None = None,
+        logger: logging.Logger | None = None,
     ):
         self.sessions_path = sessions_path or TRADING_SESSIONS_PATH
         self.logger = logger or logging.getLogger("date_strategy")
-        self.all_sessions: List[str] = []
-        self.session_to_idx: Dict[str, int] = {}
+        self.all_sessions: list[str] = []
+        self.session_to_idx: dict[str, int] = {}
         self._load_sessions()
 
     def _load_sessions(self) -> None:
@@ -37,9 +37,16 @@ class RepresentativeDateStrategy:
             df = pl.read_parquet(self.sessions_path)
             self.all_sessions = df["session_date"].to_list()
             self.session_to_idx = {d: i for i, d in enumerate(self.all_sessions)}
-            self.logger.info("Loaded %d trading sessions from %s.", len(self.all_sessions), self.sessions_path)
+            self.logger.info(
+                "Loaded %d trading sessions from %s.",
+                len(self.all_sessions),
+                self.sessions_path,
+            )
         else:
-            self.logger.warning("Trading sessions file not found at %s. Midpoints will use fallback.", self.sessions_path)
+            self.logger.warning(
+                "Trading sessions file not found at %s. Midpoints will use fallback.",
+                self.sessions_path,
+            )
 
     def get_midpoint_session(self, start_date: str, end_date: str) -> str:
         """Finds trading calendar midpoint date between start_date and end_date."""
@@ -52,8 +59,8 @@ class RepresentativeDateStrategy:
 
     def detect_drift(
         self,
-        evidence_points: List[Tuple[str, str, Dict[str, Any]]],
-    ) -> Tuple[bool, str]:
+        evidence_points: list[tuple[str, str, dict[str, Any]]],
+    ) -> tuple[bool, str]:
         """Detects if multiple sample points within a spell produce divergent CIKs or FIGIs.
 
         Args:

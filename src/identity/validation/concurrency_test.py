@@ -16,15 +16,18 @@ import json
 import logging
 import sys
 import time
-from pathlib import Path
 
 from src.common.config import LOG_DIR, MASSIVE_V3_CACHE_DIR, QUALITY_DIR
-from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool as ConcurrentKeyWorkerPoolV3
+from src.identity.massive.worker_pool import (
+    ConcurrentKeyWorkerPool as ConcurrentKeyWorkerPoolV3,
+)
 
 LOG_FILE = LOG_DIR / "v3_concurrency.log"
 REPORT_MD = QUALITY_DIR / "concurrency_test_report.md"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("concurrency_test_v3")
 
 
@@ -49,7 +52,9 @@ def run_concurrency_test():
     log(f"Phase 1: 9 racing threads querying identical key '{race_tk}:{race_dt}'...")
 
     def race_query(idx: int):
-        matched, telem = pool.query(race_tk, race_dt, spell_id=f"RACE_{idx}", preferred_worker_idx=idx)
+        matched, telem = pool.query(
+            race_tk, race_dt, spell_id=f"RACE_{idx}", preferred_worker_idx=idx
+        )
         return idx, matched, telem
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=9) as executor:
@@ -58,27 +63,59 @@ def run_concurrency_test():
 
     # Validate identical results
     ciks = [r[1].get("cik") for r in race_results if r[1]]
-    all_same = (len(set(ciks)) == 1 and len(ciks) == 9)
-    log(f"Phase 1 Verification: All 9 threads received identical CIK {ciks[0] if ciks else 'None'} (Agreement: {all_same})")
+    all_same = len(set(ciks)) == 1 and len(ciks) == 9
+    log(
+        f"Phase 1 Verification: All 9 threads received identical CIK {ciks[0] if ciks else 'None'} (Agreement: {all_same})"
+    )
 
     # -------------------------------------------------------------------------
     # Test Phase 2: Multi-Ticker Multi-Worker Concurrent Dispatch (27 queries)
     # -------------------------------------------------------------------------
     test_tickers = [
-        "AAPL", "MSFT", "CAT", "JNJ", "BA", "IBM", "GE", "DIS", "XOM",
-        "CVX", "ACMR", "AAC", "MON", "META", "AAA", "CMCSA", "TWTR", "SIVB",
-        "CELG", "FRC", "NOW", "PATH", "SHOP", "BTX.WSw", "AANw", "AAPw", "AAB.WS"
+        "AAPL",
+        "MSFT",
+        "CAT",
+        "JNJ",
+        "BA",
+        "IBM",
+        "GE",
+        "DIS",
+        "XOM",
+        "CVX",
+        "ACMR",
+        "AAC",
+        "MON",
+        "META",
+        "AAA",
+        "CMCSA",
+        "TWTR",
+        "SIVB",
+        "CELG",
+        "FRC",
+        "NOW",
+        "PATH",
+        "SHOP",
+        "BTX.WSw",
+        "AANw",
+        "AAPw",
+        "AAB.WS",
     ]
     test_date = "2015-05-04"
-    log(f"Phase 2: Dispatching {len(test_tickers)} concurrent queries across 9 workers...")
+    log(
+        f"Phase 2: Dispatching {len(test_tickers)} concurrent queries across 9 workers..."
+    )
 
     def multi_query(item):
         idx, tk = item
-        matched, telem = pool.query(tk, test_date, spell_id=f"MULTI_{tk}", preferred_worker_idx=idx % 9)
+        matched, telem = pool.query(
+            tk, test_date, spell_id=f"MULTI_{tk}", preferred_worker_idx=idx % 9
+        )
         return idx, tk, matched, telem
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=9) as executor:
-        futures = [executor.submit(multi_query, (i, tk)) for i, tk in enumerate(test_tickers)]
+        futures = [
+            executor.submit(multi_query, (i, tk)) for i, tk in enumerate(test_tickers)
+        ]
         multi_results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
     log(f"Phase 2 Completed: {len(multi_results)} queries processed.")
@@ -91,13 +128,15 @@ def run_concurrency_test():
     for cf in MASSIVE_V3_CACHE_DIR.glob("*.json"):
         total_files_checked += 1
         try:
-            with open(cf, "r", encoding="utf-8") as f:
+            with open(cf, encoding="utf-8") as f:
                 json.load(f)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
             corrupted_files += 1
             log(f"ERROR: Corrupted cache file: {cf} ({e})")
 
-    log(f"Phase 3 Cache Integrity: {total_files_checked} cache files checked. Corrupted: {corrupted_files}")
+    log(
+        f"Phase 3 Cache Integrity: {total_files_checked} cache files checked. Corrupted: {corrupted_files}"
+    )
 
     # -------------------------------------------------------------------------
     # Test Phase 4: Telemetry Reconciliation
@@ -107,8 +146,13 @@ def run_concurrency_test():
     total_telemetry_records = summary["total_records"]
     worker_total_sum = sum(w["total_requests"] for w in summary["workers"])
 
-    reconciliation_pass = (total_telemetry_records == total_queries_expected and worker_total_sum == total_queries_expected)
-    log(f"Phase 4 Telemetry Reconciliation: Expected={total_queries_expected}, Records={total_telemetry_records}, WorkerSum={worker_total_sum} (Reconciled: {reconciliation_pass})")
+    reconciliation_pass = (
+        total_telemetry_records == total_queries_expected
+        and worker_total_sum == total_queries_expected
+    )
+    log(
+        f"Phase 4 Telemetry Reconciliation: Expected={total_queries_expected}, Records={total_telemetry_records}, WorkerSum={worker_total_sum} (Reconciled: {reconciliation_pass})"
+    )
 
     # Write log file
     LOG_FILE.write_text("\n".join(log_records) + "\n", encoding="utf-8")
@@ -138,8 +182,8 @@ This empirical audit verifies the multi-threaded correctness, atomic write safet
 
     report_md += f"""
 **Total Worker Sum**: **{worker_total_sum}**  
-**Global Cache Hits**: **{summary['global_cache_hits']}**  
-**Global Live Requests**: **{summary['global_live_requests']}**  
+**Global Cache Hits**: **{summary["global_cache_hits"]}**  
+**Global Live Requests**: **{summary["global_live_requests"]}**  
 
 ---
 

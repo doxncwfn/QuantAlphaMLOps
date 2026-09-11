@@ -15,31 +15,36 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import sys
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any
 
 import polars as pl
 
+from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool
 from src.identity.resolver.model import (
     IdentityStatus,
     SecurityType,
-    UniverseStatus,
     are_names_consistent,
     classify_universe_status,
-    extract_entity_tokens,
     make_deterministic_unresolved_id,
     make_provisional_cik_id,
     normalize_security_type,
 )
-from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 SPELLS_PATH = REPO_ROOT / "data" / "universe" / "spells.csv"
 OUT_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "v2"
 CACHE_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "cache" / "massive"
-SEC_CACHE_PATH = REPO_ROOT / "data" / "identity" / "experiments" / "resolver_v1" / "api_cache" / "sec" / "company_tickers_exchange.json"
+SEC_CACHE_PATH = (
+    REPO_ROOT
+    / "data"
+    / "identity"
+    / "experiments"
+    / "resolver_v1"
+    / "api_cache"
+    / "sec"
+    / "company_tickers_exchange.json"
+)
 OPENFIGI_CACHE_PATH = REPO_ROOT / "data" / "raw" / "openfigi" / "openfigi_cache.parquet"
 
 OUT_REUSE_PARQUET = OUT_DIR / "full_ticker_reuse_collision_report.parquet"
@@ -47,14 +52,16 @@ OUT_REUSE_MD = OUT_DIR / "full_ticker_reuse_collision_report.md"
 OUT_SAMECIK_PARQUET = OUT_DIR / "same_cik_multiple_security_test.parquet"
 OUT_SAMECIK_MD = OUT_DIR / "same_cik_multiple_security_test.md"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("collision_tests")
 
 
-def load_sec_mapping() -> Dict[str, Dict[str, Any]]:
+def load_sec_mapping() -> dict[str, dict[str, Any]]:
     sec_map = {}
     if SEC_CACHE_PATH.exists():
-        with open(SEC_CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(SEC_CACHE_PATH, encoding="utf-8") as f:
             d = json.load(f)
         fields = d.get("fields", [])
         rows = d.get("data", [])
@@ -63,12 +70,12 @@ def load_sec_mapping() -> Dict[str, Dict[str, Any]]:
             sec_map[tk.upper()] = {
                 "cik": str(r[fields.index("cik")]).zfill(10),
                 "name": r[fields.index("name")],
-                "exchange": r[fields.index("exchange")]
+                "exchange": r[fields.index("exchange")],
             }
     return sec_map
 
 
-def load_openfigi_mapping() -> Dict[str, Dict[str, Any]]:
+def load_openfigi_mapping() -> dict[str, dict[str, Any]]:
     figi_map = {}
     if OPENFIGI_CACHE_PATH.exists():
         df_of = pl.read_parquet(OPENFIGI_CACHE_PATH)
@@ -76,17 +83,17 @@ def load_openfigi_mapping() -> Dict[str, Dict[str, Any]]:
             figi_map[r["query_ticker"].upper()] = {
                 "share_class_figi": r.get("top_share_class_figi"),
                 "name": r.get("top_name"),
-                "sec_type": r.get("top_security_type")
+                "sec_type": r.get("top_security_type"),
             }
     return figi_map
 
 
 def resolve_spell_v2(
-    spell: Dict[str, Any],
+    spell: dict[str, Any],
     pool: ConcurrentKeyWorkerPool,
-    sec_map: Dict[str, Any],
-    figi_map: Dict[str, Any]
-) -> Dict[str, Any]:
+    sec_map: dict[str, Any],
+    figi_map: dict[str, Any],
+) -> dict[str, Any]:
     tk = spell["ticker"].strip().upper()
     seq = spell["spell_seq"]
     s_date = spell["start_date"]
@@ -150,7 +157,9 @@ def resolve_spell_v2(
         # Corroborated with OpenFIGI ONLY IF SEC CIK matches Massive CIK AND names consistent
         corroborated = False
         if s_cik and s_cik == m_cik:
-            if are_names_consistent(of_name, s_name) or are_names_consistent(m_name, of_name):
+            if are_names_consistent(of_name, s_name) or are_names_consistent(
+                m_name, of_name
+            ):
                 corroborated = True
 
         if corroborated and of_figi:
@@ -177,7 +186,9 @@ def resolve_spell_v2(
         is_canonical = False
         id_status = IdentityStatus.UNRESOLVED
         id_conf = "LOW"
-        decision_reason = "No authoritative PIT FIGI or CIK evidence; isolated deterministically."
+        decision_reason = (
+            "No authoritative PIT FIGI or CIK evidence; isolated deterministically."
+        )
 
     return {
         "ticker": tk,
@@ -200,7 +211,7 @@ def resolve_spell_v2(
         "identity_type": sec_type,
         "research_universe_status": univ_status,
         "conflict_flag": conflict_flag,
-        "decision_reason": decision_reason
+        "decision_reason": decision_reason,
     }
 
 
@@ -219,19 +230,44 @@ def run_all_collision_tests():
     # -------------------------------------------------------------------------
     # Test 1: Section 4 - Ticker-Reuse Collision Test across Multi-Spell Tickers
     # -------------------------------------------------------------------------
-    multi_spell_counts = df_spells.group_by("ticker").agg(pl.len().alias("spell_count")).filter(pl.col("spell_count") > 1)
+    multi_spell_counts = (
+        df_spells.group_by("ticker")
+        .agg(pl.len().alias("spell_count"))
+        .filter(pl.col("spell_count") > 1)
+    )
     multi_tickers = set(multi_spell_counts["ticker"].to_list())
     logger.info("Total multi-spell tickers in universe: %d tickers", len(multi_tickers))
 
     # Evaluate all spells for negative controls + sampled multi-spell tickers
-    control_tickers = ["ACMR", "AAC", "MON", "META", "AAA", "CMCSA", "SIVB", "NOW", "SHOP", "APC", "BBBY", "BSC", "DISC.A", "LINT.A"]
-    eval_tickers = sorted(list(multi_tickers.intersection(set(control_tickers))))
+    control_tickers = [
+        "ACMR",
+        "AAC",
+        "MON",
+        "META",
+        "AAA",
+        "CMCSA",
+        "SIVB",
+        "NOW",
+        "SHOP",
+        "APC",
+        "BBBY",
+        "BSC",
+        "DISC.A",
+        "LINT.A",
+    ]
+    eval_tickers = sorted(multi_tickers.intersection(set(control_tickers)))
     # Add an additional sample of multi-spell tickers
     extra_multi = sorted([t for t in multi_tickers if t not in eval_tickers])[:50]
     eval_tickers.extend(extra_multi)
 
-    df_eval_spells = df_spells.filter(pl.col("ticker").is_in(eval_tickers)).sort(["ticker", "spell_seq"])
-    logger.info("Resolving %d spells across %d multi-spell tickers...", df_eval_spells.height, len(eval_tickers))
+    df_eval_spells = df_spells.filter(pl.col("ticker").is_in(eval_tickers)).sort(
+        ["ticker", "spell_seq"]
+    )
+    logger.info(
+        "Resolving %d spells across %d multi-spell tickers...",
+        df_eval_spells.height,
+        len(eval_tickers),
+    )
 
     resolved_spells = []
     for s in df_eval_spells.iter_rows(named=True):
@@ -243,7 +279,9 @@ def run_all_collision_tests():
     # Evaluate pairwise separation across multi-spell tickers
     reuse_evals = []
     for tk in eval_tickers:
-        t_spells = df_resolved.filter(pl.col("ticker") == tk).sort("spell_seq").to_dicts()
+        t_spells = (
+            df_resolved.filter(pl.col("ticker") == tk).sort("spell_seq").to_dicts()
+        )
         for i in range(len(t_spells)):
             for j in range(i + 1, len(t_spells)):
                 s1 = t_spells[i]
@@ -255,7 +293,7 @@ def run_all_collision_tests():
                 name1, name2 = s1["massive_name"], s2["massive_name"]
                 type1, type2 = s1["identity_type"], s2["identity_type"]
 
-                same_id = (s1["security_id"] == s2["security_id"])
+                same_id = s1["security_id"] == s2["security_id"]
 
                 # Determine ground truth relationship
                 is_contradictory = False
@@ -274,8 +312,13 @@ def run_all_collision_tests():
                     relationship = "SAME_ISSUER_CONTINUITY"
 
                 # Evaluation: Did V2 falsely merge contradictory spells?
-                false_merge = (same_id and is_contradictory)
-                false_split = (not same_id and relationship == "SAME_ISSUER_CONTINUITY" and s1["is_canonical"] and s2["is_canonical"])
+                false_merge = same_id and is_contradictory
+                false_split = (
+                    not same_id
+                    and relationship == "SAME_ISSUER_CONTINUITY"
+                    and s1["is_canonical"]
+                    and s2["is_canonical"]
+                )
 
                 if false_merge:
                     verdict = "FAIL_FALSE_MERGE"
@@ -284,26 +327,32 @@ def run_all_collision_tests():
                 else:
                     verdict = "PASS_SEPARATED"
 
-                reuse_evals.append({
-                    "ticker": tk,
-                    "spell_1": s1["spell_seq"],
-                    "spell_2": s2["spell_seq"],
-                    "date_1": s1["representative_date"],
-                    "date_2": s2["representative_date"],
-                    "id_1": s1["security_id"],
-                    "id_2": s2["security_id"],
-                    "name_1": name1 or s1["openfigi_name"],
-                    "name_2": name2 or s2["openfigi_name"],
-                    "relationship": relationship,
-                    "is_contradictory": is_contradictory,
-                    "false_merge_detected": false_merge,
-                    "false_split_detected": false_split,
-                    "separation_verdict": verdict
-                })
+                reuse_evals.append(
+                    {
+                        "ticker": tk,
+                        "spell_1": s1["spell_seq"],
+                        "spell_2": s2["spell_seq"],
+                        "date_1": s1["representative_date"],
+                        "date_2": s2["representative_date"],
+                        "id_1": s1["security_id"],
+                        "id_2": s2["security_id"],
+                        "name_1": name1 or s1["openfigi_name"],
+                        "name_2": name2 or s2["openfigi_name"],
+                        "relationship": relationship,
+                        "is_contradictory": is_contradictory,
+                        "false_merge_detected": false_merge,
+                        "false_split_detected": false_split,
+                        "separation_verdict": verdict,
+                    }
+                )
 
     df_reuse = pl.DataFrame(reuse_evals)
     df_reuse.write_parquet(OUT_REUSE_PARQUET)
-    logger.info("Saved ticker-reuse collision report to %s (%d pairs)", OUT_REUSE_PARQUET, df_reuse.height)
+    logger.info(
+        "Saved ticker-reuse collision report to %s (%d pairs)",
+        OUT_REUSE_PARQUET,
+        df_reuse.height,
+    )
 
     # -------------------------------------------------------------------------
     # Test 2: Section 5 - Same-CIK / Multiple-Security Test
@@ -317,19 +366,89 @@ def run_all_collision_tests():
     # 5. Ares SPAC 3 (CIK 0002128115): AAC (Class A) vs AAC.U (Units) vs AAC.WS (Warrants)
     multi_sec_cases = [
         # Alphabet
-        {"ticker": "GOOG", "spell_seq": 1, "start_date": "2014-04-03", "representative_date": "2020-01-02", "issuer": "Alphabet Inc", "class": "Class C"},
-        {"ticker": "GOOGL", "spell_seq": 1, "start_date": "2004-08-19", "representative_date": "2020-01-02", "issuer": "Alphabet Inc", "class": "Class A"},
+        {
+            "ticker": "GOOG",
+            "spell_seq": 1,
+            "start_date": "2014-04-03",
+            "representative_date": "2020-01-02",
+            "issuer": "Alphabet Inc",
+            "class": "Class C",
+        },
+        {
+            "ticker": "GOOGL",
+            "spell_seq": 1,
+            "start_date": "2004-08-19",
+            "representative_date": "2020-01-02",
+            "issuer": "Alphabet Inc",
+            "class": "Class A",
+        },
         # Discovery
-        {"ticker": "DISCA", "spell_seq": 1, "start_date": "2008-09-18", "representative_date": "2015-06-15", "issuer": "Discovery Inc", "class": "Class A"},
-        {"ticker": "DISCK", "spell_seq": 1, "start_date": "2008-09-18", "representative_date": "2015-06-15", "issuer": "Discovery Inc", "class": "Class C"},
+        {
+            "ticker": "DISCA",
+            "spell_seq": 1,
+            "start_date": "2008-09-18",
+            "representative_date": "2015-06-15",
+            "issuer": "Discovery Inc",
+            "class": "Class A",
+        },
+        {
+            "ticker": "DISCK",
+            "spell_seq": 1,
+            "start_date": "2008-09-18",
+            "representative_date": "2015-06-15",
+            "issuer": "Discovery Inc",
+            "class": "Class C",
+        },
         # Ares SPAC 1 (Multi-instrument under CIK 0001829432)
-        {"ticker": "AAC", "spell_seq": 4, "start_date": "2021-02-01", "representative_date": "2022-07-15", "issuer": "Ares Acquisition Corp", "class": "Class A Common"},
-        {"ticker": "AAC.U", "spell_seq": 1, "start_date": "2021-02-01", "representative_date": "2022-06-17", "issuer": "Ares Acquisition Corp", "class": "Units"},
-        {"ticker": "AAC.WS", "spell_seq": 1, "start_date": "2021-02-01", "representative_date": "2022-07-15", "issuer": "Ares Acquisition Corp", "class": "Warrants"},
+        {
+            "ticker": "AAC",
+            "spell_seq": 4,
+            "start_date": "2021-02-01",
+            "representative_date": "2022-07-15",
+            "issuer": "Ares Acquisition Corp",
+            "class": "Class A Common",
+        },
+        {
+            "ticker": "AAC.U",
+            "spell_seq": 1,
+            "start_date": "2021-02-01",
+            "representative_date": "2022-06-17",
+            "issuer": "Ares Acquisition Corp",
+            "class": "Units",
+        },
+        {
+            "ticker": "AAC.WS",
+            "spell_seq": 1,
+            "start_date": "2021-02-01",
+            "representative_date": "2022-07-15",
+            "issuer": "Ares Acquisition Corp",
+            "class": "Warrants",
+        },
         # Ares SPAC 3 (Multi-instrument under CIK 0002128115)
-        {"ticker": "AAC", "spell_seq": 5, "start_date": "2026-03-27", "representative_date": "2026-08-28", "issuer": "Ares Acquisition Corp III", "class": "Class A Common"},
-        {"ticker": "AAC.U", "spell_seq": 2, "start_date": "2026-03-27", "representative_date": "2026-07-30", "issuer": "Ares Acquisition Corp III", "class": "Units"},
-        {"ticker": "AAC.WS", "spell_seq": 2, "start_date": "2026-03-27", "representative_date": "2026-08-28", "issuer": "Ares Acquisition Corp III", "class": "Warrants"},
+        {
+            "ticker": "AAC",
+            "spell_seq": 5,
+            "start_date": "2026-03-27",
+            "representative_date": "2026-08-28",
+            "issuer": "Ares Acquisition Corp III",
+            "class": "Class A Common",
+        },
+        {
+            "ticker": "AAC.U",
+            "spell_seq": 2,
+            "start_date": "2026-03-27",
+            "representative_date": "2026-07-30",
+            "issuer": "Ares Acquisition Corp III",
+            "class": "Units",
+        },
+        {
+            "ticker": "AAC.WS",
+            "spell_seq": 2,
+            "start_date": "2026-03-27",
+            "representative_date": "2026-08-28",
+            "issuer": "Ares Acquisition Corp III",
+            "class": "Warrants",
+        },
     ]
 
     same_cik_resolved = []
@@ -349,31 +468,43 @@ def run_all_collision_tests():
             s2 = same_cik_resolved[j]
 
             # Compare only if they share the same issuer or CIK
-            same_issuer = (s1["expected_issuer"] == s2["expected_issuer"])
+            same_issuer = s1["expected_issuer"] == s2["expected_issuer"]
             if same_issuer:
-                same_id = (s1["security_id"] == s2["security_id"])
-                same_class = (s1["share_class_description"] == s2["share_class_description"])
-                
+                same_id = s1["security_id"] == s2["security_id"]
+                same_class = (
+                    s1["share_class_description"] == s2["share_class_description"]
+                )
+
                 # Fatal violation if two distinct share classes / instruments receive the same security_id
                 illegal_collision = same_id and not same_class
-                verdict = "FAIL_SAME_CIK_COLLISION" if illegal_collision else "PASS_DISTINCT_SECURITIES_SEPARATED"
+                verdict = (
+                    "FAIL_SAME_CIK_COLLISION"
+                    if illegal_collision
+                    else "PASS_DISTINCT_SECURITIES_SEPARATED"
+                )
 
-                same_cik_evals.append({
-                    "issuer": s1["expected_issuer"],
-                    "instrument_1": f"{s1['ticker']} ({s1['share_class_description']})",
-                    "id_1": s1["security_id"],
-                    "type_1": s1["identity_type"],
-                    "instrument_2": f"{s2['ticker']} ({s2['share_class_description']})",
-                    "id_2": s2["security_id"],
-                    "type_2": s2["identity_type"],
-                    "same_security_id": same_id,
-                    "illegal_collision": illegal_collision,
-                    "verdict": verdict
-                })
+                same_cik_evals.append(
+                    {
+                        "issuer": s1["expected_issuer"],
+                        "instrument_1": f"{s1['ticker']} ({s1['share_class_description']})",
+                        "id_1": s1["security_id"],
+                        "type_1": s1["identity_type"],
+                        "instrument_2": f"{s2['ticker']} ({s2['share_class_description']})",
+                        "id_2": s2["security_id"],
+                        "type_2": s2["identity_type"],
+                        "same_security_id": same_id,
+                        "illegal_collision": illegal_collision,
+                        "verdict": verdict,
+                    }
+                )
 
     df_same_cik_eval = pl.DataFrame(same_cik_evals)
     df_same_cik_eval.write_parquet(OUT_SAMECIK_PARQUET)
-    logger.info("Saved same-CIK collision evaluation to %s (%d pairs)", OUT_SAMECIK_PARQUET, df_same_cik_eval.height)
+    logger.info(
+        "Saved same-CIK collision evaluation to %s (%d pairs)",
+        OUT_SAMECIK_PARQUET,
+        df_same_cik_eval.height,
+    )
 
     # Generate Reports
     generate_reuse_report(df_reuse)
@@ -384,8 +515,12 @@ def generate_reuse_report(df_reuse: pl.DataFrame):
     total = df_reuse.height
     n_false_merges = df_reuse.filter(pl.col("false_merge_detected") == True).height
     n_false_splits = df_reuse.filter(pl.col("false_split_detected") == True).height
-    n_separated = df_reuse.filter(pl.col("separation_verdict") == "PASS_SEPARATED").height
-    n_linked = df_reuse.filter(pl.col("separation_verdict") == "PASS_SAME_SECURITY_LINKED").height
+    n_separated = df_reuse.filter(
+        pl.col("separation_verdict") == "PASS_SEPARATED"
+    ).height
+    n_linked = df_reuse.filter(
+        pl.col("separation_verdict") == "PASS_SAME_SECURITY_LINKED"
+    ).height
 
     # Check the 14 negative controls specifically
     neg_control_tickers = ["ACMR", "AAC", "MON", "META", "AAA"]
@@ -393,7 +528,9 @@ def generate_reuse_report(df_reuse: pl.DataFrame):
     n_ctrl_false_merges = df_ctrl.filter(pl.col("false_merge_detected") == True).height
 
     table_rows = []
-    for r in df_reuse.filter(pl.col("ticker").is_in(neg_control_tickers)).iter_rows(named=True):
+    for r in df_reuse.filter(pl.col("ticker").is_in(neg_control_tickers)).iter_rows(
+        named=True
+    ):
         n1 = (r["name_1"] or "—")[:18]
         n2 = (r["name_2"] or "—")[:18]
         table_rows.append(
@@ -455,7 +592,7 @@ def generate_same_cik_report(df_eval: pl.DataFrame):
         )
     table_md = "\n".join(rows_md)
 
-    report_md = f"""# Section 5: Same-CIK / Multi-Security Test Report
+    report_md = rf"""# Section 5: Same-CIK / Multi-Security Test Report
 
 **Investigation Scope**: Multi-Share Class & Multi-Instrument Issuer Collision Audit  
 **Priority Level**: CRITICAL / HIGH PRIORITY  

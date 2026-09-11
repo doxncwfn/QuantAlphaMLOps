@@ -8,11 +8,8 @@ and rendering the formal production recommendation.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
 
 import polars as pl
 
@@ -20,7 +17,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 OUT_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "v2"
 GATE_REPORT_PATH = OUT_DIR / "PRODUCTION_GATE_REPORT.md"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("gate_report")
 
 

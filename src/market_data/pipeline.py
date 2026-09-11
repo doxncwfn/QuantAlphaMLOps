@@ -19,8 +19,7 @@ def setup_logging() -> logging.Logger:
     logger.handlers.clear()
 
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)-7s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     console = logging.StreamHandler(sys.stdout)
@@ -60,8 +59,8 @@ def main():
         logger.info("MARKET DATA LAYER PIPELINE COMPLETED IN %.2f SECONDS.", t_elapsed)
         logger.info("=" * 80)
 
-    except Exception as exc:
-        logger.exception("Fatal error in market data pipeline: %s", exc)
+    except Exception:
+        logger.exception("Fatal error in market data pipeline")
         sys.exit(1)
 
 

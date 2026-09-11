@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ def retry_with_backoff(
     max_retries: int = 3,
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
-    allowed_exceptions: tuple = (Exception,)
+    allowed_exceptions: tuple = (Exception,),
 ) -> T:
     """Executes func with exponential backoff on allowed exceptions."""
     delay = initial_delay
@@ -30,7 +31,9 @@ def retry_with_backoff(
             if attempt == max_retries:
                 logger.warning("Failed after %d attempts: %s", max_retries, exc)
                 raise exc
-            logger.debug("Attempt %d failed (%s). Retrying in %.2fs...", attempt, exc, delay)
+            logger.debug(
+                "Attempt %d failed (%s). Retrying in %.2fs...", attempt, exc, delay
+            )
             time.sleep(delay)
             delay *= backoff_factor
 

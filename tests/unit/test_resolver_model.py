@@ -3,7 +3,6 @@
 import unittest
 
 from src.identity.resolver.model import (
-    IdentityStatus,
     SecurityType,
     UniverseStatus,
     classify_universe_status,
@@ -25,9 +24,15 @@ class TestResolverModel(unittest.TestCase):
         self.assertTrue(id2.startswith("UNRESOLVED_AAPL_2_"))
 
     def test_classify_universe_status(self):
-        self.assertEqual(classify_universe_status(SecurityType.COMMON_STOCK), UniverseStatus.INCLUDE)
-        self.assertEqual(classify_universe_status(SecurityType.ETF), UniverseStatus.EXCLUDE)
-        self.assertEqual(classify_universe_status(SecurityType.UNKNOWN), UniverseStatus.QUARANTINE)
+        self.assertEqual(
+            classify_universe_status(SecurityType.COMMON_STOCK), UniverseStatus.INCLUDE
+        )
+        self.assertEqual(
+            classify_universe_status(SecurityType.ETF), UniverseStatus.EXCLUDE
+        )
+        self.assertEqual(
+            classify_universe_status(SecurityType.UNKNOWN), UniverseStatus.QUARANTINE
+        )
 
 
 if __name__ == "__main__":

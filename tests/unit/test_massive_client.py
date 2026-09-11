@@ -2,15 +2,16 @@
 
 import unittest
 from unittest.mock import MagicMock, patch
-import requests
 
-from src.identity.massive.client import MassiveClient
 from src.common.rate_limiter import PerKeyRateLimiter
+from src.identity.massive.client import MassiveClient
 
 
 class TestMassiveClient(unittest.TestCase):
     def setUp(self):
-        self.rate_limiter = PerKeyRateLimiter(min_interval_seconds=0.001, initial_backoff_seconds=0.001)
+        self.rate_limiter = PerKeyRateLimiter(
+            min_interval_seconds=0.001, initial_backoff_seconds=0.001
+        )
         self.client = MassiveClient(
             api_key="TEST_API_KEY",
             rate_limiter=self.rate_limiter,
@@ -32,7 +33,11 @@ class TestMassiveClient(unittest.TestCase):
     def test_extract_match_dot_notation(self):
         data = {
             "results": [
-                {"ticker": "CMCSA", "cik": "0001234567", "name": "Comcast Corp Class A"},
+                {
+                    "ticker": "CMCSA",
+                    "cik": "0001234567",
+                    "name": "Comcast Corp Class A",
+                },
             ]
         }
         match = MassiveClient.extract_match(data, "CMCS.A")
@@ -49,11 +54,19 @@ class TestMassiveClient(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
-            "results": [{"ticker": "AAPL", "cik": "0000320193", "share_class_figi": "BBG001S5N8V8"}]
+            "results": [
+                {
+                    "ticker": "AAPL",
+                    "cik": "0000320193",
+                    "share_class_figi": "BBG001S5N8V8",
+                }
+            ]
         }
         mock_get.return_value = mock_resp
 
-        match, raw, outcome, status, retries = self.client.query_pit("AAPL", "2020-01-02")
+        match, raw, outcome, status, retries = self.client.query_pit(
+            "AAPL", "2020-01-02"
+        )
         self.assertEqual(outcome, "SUCCESS")
         self.assertEqual(status, 200)
         self.assertEqual(retries, 0)
@@ -66,7 +79,9 @@ class TestMassiveClient(unittest.TestCase):
         mock_resp.json.return_value = {"results": []}
         mock_get.return_value = mock_resp
 
-        match, raw, outcome, status, retries = self.client.query_pit("EMPTY_TICKER", "2020-01-02")
+        match, raw, outcome, status, retries = self.client.query_pit(
+            "EMPTY_TICKER", "2020-01-02"
+        )
         self.assertEqual(outcome, "MASSIVE_EMPTY")
         self.assertEqual(status, 200)
 
@@ -76,7 +91,9 @@ class TestMassiveClient(unittest.TestCase):
         mock_resp.status_code = 404
         mock_get.return_value = mock_resp
 
-        match, raw, outcome, status, retries = self.client.query_pit("UNKNOWN", "2020-01-02")
+        match, raw, outcome, status, retries = self.client.query_pit(
+            "UNKNOWN", "2020-01-02"
+        )
         self.assertEqual(outcome, "NOT_FOUND")
         self.assertEqual(status, 404)
 

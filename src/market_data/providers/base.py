@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional
+
 import polars as pl
 
 
@@ -12,11 +12,8 @@ class BaseMarketDataProvider(ABC):
 
     @abstractmethod
     def fetch_daily_bars(
-        self,
-        ticker: str,
-        start_date: str,
-        end_date: str
-    ) -> Optional[pl.DataFrame]:
+        self, ticker: str, start_date: str, end_date: str
+    ) -> pl.DataFrame | None:
         """Fetches daily OHLCV bars.
 
         Returns standard schema:
@@ -28,4 +25,3 @@ class BaseMarketDataProvider(ABC):
             adj_close: pl.Float64
             volume: pl.Float64
         """
-        pass

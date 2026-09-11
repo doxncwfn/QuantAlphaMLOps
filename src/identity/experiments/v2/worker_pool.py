@@ -19,19 +19,25 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from dotenv import dotenv_values
 import requests
+from dotenv import dotenv_values
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 ENV_PATH = REPO_ROOT / "src" / ".env"
 LOG_DIR = REPO_ROOT / "log" / "identity_v2"
 CACHE_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "cache" / "massive"
 LEGACY_CACHE_DIRS = [
-    REPO_ROOT / "data" / "identity" / "experiments" / "resolver_v1" / "api_cache" / "massive",
+    REPO_ROOT
+    / "data"
+    / "identity"
+    / "experiments"
+    / "resolver_v1"
+    / "api_cache"
+    / "massive",
     REPO_ROOT / "data" / "identity" / "experiments" / "raw_massive",
-    REPO_ROOT / "data" / "raw" / "massive" / "reference_cache"
+    REPO_ROOT / "data" / "raw" / "massive" / "reference_cache",
 ]
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -40,10 +46,11 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 class WorkerTelemetry:
     """Thread-safe telemetry collector for worker operations."""
+
     def __init__(self):
         self._lock = threading.Lock()
-        self.records: List[Dict[str, Any]] = []
-        self.worker_stats: Dict[str, Dict[str, Any]] = {}
+        self.records: list[dict[str, Any]] = []
+        self.worker_stats: dict[str, dict[str, Any]] = {}
 
     def init_worker(self, worker_id: str):
         with self._lock:
@@ -59,7 +66,7 @@ class WorkerTelemetry:
                     "errors": 0,
                     "retries": 0,
                     "total_latency_ms": 0.0,
-                    "latencies_ms": []
+                    "latencies_ms": [],
                 }
 
     def record_request(
@@ -74,7 +81,7 @@ class WorkerTelemetry:
         retry_count: int,
         is_cache: bool,
         is_live: bool,
-        error_category: Optional[str] = None
+        error_category: str | None = None,
     ):
         latency_ms = (resp_ts - req_ts) * 1000.0
         rec = {
@@ -89,7 +96,7 @@ class WorkerTelemetry:
             "retry_count": retry_count,
             "is_cache": is_cache,
             "is_live": is_live,
-            "error_category": error_category or "NONE"
+            "error_category": error_category or "NONE",
         }
         with self._lock:
             self.records.append(rec)
@@ -116,33 +123,38 @@ class WorkerTelemetry:
             if st:
                 st["empty_responses"] += 1
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         with self._lock:
             all_live_latencies = []
             for st in self.worker_stats.values():
                 all_live_latencies.extend(st["latencies_ms"])
             all_live_latencies.sort()
 
-            median_lat = (all_live_latencies[len(all_live_latencies)//2]
-                          if all_live_latencies else 0.0)
-            p95_lat = (all_live_latencies[int(len(all_live_latencies)*0.95)]
-                       if all_live_latencies else 0.0)
+            median_lat = (
+                all_live_latencies[len(all_live_latencies) // 2]
+                if all_live_latencies
+                else 0.0
+            )
+            p95_lat = (
+                all_live_latencies[int(len(all_live_latencies) * 0.95)]
+                if all_live_latencies
+                else 0.0
+            )
 
             return {
                 "total_records": len(self.records),
                 "workers": list(self.worker_stats.values()),
                 "all_live_latencies_count": len(all_live_latencies),
                 "median_latency_ms": median_lat,
-                "p95_latency_ms": p95_lat
+                "p95_latency_ms": p95_lat,
             }
 
 
 class ConcurrentKeyWorkerPool:
     """Manages 9 concurrent worker channels, each with a private API key."""
+
     def __init__(
-        self,
-        min_per_key_interval: float = 12.1,
-        logger: Optional[logging.Logger] = None
+        self, min_per_key_interval: float = 12.1, logger: logging.Logger | None = None
     ):
         self.min_per_key_interval = min_per_key_interval
         self.logger = logger or logging.getLogger("worker_pool")
@@ -150,42 +162,51 @@ class ConcurrentKeyWorkerPool:
 
         # Load keys from environment
         env = dotenv_values(ENV_PATH)
-        key_items = sorted([
-            (k, v) for k, v in env.items()
-            if k.startswith("MASSIVE_API_KEY") and v and not v.startswith("your_")
-        ])
+        key_items = sorted(
+            [
+                (k, v)
+                for k, v in env.items()
+                if k.startswith("MASSIVE_API_KEY") and v and not v.startswith("your_")
+            ]
+        )
 
         if not key_items:
             fallback = env.get("MASSIVE_API_KEY") or "IbC9qw1ouX7vSkiyYpGVaDk9jCrk2t_K"
             key_items = [("MASSIVE_API_KEY_1", fallback)]
 
-        self.workers: List[Dict[str, Any]] = []
+        self.workers: list[dict[str, Any]] = []
         for idx, (k_name, k_val) in enumerate(key_items, 1):
             w_id = f"WORKER_{idx}"
-            self.workers.append({
-                "worker_id": w_id,
-                "api_key": k_val,  # NEVER logged or exported
-                "last_used": 0.0,
-                "backoff_until": 0.0,
-                "lock": threading.Lock()
-            })
+            self.workers.append(
+                {
+                    "worker_id": w_id,
+                    "api_key": k_val,  # NEVER logged or exported
+                    "last_used": 0.0,
+                    "backoff_until": 0.0,
+                    "lock": threading.Lock(),
+                }
+            )
             self.telemetry.init_worker(w_id)
 
         self.round_robin_idx = 0
         self.rr_lock = threading.Lock()
         self.logger.info(
             "Initialized ConcurrentKeyWorkerPool with %d masked workers (WORKER_1 to WORKER_%d). Rate limit: %.1fs per worker.",
-            len(self.workers), len(self.workers), self.min_per_key_interval
+            len(self.workers),
+            len(self.workers),
+            self.min_per_key_interval,
         )
 
     def num_workers(self) -> int:
         return len(self.workers)
 
-    def _atomic_write_cache(self, cache_file: Path, data: Dict[str, Any]):
+    def _atomic_write_cache(self, cache_file: Path, data: dict[str, Any]):
         """Safe atomic write: writes to temporary file in same folder, then renames."""
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         temp_dir = cache_file.parent
-        with tempfile.NamedTemporaryFile("w", dir=temp_dir, delete=False, encoding="utf-8") as tf:
+        with tempfile.NamedTemporaryFile(
+            "w", dir=temp_dir, delete=False, encoding="utf-8"
+        ) as tf:
             json.dump(data, tf, indent=2)
             temp_path = Path(tf.name)
         # Atomic rename replaces existing file safely without partial reads
@@ -196,8 +217,8 @@ class ConcurrentKeyWorkerPool:
         ticker: str,
         query_date: str,
         spell_id: str = "UNKNOWN",
-        preferred_worker_idx: Optional[int] = None
-    ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+        preferred_worker_idx: int | None = None,
+    ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
         """
         Queries Massive reference ticker metadata for (ticker, date).
         Checks shared multi-level cache first. If missing, assigns to a worker and queries live API.
@@ -211,7 +232,7 @@ class ConcurrentKeyWorkerPool:
         # 1. Check primary V2 cache
         if primary_cache_file.exists():
             try:
-                with open(primary_cache_file, "r", encoding="utf-8") as f:
+                with open(primary_cache_file, encoding="utf-8") as f:
                     data = json.load(f)
                 matched = self._extract_match(data, clean_tk)
                 self.telemetry.record_request(
@@ -224,18 +245,20 @@ class ConcurrentKeyWorkerPool:
                     http_status=200,
                     retry_count=0,
                     is_cache=True,
-                    is_live=False
+                    is_live=False,
                 )
                 return matched, {"source": "CACHE", "worker": "CACHE", "cached": True}
-            except Exception:
-                pass
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError, KeyError) as err:
+                self.logger.debug(
+                    "Cache read error for %s: %s", primary_cache_file, err
+                )
 
         # 2. Check legacy fallback caches
         for leg_dir in LEGACY_CACHE_DIRS:
             leg_file = leg_dir / cache_filename
             if leg_file.exists():
                 try:
-                    with open(leg_file, "r", encoding="utf-8") as f:
+                    with open(leg_file, encoding="utf-8") as f:
                         data = json.load(f)
                     # Promote into primary V2 cache atomically
                     self._atomic_write_cache(primary_cache_file, data)
@@ -250,15 +273,28 @@ class ConcurrentKeyWorkerPool:
                         http_status=200,
                         retry_count=0,
                         is_cache=True,
-                        is_live=False
+                        is_live=False,
                     )
-                    return matched, {"source": "LEGACY_CACHE", "worker": "CACHE", "cached": True}
-                except Exception:
-                    pass
+                    return matched, {
+                        "source": "LEGACY_CACHE",
+                        "worker": "CACHE",
+                        "cached": True,
+                    }
+                except (
+                    OSError,
+                    json.JSONDecodeError,
+                    UnicodeDecodeError,
+                    KeyError,
+                ) as err:
+                    self.logger.debug(
+                        "Legacy cache read error for %s: %s", leg_file, err
+                    )
 
         # 3. Live Query via Worker Pool
         # Select worker
-        if preferred_worker_idx is not None and 0 <= preferred_worker_idx < len(self.workers):
+        if preferred_worker_idx is not None and 0 <= preferred_worker_idx < len(
+            self.workers
+        ):
             worker = self.workers[preferred_worker_idx]
         else:
             with self.rr_lock:
@@ -277,7 +313,9 @@ class ConcurrentKeyWorkerPool:
                 # Check 429 backoff
                 if now < worker["backoff_until"]:
                     wait_backoff = worker["backoff_until"] - now
-                    self.logger.warning("[%s] Under 429 backoff. Waiting %.1fs...", w_id, wait_backoff)
+                    self.logger.warning(
+                        "[%s] Under 429 backoff. Waiting %.1fs...", w_id, wait_backoff
+                    )
                     time.sleep(min(30.0, wait_backoff))
 
                 # Enforce per-key interval
@@ -293,7 +331,7 @@ class ConcurrentKeyWorkerPool:
                 resp = requests.get(
                     url,
                     params={"ticker": clean_tk, "date": query_date, "apiKey": api_key},
-                    timeout=12
+                    timeout=12,
                 )
                 resp_t = time.time()
 
@@ -314,9 +352,13 @@ class ConcurrentKeyWorkerPool:
                         http_status=200,
                         retry_count=retry_cnt,
                         is_cache=False,
-                        is_live=True
+                        is_live=True,
                     )
-                    return matched, {"source": "LIVE_API", "worker": w_id, "cached": False}
+                    return matched, {
+                        "source": "LIVE_API",
+                        "worker": w_id,
+                        "cached": False,
+                    }
 
                 elif resp.status_code == 429:
                     retry_cnt += 1
@@ -333,7 +375,7 @@ class ConcurrentKeyWorkerPool:
                         retry_count=retry_cnt,
                         is_cache=False,
                         is_live=True,
-                        error_category="RATE_LIMIT_429"
+                        error_category="RATE_LIMIT_429",
                     )
                     time.sleep(2.0)
                     continue
@@ -351,12 +393,17 @@ class ConcurrentKeyWorkerPool:
                         retry_count=retry_cnt,
                         is_cache=False,
                         is_live=True,
-                        error_category=f"HTTP_{resp.status_code}"
+                        error_category=f"HTTP_{resp.status_code}",
                     )
                     time.sleep(1.0)
                     continue
 
-            except Exception as e:
+            except (
+                requests.RequestException,
+                OSError,
+                json.JSONDecodeError,
+                ValueError,
+            ) as e:
                 retry_cnt += 1
                 resp_t = time.time()
                 self.telemetry.record_request(
@@ -370,17 +417,22 @@ class ConcurrentKeyWorkerPool:
                     retry_count=retry_cnt,
                     is_cache=False,
                     is_live=True,
-                    error_category=type(e).__name__
+                    error_category=type(e).__name__,
                 )
                 time.sleep(1.5)
 
         return None, {"source": "FAILED", "worker": w_id, "cached": False}
 
-    def _extract_match(self, payload: Dict[str, Any], target_ticker: str) -> Optional[Dict[str, Any]]:
+    def _extract_match(
+        self, payload: dict[str, Any], target_ticker: str
+    ) -> dict[str, Any] | None:
         results = payload.get("results", [])
         if isinstance(results, list) and len(results) > 0:
             for item in results:
-                if isinstance(item, dict) and item.get("ticker", "").upper() == target_ticker:
+                if (
+                    isinstance(item, dict)
+                    and item.get("ticker", "").upper() == target_ticker
+                ):
                     return item
             if isinstance(results[0], dict):
                 return results[0]

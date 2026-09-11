@@ -8,18 +8,11 @@ data coverage gaps, and formalizes the policy: MASSIVE_EMPTY != SECURITY_INACTIV
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 from pathlib import Path
-from typing import Any, Dict, List
 
 import polars as pl
 
-from src.identity.resolver.model import (
-    IdentityStatus,
-    normalize_security_type,
-)
 from src.identity.aliases.alias_engine import generate_alias_candidates
 from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool
 
@@ -31,7 +24,9 @@ OPENFIGI_CACHE_PATH = REPO_ROOT / "data" / "raw" / "openfigi" / "openfigi_cache.
 OUT_PARQUET = OUT_DIR / "massive_empty_analysis.parquet"
 OUT_MD = OUT_DIR / "massive_empty_analysis.md"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("empty_analysis")
 
 
@@ -85,9 +80,14 @@ def run_empty_analysis():
     # 4. Standard spells
     dot_spells = df_spells.filter(pl.col("ticker").str.contains(r"[./\-wW]")).head(150)
     short_spells = df_spells.filter(pl.col("n_sessions") <= 3).head(100)
-    sample_combined = pl.concat([dot_spells, short_spells]).unique(subset=["ticker", "spell_seq"])
+    sample_combined = pl.concat([dot_spells, short_spells]).unique(
+        subset=["ticker", "spell_seq"]
+    )
 
-    logger.info("Evaluating %d candidate spells for empty response analysis...", sample_combined.height)
+    logger.info(
+        "Evaluating %d candidate spells for empty response analysis...",
+        sample_combined.height,
+    )
 
     empty_records = []
     total_evaluated = 0
@@ -103,10 +103,12 @@ def run_empty_analysis():
         total_evaluated += 1
         rec, telem = pool.query(tk, s_date, spell_id=f"EMPTY_{tk}_{seq}")
 
-        is_empty = (rec is None or (not rec.get("cik") and not rec.get("share_class_figi")))
+        is_empty = rec is None or (
+            not rec.get("cik") and not rec.get("share_class_figi")
+        )
         if is_empty:
             total_empty += 1
-            has_of = (tk in figi_set)
+            has_of = tk in figi_set
             cause = categorize_empty_cause(tk, s_date, dur, has_of)
 
             # Test symbol aliases if dot or warrant
@@ -115,32 +117,46 @@ def run_empty_analysis():
             resolved_candidate = None
             if len(candidates) > 1:
                 for cand in candidates[1:]:  # test non-original candidates
-                    cand_rec, _ = pool.query(cand, s_date, spell_id=f"ALIAS_{cand}_{seq}")
-                    if cand_rec and (cand_rec.get("cik") or cand_rec.get("share_class_figi")):
+                    cand_rec, _ = pool.query(
+                        cand, s_date, spell_id=f"ALIAS_{cand}_{seq}"
+                    )
+                    if cand_rec and (
+                        cand_rec.get("cik") or cand_rec.get("share_class_figi")
+                    ):
                         alias_resolved = True
                         resolved_candidate = cand
                         break
 
-            empty_records.append({
-                "ticker": tk,
-                "spell_seq": seq,
-                "start_date": s_date,
-                "end_date": e_date,
-                "duration_sessions": dur,
-                "cause_category": cause,
-                "has_openfigi_entry": has_of,
-                "candidate_count": len(candidates),
-                "alias_resolved": alias_resolved,
-                "successful_alias": resolved_candidate,
-            })
+            empty_records.append(
+                {
+                    "ticker": tk,
+                    "spell_seq": seq,
+                    "start_date": s_date,
+                    "end_date": e_date,
+                    "duration_sessions": dur,
+                    "cause_category": cause,
+                    "has_openfigi_entry": has_of,
+                    "candidate_count": len(candidates),
+                    "alias_resolved": alias_resolved,
+                    "successful_alias": resolved_candidate,
+                }
+            )
 
     df_empty = pl.DataFrame(empty_records)
     OUT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     df_empty.write_parquet(OUT_PARQUET)
-    logger.info("Saved empty response taxonomy parquet to %s (%d records)", OUT_PARQUET, df_empty.height)
+    logger.info(
+        "Saved empty response taxonomy parquet to %s (%d records)",
+        OUT_PARQUET,
+        df_empty.height,
+    )
 
     # Summarize causes
-    cause_counts = df_empty.group_by("cause_category").agg(pl.len().alias("count")).sort("count", descending=True)
+    cause_counts = (
+        df_empty.group_by("cause_category")
+        .agg(pl.len().alias("count"))
+        .sort("count", descending=True)
+    )
     alias_recoveries = df_empty.filter(pl.col("alias_resolved") == True).height
 
     md_content = f"""# Section 8: Massive Empty Response Taxonomy & Inactivity Policy
@@ -178,14 +194,16 @@ From an empirical sample of **{total_evaluated}** targeted spells, **{total_empt
 ---
 
 ## 3. Alias Recovery Performance
-- Total spells evaluated with symbol aliases: **{df_empty.filter(pl.col('candidate_count') > 1).height}**
-- Successfully recovered via Candidate Alias Layer: **{alias_recoveries}** ({(alias_recoveries / max(1, df_empty.filter(pl.col('candidate_count') > 1).height) * 100):.1f}%)
+- Total spells evaluated with symbol aliases: **{df_empty.filter(pl.col("candidate_count") > 1).height}**
+- Successfully recovered via Candidate Alias Layer: **{alias_recoveries}** ({(alias_recoveries / max(1, df_empty.filter(pl.col("candidate_count") > 1).height) * 100):.1f}%)
 
 ### Empirical Examples of Empty Recovery
 | Original Ticker | Recovered Candidate | Start Date | Category |
 | :--- | :--- | :--- | :--- |
 """
-    for r in df_empty.filter(pl.col("alias_resolved") == True).head(10).iter_rows(named=True):
+    for r in (
+        df_empty.filter(pl.col("alias_resolved") == True).head(10).iter_rows(named=True)
+    ):
         md_content += f"| `{r['ticker']}` | `{r['successful_alias']}` | {r['start_date']} | `{r['cause_category']}` |\n"
 
     md_content += """

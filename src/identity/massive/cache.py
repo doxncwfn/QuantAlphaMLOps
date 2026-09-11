@@ -13,7 +13,7 @@ import os
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.common.config import ALL_CACHE_DIRS, MASSIVE_V3_CACHE_DIR
 from src.identity.massive.client import MassiveClient
@@ -24,15 +24,15 @@ class CacheManager:
 
     def __init__(
         self,
-        primary_cache_dir: Optional[Path] = None,
-        search_dirs: Optional[List[Path]] = None,
-        logger: Optional[logging.Logger] = None,
+        primary_cache_dir: Path | None = None,
+        search_dirs: list[Path] | None = None,
+        logger: logging.Logger | None = None,
     ):
         self.primary_cache_dir = primary_cache_dir or MASSIVE_V3_CACHE_DIR
         self.search_dirs = search_dirs or ALL_CACHE_DIRS
         self.logger = logger or logging.getLogger("cache_manager")
         self._lock = threading.Lock()
-        self.cache_index: Dict[str, Dict[str, Any]] = {}
+        self.cache_index: dict[str, dict[str, Any]] = {}
         self.primary_cache_dir.mkdir(parents=True, exist_ok=True)
 
     def index_caches(self) -> int:
@@ -50,7 +50,7 @@ class CacheManager:
                         key = f"{tk}:{dt}"
                         if key not in self.cache_index:
                             try:
-                                with open(f, "r", encoding="utf-8") as fp:
+                                with open(f, encoding="utf-8") as fp:
                                     data = json.load(fp)
                                 matched = MassiveClient.extract_match(data, tk)
                                 self.cache_index[key] = {
@@ -59,12 +59,23 @@ class CacheManager:
                                     "source_file": str(f),
                                 }
                                 count += 1
-                            except Exception:
-                                pass
-            self.logger.info("Indexed %d unique ticker:date entries across cache directories.", count)
+                            except (
+                                OSError,
+                                json.JSONDecodeError,
+                                ValueError,
+                                KeyError,
+                            ) as err:
+                                self.logger.debug(
+                                    "Failed to read cache file %s: %s", f, err
+                                )
+            self.logger.info(
+                "Indexed %d unique ticker:date entries across cache directories.", count
+            )
             return count
 
-    def get(self, ticker: str, date_str: str) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]], bool]:
+    def get(
+        self, ticker: str, date_str: str
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, bool]:
         """Looks up a ticker:date in memory index.
 
         Returns:
@@ -81,7 +92,7 @@ class CacheManager:
             target_file = self.primary_cache_dir / f"{clean_tk}_{date_str}.json"
             if target_file.exists():
                 try:
-                    with open(target_file, "r", encoding="utf-8") as fp:
+                    with open(target_file, encoding="utf-8") as fp:
                         data = json.load(fp)
                     matched = MassiveClient.extract_match(data, clean_tk)
                     self.cache_index[key] = {
@@ -90,34 +101,37 @@ class CacheManager:
                         "source_file": str(target_file),
                     }
                     return matched, data, True
-                except Exception:
-                    pass
+                except (OSError, json.JSONDecodeError, ValueError, KeyError) as err:
+                    self.logger.debug(
+                        "Failed to read cache file %s: %s", target_file, err
+                    )
 
         return None, None, False
 
-    def put_atomic(self, ticker: str, date_str: str, data: Dict[str, Any]) -> Path:
+    def put_atomic(self, ticker: str, date_str: str, data: dict[str, Any]) -> Path:
         """Atomically saves data to JSON cache and updates in-memory index."""
         clean_tk = ticker.strip().upper()
         target_path = self.primary_cache_dir / f"{clean_tk}_{date_str}.json"
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
-        tmp_file = tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=target_path.parent,
-            prefix=f".{target_path.stem}_",
-            suffix=".tmp",
-            delete=False,
-        )
+        tmp_name: str | None = None
         try:
-            json.dump(data, tmp_file, indent=2, ensure_ascii=False)
-            tmp_file.flush()
-            os.fsync(tmp_file.fileno())
-            tmp_file.close()
-            os.replace(tmp_file.name, target_path)
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=target_path.parent,
+                prefix=f".{target_path.stem}_",
+                suffix=".tmp",
+                delete=False,
+            ) as tmp_file:
+                tmp_name = tmp_file.name
+                json.dump(data, tmp_file, indent=2, ensure_ascii=False)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())
+            os.replace(tmp_name, target_path)
         except Exception:
-            if os.path.exists(tmp_file.name):
-                os.remove(tmp_file.name)
+            if tmp_name and os.path.exists(tmp_name):
+                os.remove(tmp_name)
             raise
 
         matched = MassiveClient.extract_match(data, clean_tk)

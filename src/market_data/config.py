@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -16,7 +14,9 @@ SPELLS_CSV_PATH = DATA_DIR / "universe" / "spells.csv"
 SECURITY_MASTER_PARQUET = DATA_DIR / "identity" / "security_master.parquet"
 TICKER_HISTORY_PARQUET = DATA_DIR / "identity" / "ticker_history.parquet"
 AVAILABILITY_EPISODES_PARQUET = DATA_DIR / "universe" / "availability_episodes.parquet"
-EXPECTED_SECURITY_DATES_PARQUET = DATA_DIR / "universe" / "expected_security_dates.parquet"
+EXPECTED_SECURITY_DATES_PARQUET = (
+    DATA_DIR / "universe" / "expected_security_dates.parquet"
+)
 YFINANCE_CACHE_DIR = DATA_DIR / "quality" / "yfinance_cache"
 
 # Output directories
@@ -47,7 +47,7 @@ LOG_FILE_PATH = LOGS_DIR / "market_data.log"
 
 # Rules and Thresholds
 CALENDAR_BUFFER_DAYS: int = 30
-CORRUPTED_DATES: List[str] = ["2009-10-29", "2010-03-30", "2010-03-31"]
+CORRUPTED_DATES: list[str] = ["2009-10-29", "2010-03-30", "2010-03-31"]
 
 # API credentials
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")

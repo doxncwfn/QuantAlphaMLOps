@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
-import json
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -46,9 +45,13 @@ REPORT_MD_PATH = QUALITY_DIR / "identity_resolution_report.md"
 LOG_FILE_PATH = LOGS_DIR / "identity_resolution.log"
 
 # API credentials
-OPENFIGI_API_KEY = os.getenv("OPENFIGI_API_KEY") or "1034b5e4-02da-440e-8ad2-dc6da71af45b"
+OPENFIGI_API_KEY = (
+    os.getenv("OPENFIGI_API_KEY") or "1034b5e4-02da-440e-8ad2-dc6da71af45b"
+)
 MASSIVE_API_KEY = os.getenv("MASSIVE_API_KEY") or "IbC9qw1ouX7vSkiyYpGVaDk9jCrk2t_K"
-SEC_USER_AGENT = os.getenv("SEC_USER_AGENT") or "HCMUT QuantResearch project_admin@hcmut.edu.vn"
+SEC_USER_AGENT = (
+    os.getenv("SEC_USER_AGENT") or "HCMUT QuantResearch project_admin@hcmut.edu.vn"
+)
 
 # Endpoints
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
@@ -75,7 +78,7 @@ class IdentityResolutionConfig:
     massive_rate_delay_seconds: float = MASSIVE_RATE_DELAY_SECONDS
     request_timeout_seconds: float = REQUEST_TIMEOUT_SECONDS
     max_retries: int = MAX_RETRIES
-    
+
     confidence_rules: dict = None
     reuse_rules: dict = None
 
@@ -86,14 +89,14 @@ class IdentityResolutionConfig:
                 "MEDIUM": "Strong agreement between ticker, exchange, and CIK/name, but share-class FIGI is derived from single current source without historical corroboration.",
                 "LOW": "Ticker/name match only, or current metadata applied without temporal consistency.",
                 "UNRESOLVED": "Conflicting identities, confirmed ticker reuse without disambiguation, or zero coverage across all sources.",
-                "REJECTED": "Candidate identity proven incompatible with historical observation."
+                "REJECTED": "Candidate identity proven incompatible with historical observation.",
             }
         if self.reuse_rules is None:
             self.reuse_rules = {
                 "CONFIRMED_REUSE": "Same ticker maps to distinct CIKs or distinct share_class_figi across spells.",
                 "LIKELY_REUSE": "Multi-year gap (>252 sessions) with evidence of corporate dissolution/IPO.",
                 "NO_EVIDENCE_OF_REUSE": "Identical security identity preserved across all spells.",
-                "UNCERTAIN": "Multi-spell ticker with large gap where early spell identity is ambiguous."
+                "UNCERTAIN": "Multi-spell ticker with large gap where early spell identity is ambiguous.",
             }
 
     def save_json(self, path: Path | str = CONFIG_JSON_PATH):

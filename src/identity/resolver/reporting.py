@@ -18,13 +18,8 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
-import logging
-import os
 import subprocess
-import sys
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
 
 import polars as pl
 
@@ -43,13 +38,23 @@ from src.common.config import (
 
 SECURITY_MASTER_PARQUET = CANDIDATES_IDENTITY_DIR / "security_master_candidate.parquet"
 TICKER_HISTORY_PARQUET = CANDIDATES_IDENTITY_DIR / "ticker_history_candidate.parquet"
-IDENTITY_EVIDENCE_PARQUET = CANDIDATES_IDENTITY_DIR / "identity_evidence_candidate.parquet"
-IDENTITY_CONFLICTS_PARQUET = CANDIDATES_IDENTITY_DIR / "identity_conflicts_candidate.parquet"
-IDENTITY_ALIASES_PARQUET = CANDIDATES_IDENTITY_DIR / "identity_aliases_candidate.parquet"
+IDENTITY_EVIDENCE_PARQUET = (
+    CANDIDATES_IDENTITY_DIR / "identity_evidence_candidate.parquet"
+)
+IDENTITY_CONFLICTS_PARQUET = (
+    CANDIDATES_IDENTITY_DIR / "identity_conflicts_candidate.parquet"
+)
+IDENTITY_ALIASES_PARQUET = (
+    CANDIDATES_IDENTITY_DIR / "identity_aliases_candidate.parquet"
+)
 
 DAILY_UNIVERSE_PARQUET = CANDIDATES_UNIVERSE_DIR / "daily_universe_candidate.parquet"
-AVAILABILITY_EPISODES_PARQUET = CANDIDATES_UNIVERSE_DIR / "availability_episodes_candidate.parquet"
-EXPECTED_SECURITY_DATES_PARQUET = CANDIDATES_UNIVERSE_DIR / "expected_security_dates_candidate.parquet"
+AVAILABILITY_EPISODES_PARQUET = (
+    CANDIDATES_UNIVERSE_DIR / "availability_episodes_candidate.parquet"
+)
+EXPECTED_SECURITY_DATES_PARQUET = (
+    CANDIDATES_UNIVERSE_DIR / "expected_security_dates_candidate.parquet"
+)
 
 MASSIVE_MANIFEST_PARQUET = MANIFESTS_DIR / "massive_manifest.parquet"
 IDENTITY_MANIFEST_PARQUET = MANIFESTS_DIR / "identity_manifest.parquet"
@@ -73,9 +78,11 @@ def hash_file(p: Path) -> str:
 
 def get_git_commit() -> str:
     try:
-        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True)
+        res = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True
+        )
         return res.stdout.strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return "UNKNOWN"
 
 
@@ -89,7 +96,11 @@ def generate_all_reports():
     df_th = pl.read_parquet(TICKER_HISTORY_PARQUET)
     df_ev = pl.read_parquet(IDENTITY_EVIDENCE_PARQUET)
     df_manifest = pl.read_parquet(MASSIVE_MANIFEST_PARQUET)
-    df_conf = pl.read_parquet(IDENTITY_CONFLICTS_PARQUET) if IDENTITY_CONFLICTS_PARQUET.exists() else pl.DataFrame()
+    df_conf = (
+        pl.read_parquet(IDENTITY_CONFLICTS_PARQUET)
+        if IDENTITY_CONFLICTS_PARQUET.exists()
+        else pl.DataFrame()
+    )
     df_inv = pl.read_parquet(INVARIANT_SUITE_PARQUET)
     df_reuse = pl.read_parquet(TICKER_REUSE_PARQUET)
     df_same_cik = pl.read_parquet(SAME_CIK_PARQUET)
@@ -104,18 +115,33 @@ def generate_all_reports():
     unique_securities = df_sec.height
 
     canonical_sec = df_sec.filter(pl.col("is_canonical") == True).height
-    provisional_sec = df_sec.filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")).height
-    unresolved_sec = df_sec.filter(pl.col("security_id").str.starts_with("UNRESOLVED_")).height
+    provisional_sec = df_sec.filter(
+        pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")
+    ).height
+    unresolved_sec = df_sec.filter(
+        pl.col("security_id").str.starts_with("UNRESOLVED_")
+    ).height
 
     # Status counts in ticker history
     conf_spells = df_th.group_by("confidence").agg(pl.len().alias("count"))
-    conf_map = dict(zip(conf_spells["confidence"].to_list(), conf_spells["count"].to_list()))
+    conf_map = dict(
+        zip(conf_spells["confidence"].to_list(), conf_spells["count"].to_list())
+    )
 
-    univ_spells = df_th.group_by("research_universe_status").agg(pl.len().alias("count"))
-    univ_map = dict(zip(univ_spells["research_universe_status"].to_list(), univ_spells["count"].to_list()))
+    univ_spells = df_th.group_by("research_universe_status").agg(
+        pl.len().alias("count")
+    )
+    univ_map = dict(
+        zip(
+            univ_spells["research_universe_status"].to_list(),
+            univ_spells["count"].to_list(),
+        )
+    )
 
     sec_types = df_th.group_by("security_type").agg(pl.len().alias("count"))
-    type_map = dict(zip(sec_types["security_type"].to_list(), sec_types["count"].to_list()))
+    type_map = dict(
+        zip(sec_types["security_type"].to_list(), sec_types["count"].to_list())
+    )
 
     drifts_count = df_manifest.filter(pl.col("drift_detected") == True).height
     conflicts_count = df_conf.height
@@ -129,12 +155,27 @@ def generate_all_reports():
     print("Writing identity_coverage_report.md...")
     # Stratification by year
     df_th_yr = df_th.with_columns(pl.col("start_date").str.slice(0, 4).alias("year"))
-    yr_counts = df_th_yr.group_by("year").agg([
-        pl.len().alias("total"),
-        pl.col("is_canonical").filter(pl.col("is_canonical") == True).count().alias("canonical"),
-        pl.col("security_id").filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")).count().alias("provisional"),
-        pl.col("security_id").filter(pl.col("security_id").str.starts_with("UNRESOLVED_")).count().alias("unresolved"),
-    ]).sort("year")
+    yr_counts = (
+        df_th_yr.group_by("year")
+        .agg(
+            [
+                pl.len().alias("total"),
+                pl.col("is_canonical")
+                .filter(pl.col("is_canonical") == True)
+                .count()
+                .alias("canonical"),
+                pl.col("security_id")
+                .filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_"))
+                .count()
+                .alias("provisional"),
+                pl.col("security_id")
+                .filter(pl.col("security_id").str.starts_with("UNRESOLVED_"))
+                .count()
+                .alias("unresolved"),
+            ]
+        )
+        .sort("year")
+    )
 
     # Stratification by duration
     def get_bucket(dur: int) -> str:
@@ -151,13 +192,32 @@ def generate_all_reports():
         else:
             return "> 252 sessions (Multi-year)"
 
-    df_th_dur = df_th.with_columns(pl.col("duration_sessions").map_elements(get_bucket, return_dtype=pl.Utf8).alias("duration_bucket"))
-    dur_counts = df_th_dur.group_by("duration_bucket").agg([
-        pl.len().alias("total"),
-        pl.col("is_canonical").filter(pl.col("is_canonical") == True).count().alias("canonical"),
-        pl.col("security_id").filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")).count().alias("provisional"),
-        pl.col("security_id").filter(pl.col("security_id").str.starts_with("UNRESOLVED_")).count().alias("unresolved"),
-    ]).sort("total", descending=True)
+    df_th_dur = df_th.with_columns(
+        pl.col("duration_sessions")
+        .map_elements(get_bucket, return_dtype=pl.Utf8)
+        .alias("duration_bucket")
+    )
+    dur_counts = (
+        df_th_dur.group_by("duration_bucket")
+        .agg(
+            [
+                pl.len().alias("total"),
+                pl.col("is_canonical")
+                .filter(pl.col("is_canonical") == True)
+                .count()
+                .alias("canonical"),
+                pl.col("security_id")
+                .filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_"))
+                .count()
+                .alias("provisional"),
+                pl.col("security_id")
+                .filter(pl.col("security_id").str.starts_with("UNRESOLVED_"))
+                .count()
+                .alias("unresolved"),
+            ]
+        )
+        .sort("total", descending=True)
+    )
 
     # Stratification by ticker format
     def get_ticker_fmt(tk: str) -> str:
@@ -174,16 +234,39 @@ def generate_all_reports():
         else:
             return "1-4 letter standard"
 
-    df_th_fmt = df_th.with_columns(pl.col("ticker").map_elements(get_ticker_fmt, return_dtype=pl.Utf8).alias("ticker_format"))
-    fmt_counts = df_th_fmt.group_by("ticker_format").agg([
-        pl.len().alias("total"),
-        pl.col("is_canonical").filter(pl.col("is_canonical") == True).count().alias("canonical"),
-        pl.col("security_id").filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")).count().alias("provisional"),
-        pl.col("security_id").filter(pl.col("security_id").str.starts_with("UNRESOLVED_")).count().alias("unresolved"),
-    ]).sort("total", descending=True)
+    df_th_fmt = df_th.with_columns(
+        pl.col("ticker")
+        .map_elements(get_ticker_fmt, return_dtype=pl.Utf8)
+        .alias("ticker_format")
+    )
+    fmt_counts = (
+        df_th_fmt.group_by("ticker_format")
+        .agg(
+            [
+                pl.len().alias("total"),
+                pl.col("is_canonical")
+                .filter(pl.col("is_canonical") == True)
+                .count()
+                .alias("canonical"),
+                pl.col("security_id")
+                .filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_"))
+                .count()
+                .alias("provisional"),
+                pl.col("security_id")
+                .filter(pl.col("security_id").str.starts_with("UNRESOLVED_"))
+                .count()
+                .alias("unresolved"),
+            ]
+        )
+        .sort("total", descending=True)
+    )
 
     # Resolution Tier counts
-    tier_counts = df_ev.group_by("resolution_tier").agg(pl.len().alias("count")).sort("count", descending=True)
+    tier_counts = (
+        df_ev.group_by("resolution_tier")
+        .agg(pl.len().alias("count"))
+        .sort("count", descending=True)
+    )
 
     cov_md = f"""# V3 Historical Security Identity Coverage & Completeness Report
 
@@ -192,7 +275,7 @@ def generate_all_reports():
 - **Total Universe Spells**: **{total_spells:,}**
 - **Total Unique Tickers**: **{unique_tickers:,}**
 - **Unique Security Entities Generated**: **{unique_securities:,}**
-- **Evaluation Date**: `{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}`
+- **Evaluation Date**: `{datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")}`
 - **Git Commit**: `{git_commit}`
 
 ---
@@ -220,8 +303,12 @@ def generate_all_reports():
 """
     for r in tier_counts.iter_rows(named=True):
         tier = r["resolution_tier"]
-        can = "YES (Canonical FIGI)" if "FIGI" in tier else "NO (Provisional / Quarantined)"
-        cov_md += f"| `{tier}` | **{r['count']:,}** | {(r['count']/total_spells*100):.2f}% | {can} | Hierarchy tier |\n"
+        can = (
+            "YES (Canonical FIGI)"
+            if "FIGI" in tier
+            else "NO (Provisional / Quarantined)"
+        )
+        cov_md += f"| `{tier}` | **{r['count']:,}** | {(r['count'] / total_spells * 100):.2f}% | {can} | Hierarchy tier |\n"
 
     cov_md += """
 ---
@@ -231,7 +318,7 @@ def generate_all_reports():
 | :--- | :--- | :--- | :--- | :--- | :--- |
 """
     for r in dur_counts.iter_rows(named=True):
-        cov_md += f"| **{r['duration_bucket']}** | {r['total']:,} | {r['canonical']:,} | {r['provisional']:,} | {r['unresolved']:,} | {(r['canonical']/r['total']*100):.2f}% |\n"
+        cov_md += f"| **{r['duration_bucket']}** | {r['total']:,} | {r['canonical']:,} | {r['provisional']:,} | {r['unresolved']:,} | {(r['canonical'] / r['total'] * 100):.2f}% |\n"
 
     cov_md += """
 ---
@@ -241,7 +328,7 @@ def generate_all_reports():
 | :--- | :--- | :--- | :--- | :--- | :--- |
 """
     for r in fmt_counts.iter_rows(named=True):
-        cov_md += f"| **{r['ticker_format']}** | {r['total']:,} | {r['canonical']:,} | {r['provisional']:,} | {r['unresolved']:,} | {(r['canonical']/r['total']*100):.2f}% |\n"
+        cov_md += f"| **{r['ticker_format']}** | {r['total']:,} | {r['canonical']:,} | {r['provisional']:,} | {r['unresolved']:,} | {(r['canonical'] / r['total'] * 100):.2f}% |\n"
 
     cov_md += """
 ---
@@ -251,7 +338,7 @@ def generate_all_reports():
 | :--- | :--- | :--- | :--- | :--- | :--- |
 """
     for r in yr_counts.iter_rows(named=True):
-        cov_md += f"| **{r['year']}** | {r['total']:,} | {r['canonical']:,} | {r['provisional']:,} | {r['unresolved']:,} | {(r['canonical']/r['total']*100):.2f}% |\n"
+        cov_md += f"| **{r['year']}** | {r['total']:,} | {r['canonical']:,} | {r['provisional']:,} | {r['unresolved']:,} | {(r['canonical'] / r['total'] * 100):.2f}% |\n"
 
     cov_md += """
 ---
@@ -261,8 +348,16 @@ def generate_all_reports():
 | :--- | :--- | :--- | :--- |
 """
     for r in univ_spells.sort("count", descending=True).iter_rows(named=True):
-        action = "Eligible for primary quantitative portfolio universe" if r["research_universe_status"] == "INCLUDE" else ("Quarantined: Awaiting full offline backfill" if r["research_universe_status"] == "QUARANTINE" else "Excluded: Derivatives, Warrants, ETFs, Units, Rights")
-        cov_md += f"| `{r['research_universe_status']}` | **{r['count']:,}** | {(r['count']/total_spells*100):.2f}% | {action} |\n"
+        action = (
+            "Eligible for primary quantitative portfolio universe"
+            if r["research_universe_status"] == "INCLUDE"
+            else (
+                "Quarantined: Awaiting full offline backfill"
+                if r["research_universe_status"] == "QUARANTINE"
+                else "Excluded: Derivatives, Warrants, ETFs, Units, Rights"
+            )
+        )
+        cov_md += f"| `{r['research_universe_status']}` | **{r['count']:,}** | {(r['count'] / total_spells * 100):.2f}% | {action} |\n"
 
     COVERAGE_REPORT_MD.write_text(cov_md, encoding="utf-8")
     print(f"Saved {COVERAGE_REPORT_MD}")
@@ -290,19 +385,19 @@ def generate_all_reports():
                 "file_path": str(p.relative_to(REPO_ROOT)),
                 "sha256": hash_file(p),
                 "row_count": df_tmp.height,
-                "byte_size": p.stat().st_size
+                "byte_size": p.stat().st_size,
             }
 
     promotion_manifest = {
         "manifest_version": "3.0.0",
-        "generated_timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "generated_timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "git_commit": git_commit,
         "input_dataset": {
             "file_path": "data/universe/spells.csv",
             "sha256": spells_sha256,
             "row_count": EXPECTED_SPELLS_ROWS,
             "unique_tickers": EXPECTED_UNIQUE_TICKERS,
-            "immutability_verified": (spells_sha256 == EXPECTED_SPELLS_HASH)
+            "immutability_verified": (spells_sha256 == EXPECTED_SPELLS_HASH),
         },
         "candidate_artifacts": manifest_artifacts,
         "validation_summary": {
@@ -313,11 +408,11 @@ def generate_all_reports():
             "figi_collisions": 0,
             "same_cik_multi_security_violations": 0,
             "bit_for_bit_deterministic": True,
-            "production_datasets_unmodified": True
+            "production_datasets_unmodified": True,
         },
         "promotion_gate_decision": "CONDITIONAL",
         "gate_justification": "All 31 architectural invariants passed, 0 false merges, 0 FIGI collisions, bit-for-bit deterministic reproducibility verified. CONDITIONAL decision reflects that 42,794 spells remain pending full offline Massive PIT backfill (~8.5 hours live query execution). Production tables remain untouched pending manual user promotion.",
-        "manual_promotion_command": "python3 src/identity/v3/promote_to_production.py --manifest data/manifests/v3/promotion_manifest.json"
+        "manual_promotion_command": "python3 src/identity/v3/promote_to_production.py --manifest data/manifests/v3/promotion_manifest.json",
     }
 
     with open(PROMOTION_MANIFEST_JSON, "w", encoding="utf-8") as fp:
@@ -443,9 +538,9 @@ PYTHONPATH=. python3 src/identity/v3/backfill_engine.py --full-live
 ## 2. Backfill
 - **Total Required Queries**: **{total_spells:,}**
 - **Completed / Accounted For**: **{total_spells:,}** (100.00%)
-- **Cached Lookups**: **{df_manifest.filter(pl.col('cache_status') == 'HIT').height:,}**
+- **Cached Lookups**: **{df_manifest.filter(pl.col("cache_status") == "HIT").height:,}**
 - **Live Queries Executed**: **0** (offline test mode; live benchmark validated separately)
-- **Massive Empty Results**: **{df_manifest.filter(pl.col('lookup_status') == 'MASSIVE_EMPTY').height:,}**
+- **Massive Empty Results**: **{df_manifest.filter(pl.col("lookup_status") == "MASSIVE_EMPTY").height:,}**
 - **Failed Queries**: **0**
 - **Retry Count**: **0**
 - **HTTP 429 Count**: **0**
@@ -453,27 +548,27 @@ PYTHONPATH=. python3 src/identity/v3/backfill_engine.py --full-live
 - **Estimated Full Runtime**: `PLANNING_ESTIMATE`: **6.4 hours baseline (8.6 hours with 35% safety margin)**
 
 ## 3. Identity
-- **Confirmed**: **{conf_map.get('HIGH', 0):,}** (High confidence canonical FIGI)
-- **Probable**: **{conf_map.get('HIGH', 0):,}** (Massive FIGI authoritative)
-- **Provisional**: **{conf_map.get('MEDIUM', 0):,}** (Provisional CIK namespace, `is_canonical = False`)
-- **Unresolved**: **{conf_map.get('LOW', 0):,}** (Quarantined, `is_canonical = False`)
+- **Confirmed**: **{conf_map.get("HIGH", 0):,}** (High confidence canonical FIGI)
+- **Probable**: **{conf_map.get("HIGH", 0):,}** (Massive FIGI authoritative)
+- **Provisional**: **{conf_map.get("MEDIUM", 0):,}** (Provisional CIK namespace, `is_canonical = False`)
+- **Unresolved**: **{conf_map.get("LOW", 0):,}** (Quarantined, `is_canonical = False`)
 - **Conflicts**: **{conflicts_count:,}** (62 ticker-reuse divergences + 1 within-spell drift)
 
 ## 4. Security Type
-- **Common Stock**: **{type_map.get('COMMON_STOCK', 0):,}**
-- **ADR**: **{type_map.get('ADR', 0):,}**
-- **ETF**: **{type_map.get('ETF', 0):,}**
-- **Warrant**: **{type_map.get('WARRANT', 0):,}**
-- **Unit**: **{type_map.get('UNIT', 0):,}**
-- **Preferred**: **{type_map.get('PREFERRED', 0):,}**
-- **Right**: **{type_map.get('RIGHT', 0):,}**
-- **Other**: **{type_map.get('OTHER', 0):,}**
-- **Unknown**: **{type_map.get('UNKNOWN', 0):,}**
+- **Common Stock**: **{type_map.get("COMMON_STOCK", 0):,}**
+- **ADR**: **{type_map.get("ADR", 0):,}**
+- **ETF**: **{type_map.get("ETF", 0):,}**
+- **Warrant**: **{type_map.get("WARRANT", 0):,}**
+- **Unit**: **{type_map.get("UNIT", 0):,}**
+- **Preferred**: **{type_map.get("PREFERRED", 0):,}**
+- **Right**: **{type_map.get("RIGHT", 0):,}**
+- **Other**: **{type_map.get("OTHER", 0):,}**
+- **Unknown**: **{type_map.get("UNKNOWN", 0):,}**
 
 ## 5. Research Universe
-- **INCLUDE**: **{univ_map.get('INCLUDE', 0):,}** (Eligible common stocks with canonical identity)
-- **QUARANTINE**: **{univ_map.get('QUARANTINE', 0):,}** (Provisional, unresolved, ADR, and unclassified)
-- **EXCLUDE**: **{univ_map.get('EXCLUDE', 0):,}** (ETFs, warrants, units, preferred shares)
+- **INCLUDE**: **{univ_map.get("INCLUDE", 0):,}** (Eligible common stocks with canonical identity)
+- **QUARANTINE**: **{univ_map.get("QUARANTINE", 0):,}** (Provisional, unresolved, ADR, and unclassified)
+- **EXCLUDE**: **{univ_map.get("EXCLUDE", 0):,}** (ETFs, warrants, units, preferred shares)
 
 ## 6. Validation
 - **Invariants Passed / Failed**: **{inv_passed} / {inv_total} Passed (0 Failed)**

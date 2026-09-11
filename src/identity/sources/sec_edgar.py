@@ -6,7 +6,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import requests
 
@@ -30,9 +30,9 @@ class SecEdgarClient:
         self.submissions_cache_dir.mkdir(parents=True, exist_ok=True)
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": SEC_USER_AGENT})
-        
-        self.exchange_tickers: Dict[str, Dict[str, Any]] = {}
-        self.mf_tickers: Dict[str, Dict[str, Any]] = {}
+
+        self.exchange_tickers: dict[str, dict[str, Any]] = {}
+        self.mf_tickers: dict[str, dict[str, Any]] = {}
         self._load_or_fetch_bulk_tables()
 
     def _load_or_fetch_bulk_tables(self):
@@ -40,19 +40,22 @@ class SecEdgarClient:
         # 1. Company tickers exchange
         exch_file = self.cache_dir / "company_tickers_exchange.json"
         if not exch_file.exists():
-            logger.info("Downloading SEC company_tickers_exchange.json from %s...", SEC_TICKERS_EXCHANGE_URL)
+            logger.info(
+                "Downloading SEC company_tickers_exchange.json from %s...",
+                SEC_TICKERS_EXCHANGE_URL,
+            )
             try:
                 resp = self.session.get(SEC_TICKERS_EXCHANGE_URL, timeout=15)
                 resp.raise_for_status()
                 with open(exch_file, "w", encoding="utf-8") as f:
                     f.write(resp.text)
                 logger.info("Cached SEC exchange tickers table.")
-            except Exception as e:
+            except (requests.RequestException, OSError) as e:
                 logger.error("Failed downloading SEC exchange tickers: %s", e)
 
         if exch_file.exists():
             try:
-                with open(exch_file, "r", encoding="utf-8") as f:
+                with open(exch_file, encoding="utf-8") as f:
                     data = json.load(f)
                 fields = data.get("fields", [])
                 rows = data.get("data", [])
@@ -66,28 +69,33 @@ class SecEdgarClient:
                             "name": rec.get("name"),
                             "ticker": tk,
                             "exchange": rec.get("exchange"),
-                            "source": "SEC_EXCHANGE_TICKERS"
+                            "source": "SEC_EXCHANGE_TICKERS",
                         }
-                logger.info("Loaded %d SEC exchange tickers into memory.", len(self.exchange_tickers))
-            except Exception as e:
+                logger.info(
+                    "Loaded %d SEC exchange tickers into memory.",
+                    len(self.exchange_tickers),
+                )
+            except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                 logger.error("Failed parsing SEC exchange tickers: %s", e)
 
         # 2. Mutual funds / ETFs
         mf_file = self.cache_dir / "company_tickers_mf.json"
         if not mf_file.exists():
-            logger.info("Downloading SEC company_tickers_mf.json from %s...", SEC_TICKERS_MF_URL)
+            logger.info(
+                "Downloading SEC company_tickers_mf.json from %s...", SEC_TICKERS_MF_URL
+            )
             try:
                 resp = self.session.get(SEC_TICKERS_MF_URL, timeout=15)
                 resp.raise_for_status()
                 with open(mf_file, "w", encoding="utf-8") as f:
                     f.write(resp.text)
                 logger.info("Cached SEC mutual funds/ETFs table.")
-            except Exception as e:
+            except (requests.RequestException, OSError) as e:
                 logger.error("Failed downloading SEC mutual funds/ETFs: %s", e)
 
         if mf_file.exists():
             try:
-                with open(mf_file, "r", encoding="utf-8") as f:
+                with open(mf_file, encoding="utf-8") as f:
                     data = json.load(f)
                 fields = data.get("fields", [])
                 rows = data.get("data", [])
@@ -101,20 +109,23 @@ class SecEdgarClient:
                             "series_id": rec.get("seriesId"),
                             "class_id": rec.get("classId"),
                             "symbol": sym,
-                            "source": "SEC_MF_TICKERS"
+                            "source": "SEC_MF_TICKERS",
                         }
-                logger.info("Loaded %d SEC mutual fund/ETF symbols into memory.", len(self.mf_tickers))
-            except Exception as e:
+                logger.info(
+                    "Loaded %d SEC mutual fund/ETF symbols into memory.",
+                    len(self.mf_tickers),
+                )
+            except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                 logger.error("Failed parsing SEC mutual funds/ETFs: %s", e)
 
-    def lookup_ticker(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def lookup_ticker(self, ticker: str) -> dict[str, Any] | None:
         """Fast in-memory lookup across SEC bulk tables."""
         tk_clean = ticker.strip().upper()
         if tk_clean in self.exchange_tickers:
             return self.exchange_tickers[tk_clean]
         if tk_clean in self.mf_tickers:
             return self.mf_tickers[tk_clean]
-        
+
         # Check alternative punctuation (e.g. '.' vs '-')
         tk_alt = tk_clean.replace(".", "-")
         if tk_alt in self.exchange_tickers:
@@ -125,17 +136,17 @@ class SecEdgarClient:
 
         return None
 
-    def get_submissions(self, cik: str) -> Optional[Dict[str, Any]]:
+    def get_submissions(self, cik: str) -> dict[str, Any] | None:
         """Retrieves and caches SEC EDGAR submissions JSON for a CIK."""
         cik_clean = str(cik).strip().zfill(10)
         cache_file = self.submissions_cache_dir / f"CIK{cik_clean}.json"
-        
+
         if cache_file.exists():
             try:
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(cache_file, encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
-                pass
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+                logger.debug("Failed reading cache file %s: %s", cache_file, e)
 
         url = SEC_SUBMISSIONS_URL_TEMPLATE.format(cik=cik_clean)
         try:
@@ -149,8 +160,19 @@ class SecEdgarClient:
             elif resp.status_code == 404:
                 return None
             else:
-                logger.warning("SEC submissions query for CIK %s returned HTTP %d", cik_clean, resp.status_code)
+                logger.warning(
+                    "SEC submissions query for CIK %s returned HTTP %d",
+                    cik_clean,
+                    resp.status_code,
+                )
                 return None
-        except Exception as exc:
-            logger.warning("Error fetching SEC submissions for CIK %s: %s", cik_clean, exc)
+        except (
+            requests.RequestException,
+            OSError,
+            json.JSONDecodeError,
+            ValueError,
+        ) as exc:
+            logger.warning(
+                "Error fetching SEC submissions for CIK %s: %s", cik_clean, exc
+            )
             return None

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import shutil
 import subprocess
 import sys
@@ -37,7 +36,9 @@ def setup_logger() -> logging.Logger:
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
     sh = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter("%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     sh.setFormatter(formatter)
     logger.addHandler(sh)
     return logger
@@ -46,7 +47,15 @@ def setup_logger() -> logging.Logger:
 def run_volume_get(remote_path: str, local_dest: Path, logger: logging.Logger) -> bool:
     """Executes `modal volume get` for a specific remote path and flattens nested folder."""
     local_dest.mkdir(parents=True, exist_ok=True)
-    cmd = ["modal", "volume", "get", VOLUME_NAME, remote_path, str(local_dest), "--force"]
+    cmd = [
+        "modal",
+        "volume",
+        "get",
+        VOLUME_NAME,
+        remote_path,
+        str(local_dest),
+        "--force",
+    ]
     logger.info("Executing: %s", " ".join(cmd))
     try:
         res = subprocess.run(cmd, check=True, capture_output=True, text=True)
@@ -66,16 +75,30 @@ def run_volume_get(remote_path: str, local_dest: Path, logger: logging.Logger) -
             shutil.rmtree(nested_dir)
         return True
     except subprocess.CalledProcessError as exc:
-        logger.error("Failed to retrieve %s: %s\nStderr: %s", remote_path, exc, exc.stderr)
+        logger.error(
+            "Failed to retrieve %s: %s\nStderr: %s", remote_path, exc, exc.stderr
+        )
         return False
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Retrieve V3 Backfill Artifacts from Modal Volume")
-    parser.add_argument("--volume", type=str, default=VOLUME_NAME, help="Modal Volume name")
-    parser.add_argument("--cache-only", action="store_true", help="Retrieve only the Massive API cache")
-    parser.add_argument("--manifests-only", action="store_true", help="Retrieve only manifests and reports")
-    parser.add_argument("--all", action="store_true", default=True, help="Retrieve all artifacts")
+    parser = argparse.ArgumentParser(
+        description="Retrieve V3 Backfill Artifacts from Modal Volume"
+    )
+    parser.add_argument(
+        "--volume", type=str, default=VOLUME_NAME, help="Modal Volume name"
+    )
+    parser.add_argument(
+        "--cache-only", action="store_true", help="Retrieve only the Massive API cache"
+    )
+    parser.add_argument(
+        "--manifests-only",
+        action="store_true",
+        help="Retrieve only manifests and reports",
+    )
+    parser.add_argument(
+        "--all", action="store_true", default=True, help="Retrieve all artifacts"
+    )
     args = parser.parse_args()
 
     logger = setup_logger()
@@ -89,10 +112,7 @@ def main():
     if args.cache_only:
         retrieval_plan = [("cache/massive", LOCAL_CACHE_DIR)]
     elif args.manifests_only:
-        retrieval_plan = [
-            ("manifests", LOCAL_MANIFESTS_DIR),
-            ("logs", LOCAL_LOGS_DIR)
-        ]
+        retrieval_plan = [("manifests", LOCAL_MANIFESTS_DIR), ("logs", LOCAL_LOGS_DIR)]
     else:
         retrieval_plan = [
             ("manifests", LOCAL_MANIFESTS_DIR),
@@ -110,8 +130,11 @@ def main():
             success_count += 1
 
     logger.info("-" * 80)
-    logger.info("RETRIEVAL SUMMARY: %d / %d artifact sets synchronized successfully.",
-                success_count, len(retrieval_plan))
+    logger.info(
+        "RETRIEVAL SUMMARY: %d / %d artifact sets synchronized successfully.",
+        success_count,
+        len(retrieval_plan),
+    )
     logger.info("=" * 80)
 
 

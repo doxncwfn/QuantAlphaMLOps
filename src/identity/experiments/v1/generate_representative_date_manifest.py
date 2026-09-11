@@ -17,12 +17,11 @@ Strict Constraints:
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
-from pathlib import Path
 import sys
 import time
-from typing import Any, Dict, List, Tuple
+from pathlib import Path
+from typing import Any
 
 import polars as pl
 
@@ -55,8 +54,7 @@ def setup_logger() -> logging.Logger:
     logger.handlers.clear()
 
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)-7s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     # Console handler
@@ -84,7 +82,9 @@ def compute_sha256(filepath: Path) -> str:
 # -----------------------------------------------------------------------------
 # Trading Calendar & Midpoint Computation
 # -----------------------------------------------------------------------------
-def load_valid_trading_sessions(logger: logging.Logger) -> Tuple[List[str], Dict[str, int]]:
+def load_valid_trading_sessions(
+    logger: logging.Logger,
+) -> tuple[list[str], dict[str, int]]:
     """
     Loads the canonical trading sessions from manifest.csv, excluding corrupted snapshots.
     Returns:
@@ -98,10 +98,15 @@ def load_valid_trading_sessions(logger: logging.Logger) -> Tuple[List[str], Dict
     df_manifest = pl.read_csv(MANIFEST_CSV_PATH)
     logger.info("Total snapshot dates in manifest.csv: %d", df_manifest.height)
 
-    valid_df = df_manifest.filter(~pl.col("date").is_in(CORRUPTED_SNAPSHOT_DATES)).sort("date")
+    valid_df = df_manifest.filter(~pl.col("date").is_in(CORRUPTED_SNAPSHOT_DATES)).sort(
+        "date"
+    )
     valid_dates = valid_df["date"].to_list()
-    logger.info("Filtered corrupted snapshot dates %s. Valid trading sessions: %d",
-                CORRUPTED_SNAPSHOT_DATES, len(valid_dates))
+    logger.info(
+        "Filtered corrupted snapshot dates %s. Valid trading sessions: %d",
+        CORRUPTED_SNAPSHOT_DATES,
+        len(valid_dates),
+    )
 
     date_to_idx = {d: i for i, d in enumerate(valid_dates)}
     return valid_dates, date_to_idx
@@ -109,17 +114,19 @@ def load_valid_trading_sessions(logger: logging.Logger) -> Tuple[List[str], Dict
 
 def build_manifest(
     df_spells: pl.DataFrame,
-    valid_dates: List[str],
-    date_to_idx: Dict[str, int],
-    logger: logging.Logger
+    valid_dates: list[str],
+    date_to_idx: dict[str, int],
+    logger: logging.Logger,
 ) -> pl.DataFrame:
     """
     Constructs the production identity-query manifest.
     Computes representative_date using the trading-session midpoint rule.
     """
-    logger.info("Constructing representative date manifest for %d spells...", df_spells.height)
+    logger.info(
+        "Constructing representative date manifest for %d spells...", df_spells.height
+    )
 
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     n_mismatches = 0
 
     for row in df_spells.iter_rows(named=True):
@@ -130,9 +137,13 @@ def build_manifest(
         n_sessions = row["n_sessions"]
 
         if start_date not in date_to_idx:
-            raise ValueError(f"Spell start_date {start_date} for ticker {ticker} not in valid trading sessions!")
+            raise ValueError(
+                f"Spell start_date {start_date} for ticker {ticker} not in valid trading sessions!"
+            )
         if end_date not in date_to_idx:
-            raise ValueError(f"Spell end_date {end_date} for ticker {ticker} not in valid trading sessions!")
+            raise ValueError(
+                f"Spell end_date {end_date} for ticker {ticker} not in valid trading sessions!"
+            )
 
         s_idx = date_to_idx[start_date]
         e_idx = date_to_idx[end_date]
@@ -147,29 +158,39 @@ def build_manifest(
         m_idx = (s_idx + e_idx) // 2
         rep_date = valid_dates[m_idx]
 
-        method = "SINGLE_SESSION_MIDPOINT" if n_sessions == 1 else "TRADING_SESSION_MIDPOINT"
+        method = (
+            "SINGLE_SESSION_MIDPOINT" if n_sessions == 1 else "TRADING_SESSION_MIDPOINT"
+        )
 
-        records.append({
-            "ticker": ticker,
-            "spell_seq": spell_seq,
-            "start_date": start_date,
-            "end_date": end_date,
-            "duration_sessions": n_sessions,
-            "representative_date": rep_date,
-            "representative_date_method": method,
-        })
+        records.append(
+            {
+                "ticker": ticker,
+                "spell_seq": spell_seq,
+                "start_date": start_date,
+                "end_date": end_date,
+                "duration_sessions": n_sessions,
+                "representative_date": rep_date,
+                "representative_date_method": method,
+            }
+        )
 
-    logger.info("Verified all spells against trading calendar. Mismatched session counts: %d", n_mismatches)
+    logger.info(
+        "Verified all spells against trading calendar. Mismatched session counts: %d",
+        n_mismatches,
+    )
 
-    df_manifest = pl.DataFrame(records, schema={
-        "ticker": pl.String,
-        "spell_seq": pl.Int64,
-        "start_date": pl.String,
-        "end_date": pl.String,
-        "duration_sessions": pl.Int64,
-        "representative_date": pl.String,
-        "representative_date_method": pl.String,
-    })
+    df_manifest = pl.DataFrame(
+        records,
+        schema={
+            "ticker": pl.String,
+            "spell_seq": pl.Int64,
+            "start_date": pl.String,
+            "end_date": pl.String,
+            "duration_sessions": pl.Int64,
+            "representative_date": pl.String,
+            "representative_date_method": pl.String,
+        },
+    )
 
     return df_manifest
 
@@ -177,7 +198,9 @@ def build_manifest(
 # -----------------------------------------------------------------------------
 # Summary Statistics Computation
 # -----------------------------------------------------------------------------
-def compute_statistics(df_manifest: pl.DataFrame, logger: logging.Logger) -> Dict[str, Any]:
+def compute_statistics(
+    df_manifest: pl.DataFrame, logger: logging.Logger
+) -> dict[str, Any]:
     """Computes comprehensive summary statistics for report synthesis."""
     logger.info("Computing summary statistics across manifest...")
 
@@ -193,18 +216,27 @@ def compute_statistics(df_manifest: pl.DataFrame, logger: logging.Logger) -> Dic
 
     # Duration buckets
     df_with_buckets = df_manifest.with_columns(
-        pl.when(pl.col("duration_sessions") == 1).then(pl.lit("1 session (ultra-transient)"))
-        .when(pl.col("duration_sessions") <= 5).then(pl.lit("2–5 sessions (1 week)"))
-        .when(pl.col("duration_sessions") <= 21).then(pl.lit("6–21 sessions (1 month)"))
-        .when(pl.col("duration_sessions") <= 63).then(pl.lit("22–63 sessions (1 quarter)"))
-        .when(pl.col("duration_sessions") <= 126).then(pl.lit("64–126 sessions (half-year)"))
-        .when(pl.col("duration_sessions") <= 252).then(pl.lit("127–252 sessions (1 year)"))
-        .when(pl.col("duration_sessions") <= 1260).then(pl.lit("253–1,260 sessions (1–5 years)"))
+        pl.when(pl.col("duration_sessions") == 1)
+        .then(pl.lit("1 session (ultra-transient)"))
+        .when(pl.col("duration_sessions") <= 5)
+        .then(pl.lit("2–5 sessions (1 week)"))
+        .when(pl.col("duration_sessions") <= 21)
+        .then(pl.lit("6–21 sessions (1 month)"))
+        .when(pl.col("duration_sessions") <= 63)
+        .then(pl.lit("22–63 sessions (1 quarter)"))
+        .when(pl.col("duration_sessions") <= 126)
+        .then(pl.lit("64–126 sessions (half-year)"))
+        .when(pl.col("duration_sessions") <= 252)
+        .then(pl.lit("127–252 sessions (1 year)"))
+        .when(pl.col("duration_sessions") <= 1260)
+        .then(pl.lit("253–1,260 sessions (1–5 years)"))
         .otherwise(pl.lit(">1,260 sessions (>5 years)"))
         .alias("duration_bucket")
     )
 
-    bucket_counts = df_with_buckets["duration_bucket"].value_counts().sort("count", descending=True)
+    bucket_counts = (
+        df_with_buckets["duration_bucket"].value_counts().sort("count", descending=True)
+    )
 
     # Year distribution of representative dates
     df_with_year = df_manifest.with_columns(
@@ -213,14 +245,16 @@ def compute_statistics(df_manifest: pl.DataFrame, logger: logging.Logger) -> Dic
     year_counts = df_with_year["rep_year"].value_counts().sort("rep_year")
 
     # Uniqueness checks
-    n_unique_ticker_date = df_manifest.select(["ticker", "representative_date"]).n_unique()
+    n_unique_ticker_date = df_manifest.select(
+        ["ticker", "representative_date"]
+    ).n_unique()
     queries_required = df_manifest.height
     total_session_observations = int(durations.sum())
 
     # In-bounds validation: start_date <= representative_date <= end_date
     invalid_bounds = df_manifest.filter(
-        (pl.col("representative_date") < pl.col("start_date")) |
-        (pl.col("representative_date") > pl.col("end_date"))
+        (pl.col("representative_date") < pl.col("start_date"))
+        | (pl.col("representative_date") > pl.col("end_date"))
     ).height
 
     stats = {
@@ -245,7 +279,9 @@ def compute_statistics(df_manifest: pl.DataFrame, logger: logging.Logger) -> Dic
 # -----------------------------------------------------------------------------
 # Markdown Report Synthesis
 # -----------------------------------------------------------------------------
-def generate_report(stats: Dict[str, Any], df_manifest: pl.DataFrame, logger: logging.Logger):
+def generate_report(
+    stats: dict[str, Any], df_manifest: pl.DataFrame, logger: logging.Logger
+):
     """Synthesizes report/quality/representative_date_manifest_report.md."""
     logger.info("Synthesizing comprehensive quality report: %s...", REPORT_MD_PATH)
 
@@ -259,9 +295,12 @@ def generate_report(stats: Dict[str, Any], df_manifest: pl.DataFrame, logger: lo
         "64–126 sessions (half-year)",
         "127–252 sessions (1 year)",
         "253–1,260 sessions (1–5 years)",
-        ">1,260 sessions (>5 years)"
+        ">1,260 sessions (>5 years)",
     ]
-    b_dict = {r["duration_bucket"]: r["count"] for r in stats["bucket_counts"].iter_rows(named=True)}
+    b_dict = {
+        r["duration_bucket"]: r["count"]
+        for r in stats["bucket_counts"].iter_rows(named=True)
+    }
     for b_name in bucket_order:
         cnt = b_dict.get(b_name, 0)
         pct = cnt / stats["total_spells"] * 100.0
@@ -304,9 +343,9 @@ This report establishes and freezes the exact production identity-query workload
 By applying the **trading-session midpoint rule** within each contiguous spell, every observation spell in `spells.csv` is mapped to an authoritative point-in-time reference date. This eliminates the naive requirement of querying all **51,387,705 daily security-session observations**, compressing the identity resolution workload to exactly **43,757 targeted queries** (a **99.91% query reduction**) while fully preserving temporal boundaries.
 
 ### Core Workload & Verification Invariants:
-1. **Queries Required = Total Spells**: Exactly **{stats['queries_required']:,} queries** for **{stats['total_spells']:,} spells** across **{stats['unique_tickers']:,} unique tickers**.
-2. **100% Unique `(ticker, representative_date)` Pairs**: There are **{stats['n_unique_ticker_date']:,} unique `(ticker, representative_date)` tuples**, proving zero temporal collision across disjoint spells of the same ticker.
-3. **100% Strict Boundary Invariance**: Zero ({stats['invalid_bounds']}) representative dates fall outside `[start_date, end_date]`. Every representative date is a verified valid trading session from historical snapshots.
+1. **Queries Required = Total Spells**: Exactly **{stats["queries_required"]:,} queries** for **{stats["total_spells"]:,} spells** across **{stats["unique_tickers"]:,} unique tickers**.
+2. **100% Unique `(ticker, representative_date)` Pairs**: There are **{stats["n_unique_ticker_date"]:,} unique `(ticker, representative_date)` tuples**, proving zero temporal collision across disjoint spells of the same ticker.
+3. **100% Strict Boundary Invariance**: Zero ({stats["invalid_bounds"]}) representative dates fall outside `[start_date, end_date]`. Every representative date is a verified valid trading session from historical snapshots.
 4. **Upstream Data Immutability**: `data/universe/spells.csv` remained strictly read-only and bit-for-bit unchanged throughout execution.
 
 ---
@@ -332,17 +371,17 @@ In accordance with architectural guidelines, the following 8 methodological prin
 
 | Metric | Empirical Value | Context & Operational Impact |
 | :--- | ---:| :--- |
-| **Total Spells (`total_spells`)** | **{stats['total_spells']:,}** | Total contiguous ticker observations in historical universe |
-| **Unique Tickers (`unique_tickers`)** | **{stats['unique_tickers']:,}** | Distinct ticker strings observed between 2004 and 2026 |
-| **Identity Queries Required** | **{stats['queries_required']:,}** | Exactly 1 query per spell |
-| **Unique `(ticker, representative_date)`** | **{stats['n_unique_ticker_date']:,}** | 100% collision-free query space |
-| **Total Security-Session Observations** | **{stats['total_session_observations']:,}** | Raw Cartesian product of security trading days represented |
+| **Total Spells (`total_spells`)** | **{stats["total_spells"]:,}** | Total contiguous ticker observations in historical universe |
+| **Unique Tickers (`unique_tickers`)** | **{stats["unique_tickers"]:,}** | Distinct ticker strings observed between 2004 and 2026 |
+| **Identity Queries Required** | **{stats["queries_required"]:,}** | Exactly 1 query per spell |
+| **Unique `(ticker, representative_date)`** | **{stats["n_unique_ticker_date"]:,}** | 100% collision-free query space |
+| **Total Security-Session Observations** | **{stats["total_session_observations"]:,}** | Raw Cartesian product of security trading days represented |
 | **Query Reduction Ratio** | **99.915%** | Workload reduction achieved by representative date sampling |
-| **Minimum Spell Duration** | **{stats['min_spell_duration']} session** | 738 transient 1-day appearance spells |
-| **Median Spell Duration** | **{stats['median_spell_duration']:.1f} sessions** | ~2.5 trading years |
-| **Mean Spell Duration** | **{stats['mean_spell_duration']:.2f} sessions** | ~4.7 trading years |
-| **Maximum Spell Duration** | **{stats['max_spell_duration']:,} sessions** | Full 22.7-year uninterrupted trading (e.g. `AAPL`, `MSFT`) |
-| **Standard Deviation of Duration** | **{stats['std_spell_duration']:.2f} sessions** | High dispersion reflecting long-lived core equities vs transient IPO/SPACs |
+| **Minimum Spell Duration** | **{stats["min_spell_duration"]} session** | 738 transient 1-day appearance spells |
+| **Median Spell Duration** | **{stats["median_spell_duration"]:.1f} sessions** | ~2.5 trading years |
+| **Mean Spell Duration** | **{stats["mean_spell_duration"]:.2f} sessions** | ~4.7 trading years |
+| **Maximum Spell Duration** | **{stats["max_spell_duration"]:,} sessions** | Full 22.7-year uninterrupted trading (e.g. `AAPL`, `MSFT`) |
+| **Standard Deviation of Duration** | **{stats["std_spell_duration"]:.2f} sessions** | High dispersion reflecting long-lived core equities vs transient IPO/SPACs |
 | **Invalid Date Boundary Checks** | **0** | All representative dates strictly within `[start_date, end_date]` |
 
 ---
@@ -356,8 +395,8 @@ The 43,757 spells exhibit significant structural heterogeneity:
 {bucket_table_md}
 
 ### Key Duration Insights:
-- **Core Long-Lived Equities (> 1 Year)**: **{b_dict.get('253–1,260 sessions (1–5 years)', 0) + b_dict.get('>1,260 sessions (>5 years)', 0):,} spells ({ (b_dict.get('253–1,260 sessions (1–5 years)', 0) + b_dict.get('>1,260 sessions (>5 years)', 0)) / stats['total_spells'] * 100.0:.1f}%)** represent established operating companies with multi-year listings.
-- **Ultra-Short Spells ($\le$ 5 Sessions)**: **{b_dict.get('1 session (ultra-transient)', 0) + b_dict.get('2–5 sessions (1 week)', 0):,} spells ({ (b_dict.get('1 session (ultra-transient)', 0) + b_dict.get('2–5 sessions (1 week)', 0)) / stats['total_spells'] * 100.0:.1f}%)** capture transient snapshot appearances, ticker reassignments, or short data glitches. The midpoint rule ensures these short spells are queried on their exact valid active day.
+- **Core Long-Lived Equities (> 1 Year)**: **{b_dict.get("253–1,260 sessions (1–5 years)", 0) + b_dict.get(">1,260 sessions (>5 years)", 0):,} spells ({(b_dict.get("253–1,260 sessions (1–5 years)", 0) + b_dict.get(">1,260 sessions (>5 years)", 0)) / stats["total_spells"] * 100.0:.1f}%)** represent established operating companies with multi-year listings.
+- **Ultra-Short Spells ($\\le$ 5 Sessions)**: **{b_dict.get("1 session (ultra-transient)", 0) + b_dict.get("2–5 sessions (1 week)", 0):,} spells ({(b_dict.get("1 session (ultra-transient)", 0) + b_dict.get("2–5 sessions (1 week)", 0)) / stats["total_spells"] * 100.0:.1f}%)** capture transient snapshot appearances, ticker reassignments, or short data glitches. The midpoint rule ensures these short spells are queried on their exact valid active day.
 
 ---
 
@@ -406,9 +445,9 @@ With the workload frozen at **43,757 queries**, we evaluate operational executio
 
 This manifest successfully establishes the static input contract for the production identity resolution engine.
 
-- [x] Input spells frozen and validated ({stats['total_spells']:,} spells).
+- [x] Input spells frozen and validated ({stats["total_spells"]:,} spells).
 - [x] Midpoint representative dates calculated without lookahead or boundary violation.
-- [x] Workload verified at exactly 1 query per spell ({stats['queries_required']:,} queries).
+- [x] Workload verified at exactly 1 query per spell ({stats["queries_required"]:,} queries).
 - [x] Parquet and CSV artifacts exported under `data/identity/experiments/`.
 - [x] Methodological principles incorporated into data schemas.
 """
@@ -443,8 +482,12 @@ def main():
 
     # Step 3: Load spells.csv
     df_spells = pl.read_csv(SPELLS_CSV_PATH)
-    logger.info("Loaded %d spells across %d unique tickers from %s.",
-                df_spells.height, df_spells["ticker"].n_unique(), SPELLS_CSV_PATH)
+    logger.info(
+        "Loaded %d spells across %d unique tickers from %s.",
+        df_spells.height,
+        df_spells["ticker"].n_unique(),
+        SPELLS_CSV_PATH,
+    )
 
     # Step 4: Build manifest with representative dates
     df_manifest = build_manifest(df_spells, valid_dates, date_to_idx, logger)
@@ -465,9 +508,15 @@ def main():
     # Step 7: Verify final hash of spells.csv
     final_hash = compute_sha256(SPELLS_CSV_PATH)
     if initial_hash != final_hash:
-        logger.critical("FATAL: spells.csv hash changed during execution! %s -> %s", initial_hash, final_hash)
+        logger.critical(
+            "FATAL: spells.csv hash changed during execution! %s -> %s",
+            initial_hash,
+            final_hash,
+        )
         sys.exit(1)
-    logger.info("VERIFIED: spells.csv remained 100%% unchanged (SHA-256: %s)", final_hash)
+    logger.info(
+        "VERIFIED: spells.csv remained 100%% unchanged (SHA-256: %s)", final_hash
+    )
 
     elapsed = time.time() - start_time
     logger.info("=" * 80)

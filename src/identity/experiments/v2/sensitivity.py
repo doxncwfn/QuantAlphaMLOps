@@ -14,31 +14,21 @@ Evaluates 5 points per spell:
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import sys
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import polars as pl
 
+from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool
 from src.identity.resolver.model import (
-    IdentityStatus,
-    SecurityType,
-    UniverseStatus,
     are_names_consistent,
-    classify_universe_status,
-    extract_entity_tokens,
-    make_deterministic_unresolved_id,
-    make_provisional_cik_id,
     normalize_security_type,
 )
-from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-SESSIONS_PATH = REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "trading_sessions.parquet"
+SESSIONS_PATH = (
+    REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "trading_sessions.parquet"
+)
 SPELLS_PATH = REPO_ROOT / "data" / "universe" / "spells.csv"
 OUT_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "v2"
 LOG_DIR = REPO_ROOT / "log" / "identity_v2"
@@ -47,7 +37,9 @@ LOG_FILE = LOG_DIR / "representative_date_sensitivity.log"
 OUT_PARQUET = OUT_DIR / "representative_date_sensitivity.parquet"
 OUT_MD = OUT_DIR / "representative_date_sensitivity.md"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("sensitivity_test")
 
 
@@ -67,15 +59,46 @@ def run_sensitivity_test():
     logger.info("Loaded spells table: %d spells", df_spells.height)
 
     target_tickers = [
-        "ACMR", "AAC", "MON", "META", "AAA",
-        "AAPL", "MSFT", "CAT", "JNJ", "BA", "IBM", "GE", "DIS", "XOM",
-        "CMCSA", "TWTR", "SIVB", "CELG", "FRC", "NOW", "PATH", "SHOP",
-        "BTX.WSw", "AANw", "AAPw", "AAB.WS", "AAC.U", "AAC.WS", "ASML", "BBBY"
+        "ACMR",
+        "AAC",
+        "MON",
+        "META",
+        "AAA",
+        "AAPL",
+        "MSFT",
+        "CAT",
+        "JNJ",
+        "BA",
+        "IBM",
+        "GE",
+        "DIS",
+        "XOM",
+        "CMCSA",
+        "TWTR",
+        "SIVB",
+        "CELG",
+        "FRC",
+        "NOW",
+        "PATH",
+        "SHOP",
+        "BTX.WSw",
+        "AANw",
+        "AAPw",
+        "AAB.WS",
+        "AAC.U",
+        "AAC.WS",
+        "ASML",
+        "BBBY",
     ]
 
-    sample_spells = df_spells.filter(pl.col("ticker").is_in(target_tickers)).sort(["ticker", "spell_seq"])
-    logger.info("Selected %d test spells across %d tickers for multi-point sensitivity evaluation.",
-                sample_spells.height, sample_spells["ticker"].n_unique())
+    sample_spells = df_spells.filter(pl.col("ticker").is_in(target_tickers)).sort(
+        ["ticker", "spell_seq"]
+    )
+    logger.info(
+        "Selected %d test spells across %d tickers for multi-point sensitivity evaluation.",
+        sample_spells.height,
+        sample_spells["ticker"].n_unique(),
+    )
 
     results = []
     for row in sample_spells.iter_rows(named=True):
@@ -116,25 +139,31 @@ def run_sensitivity_test():
             rec, telem = pool.query(tk, dt, spell_id=f"SENS_{tk}_{seq}_{label}")
             point_records[label] = {
                 "date": dt,
-                "cik": str(rec.get("cik")).zfill(10) if rec and rec.get("cik") else None,
+                "cik": str(rec.get("cik")).zfill(10)
+                if rec and rec.get("cik")
+                else None,
                 "figi": rec.get("share_class_figi") if rec else None,
                 "name": rec.get("name") if rec else None,
                 "type": rec.get("type") if rec else None,
                 "exchange": rec.get("primary_exchange") if rec else None,
                 "active": rec.get("active") if rec else None,
-                "found": (rec is not None)
+                "found": (rec is not None),
             }
 
         all_ciks = {p["cik"] for p in point_records.values() if p["cik"]}
         all_figis = {p["figi"] for p in point_records.values() if p["figi"]}
-        all_types = {normalize_security_type(p["type"]) for p in point_records.values() if p["type"]}
+        all_types = {
+            normalize_security_type(p["type"])
+            for p in point_records.values()
+            if p["type"]
+        }
         all_names = [p["name"] for p in point_records.values() if p["name"]]
         all_founds = [p["found"] for p in point_records.values()]
 
-        cik_stable = (len(all_ciks) <= 1)
-        figi_stable = (len(all_figis) <= 1)
-        type_stable = (len(all_types) <= 1)
-        presence_stable = (len(set(all_founds)) == 1)
+        cik_stable = len(all_ciks) <= 1
+        figi_stable = len(all_figis) <= 1
+        type_stable = len(all_types) <= 1
+        presence_stable = len(set(all_founds)) == 1
 
         name_drift = False
         if len(all_names) > 1:
@@ -148,10 +177,14 @@ def run_sensitivity_test():
         start_point = point_records["START"]
         end_point = point_records["END"]
 
-        mid_differs_from_start = (mid_point["cik"] != start_point["cik"] or
-                                  mid_point["figi"] != start_point["figi"])
-        mid_differs_from_end = (mid_point["cik"] != end_point["cik"] or
-                                mid_point["figi"] != end_point["figi"])
+        mid_differs_from_start = (
+            mid_point["cik"] != start_point["cik"]
+            or mid_point["figi"] != start_point["figi"]
+        )
+        mid_differs_from_end = (
+            mid_point["cik"] != end_point["cik"]
+            or mid_point["figi"] != end_point["figi"]
+        )
 
         identity_invariant = cik_stable and figi_stable and not name_drift
 
@@ -179,12 +212,23 @@ def run_sensitivity_test():
             "type_stable": type_stable,
             "name_consistent": not name_drift,
             "identity_invariant": identity_invariant,
-            "mid_differs_from_boundary": (mid_differs_from_start or mid_differs_from_end),
-            "verdict": "PASS_INVARIANT" if identity_invariant else "CAUTION_WITHIN_SPELL_DRIFT"
+            "mid_differs_from_boundary": (
+                mid_differs_from_start or mid_differs_from_end
+            ),
+            "verdict": "PASS_INVARIANT"
+            if identity_invariant
+            else "CAUTION_WITHIN_SPELL_DRIFT",
         }
         results.append(res_row)
-        logger.info("[%s Seq %d, Dur %4d] Invariant: %5s | CIKs: %s | FIGIs: %s",
-                    tk, seq, dur, str(identity_invariant), list(all_ciks), list(all_figis))
+        logger.info(
+            "[%s Seq %d, Dur %4d] Invariant: %5s | CIKs: %s | FIGIs: %s",
+            tk,
+            seq,
+            dur,
+            str(identity_invariant),
+            list(all_ciks),
+            list(all_figis),
+        )
 
     df_res = pl.DataFrame(results)
     df_res.write_parquet(OUT_PARQUET)
@@ -276,7 +320,7 @@ def generate_sensitivity_report(df: pl.DataFrame):
         "> **Recommendation**: A single representative date (the trading session midpoint) is **empirically justified** as the primary resolution point for contiguous ticker spells.",
         "> ",
         "> However, to safeguard against vendor coverage gaps near spell boundaries, the resolver should support **boundary corroboration**: if the midpoint query returns empty or missing FIGI, the resolver evaluates start and end session candidates before falling back to unresolved.",
-        ""
+        "",
     ]
 
     OUT_MD.write_text("\n".join(lines), encoding="utf-8")

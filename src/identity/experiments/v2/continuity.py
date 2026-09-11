@@ -15,19 +15,18 @@ Outputs:
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import polars as pl
 
+from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool
 from src.identity.resolver.model import (
     are_names_consistent,
     extract_entity_tokens,
     normalize_security_type,
 )
-from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 SPELLS_PATH = REPO_ROOT / "data" / "universe" / "spells.csv"
@@ -36,16 +35,18 @@ OUT_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "v2"
 OUT_PARQUET = OUT_DIR / "spell_relationships.parquet"
 OUT_MD = OUT_DIR / "spell_relationships.md"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("continuity")
 
 
 def classify_continuity(
-    s1: Dict[str, Any],
-    s2: Dict[str, Any],
-    rec1: Dict[str, Any] | None,
-    rec2: Dict[str, Any] | None
-) -> Dict[str, Any]:
+    s1: dict[str, Any],
+    s2: dict[str, Any],
+    rec1: dict[str, Any] | None,
+    rec2: dict[str, Any] | None,
+) -> dict[str, Any]:
     cik1 = str(rec1.get("cik")).zfill(10) if rec1 and rec1.get("cik") else None
     cik2 = str(rec2.get("cik")).zfill(10) if rec2 and rec2.get("cik") else None
 
@@ -65,7 +66,7 @@ def classify_continuity(
         return {
             "relationship_type": "SAME_SECURITY",
             "confidence": "HIGH",
-            "reason": f"Identical share-class FIGI ({figi1}) across consecutive spells."
+            "reason": f"Identical share-class FIGI ({figi1}) across consecutive spells.",
         }
 
     if cik1 and cik2:
@@ -75,25 +76,25 @@ def classify_continuity(
                     return {
                         "relationship_type": "SAME_SECURITY",
                         "confidence": "HIGH",
-                        "reason": f"Same CIK ({cik1}) and consistent corporate name ({name1})."
+                        "reason": f"Same CIK ({cik1}) and consistent corporate name ({name1}).",
                     }
                 else:
                     return {
                         "relationship_type": "CORPORATE_RESTRUCTURING",
                         "confidence": "MEDIUM",
-                        "reason": f"Same CIK ({cik1}) but instrument type changed ({type1} -> {type2})."
+                        "reason": f"Same CIK ({cik1}) but instrument type changed ({type1} -> {type2}).",
                     }
             else:
                 return {
                     "relationship_type": "CORPORATE_RESTRUCTURING",
                     "confidence": "MEDIUM",
-                    "reason": f"Same CIK ({cik1}) but corporate name shifted ({name1} -> {name2})."
+                    "reason": f"Same CIK ({cik1}) but corporate name shifted ({name1} -> {name2}).",
                 }
         else:
             return {
                 "relationship_type": "DIFFERENT_SECURITY",
                 "confidence": "HIGH",
-                "reason": f"Divergent CIKs ({cik1} vs {cik2}) indicates ticker reuse by different corporations."
+                "reason": f"Divergent CIKs ({cik1} vs {cik2}) indicates ticker reuse by different corporations.",
             }
 
     if name1 and name2:
@@ -101,7 +102,7 @@ def classify_continuity(
             return {
                 "relationship_type": "LIKELY_SAME_SECURITY",
                 "confidence": "MEDIUM",
-                "reason": f"Matching corporate brand tokens ('{name1}' vs '{name2}') without authoritative CIK."
+                "reason": f"Matching corporate brand tokens ('{name1}' vs '{name2}') without authoritative CIK.",
             }
         else:
             tokens1 = extract_entity_tokens(name1)
@@ -110,13 +111,13 @@ def classify_continuity(
                 return {
                     "relationship_type": "DIFFERENT_SECURITY",
                     "confidence": "HIGH",
-                    "reason": f"Completely disjoint entity names ('{name1}' vs '{name2}')."
+                    "reason": f"Completely disjoint entity names ('{name1}' vs '{name2}').",
                 }
 
     return {
         "relationship_type": "UNKNOWN_CONTINUITY",
         "confidence": "LOW",
-        "reason": "Insufficient point-in-time reference evidence to verify continuity."
+        "reason": "Insufficient point-in-time reference evidence to verify continuity.",
     }
 
 
@@ -130,56 +131,96 @@ def run_continuity_analysis():
     logger.info("Loaded %d spells.", df_spells.height)
 
     # Filter multi-spell tickers
-    multi_counts = df_spells.group_by("ticker").agg(pl.len().alias("count")).filter(pl.col("count") > 1)
+    multi_counts = (
+        df_spells.group_by("ticker")
+        .agg(pl.len().alias("count"))
+        .filter(pl.col("count") > 1)
+    )
     multi_tickers = sorted(multi_counts["ticker"].to_list())
     logger.info("Found %d multi-spell tickers in universe.", len(multi_tickers))
 
     # We evaluate all consecutive spell pairs for negative controls + sampled multi-spell tickers
-    controls = ["ACMR", "AAC", "MON", "META", "AAA", "ASML", "BBBY", "CMCSA", "SIVB", "NOW", "SHOP"]
-    sample_tickers = sorted(list(set(controls).union(set(multi_tickers[:100]))))
+    controls = [
+        "ACMR",
+        "AAC",
+        "MON",
+        "META",
+        "AAA",
+        "ASML",
+        "BBBY",
+        "CMCSA",
+        "SIVB",
+        "NOW",
+        "SHOP",
+    ]
+    sample_tickers = sorted(set(controls).union(set(multi_tickers[:100])))
 
-    df_multi_sample = df_spells.filter(pl.col("ticker").is_in(sample_tickers)).sort(["ticker", "spell_seq"])
-    logger.info("Evaluating consecutive pairs across %d spells in %d tickers...", df_multi_sample.height, len(sample_tickers))
+    df_multi_sample = df_spells.filter(pl.col("ticker").is_in(sample_tickers)).sort(
+        ["ticker", "spell_seq"]
+    )
+    logger.info(
+        "Evaluating consecutive pairs across %d spells in %d tickers...",
+        df_multi_sample.height,
+        len(sample_tickers),
+    )
 
     relationships = []
     for tk in sample_tickers:
-        t_spells = df_multi_sample.filter(pl.col("ticker") == tk).sort("spell_seq").to_dicts()
+        t_spells = (
+            df_multi_sample.filter(pl.col("ticker") == tk).sort("spell_seq").to_dicts()
+        )
         for i in range(len(t_spells) - 1):
             s1 = t_spells[i]
             s2 = t_spells[i + 1]
 
             # Representative dates
-            rec1, _ = pool.query(tk, s1["start_date"], spell_id=f"CONT_{tk}_{s1['spell_seq']}")
-            rec2, _ = pool.query(tk, s2["start_date"], spell_id=f"CONT_{tk}_{s2['spell_seq']}")
+            rec1, _ = pool.query(
+                tk, s1["start_date"], spell_id=f"CONT_{tk}_{s1['spell_seq']}"
+            )
+            rec2, _ = pool.query(
+                tk, s2["start_date"], spell_id=f"CONT_{tk}_{s2['spell_seq']}"
+            )
 
             res = classify_continuity(s1, s2, rec1, rec2)
 
-            relationships.append({
-                "ticker": tk,
-                "spell_seq_from": s1["spell_seq"],
-                "spell_seq_to": s2["spell_seq"],
-                "start_date_from": s1["start_date"],
-                "end_date_from": s1["end_date"],
-                "start_date_to": s2["start_date"],
-                "end_date_to": s2["end_date"],
-                "cik_from": str(rec1.get("cik")).zfill(10) if rec1 and rec1.get("cik") else None,
-                "cik_to": str(rec2.get("cik")).zfill(10) if rec2 and rec2.get("cik") else None,
-                "figi_from": rec1.get("share_class_figi") if rec1 else None,
-                "figi_to": rec2.get("share_class_figi") if rec2 else None,
-                "name_from": rec1.get("name") if rec1 else None,
-                "name_to": rec2.get("name") if rec2 else None,
-                "relationship_type": res["relationship_type"],
-                "confidence": res["confidence"],
-                "reason": res["reason"],
-            })
+            relationships.append(
+                {
+                    "ticker": tk,
+                    "spell_seq_from": s1["spell_seq"],
+                    "spell_seq_to": s2["spell_seq"],
+                    "start_date_from": s1["start_date"],
+                    "end_date_from": s1["end_date"],
+                    "start_date_to": s2["start_date"],
+                    "end_date_to": s2["end_date"],
+                    "cik_from": str(rec1.get("cik")).zfill(10)
+                    if rec1 and rec1.get("cik")
+                    else None,
+                    "cik_to": str(rec2.get("cik")).zfill(10)
+                    if rec2 and rec2.get("cik")
+                    else None,
+                    "figi_from": rec1.get("share_class_figi") if rec1 else None,
+                    "figi_to": rec2.get("share_class_figi") if rec2 else None,
+                    "name_from": rec1.get("name") if rec1 else None,
+                    "name_to": rec2.get("name") if rec2 else None,
+                    "relationship_type": res["relationship_type"],
+                    "confidence": res["confidence"],
+                    "reason": res["reason"],
+                }
+            )
 
     df_rel = pl.DataFrame(relationships)
     OUT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     df_rel.write_parquet(OUT_PARQUET)
-    logger.info("Saved spell relationships parquet to %s (%d pairs)", OUT_PARQUET, df_rel.height)
+    logger.info(
+        "Saved spell relationships parquet to %s (%d pairs)", OUT_PARQUET, df_rel.height
+    )
 
     # Metrics
-    rel_counts = df_rel.group_by("relationship_type").agg(pl.len().alias("count")).sort("count", descending=True)
+    rel_counts = (
+        df_rel.group_by("relationship_type")
+        .agg(pl.len().alias("count"))
+        .sort("count", descending=True)
+    )
 
     md_content = f"""# Section 10: Multi-Spell Ticker Continuity & Relationship Table
 
@@ -202,7 +243,15 @@ Total consecutive spell transitions evaluated: **{df_rel.height}**
 """
     for r in rel_counts.iter_rows(named=True):
         pct = (r["count"] / max(1, df_rel.height)) * 100
-        handling = "Stitch price series across gap" if r["relationship_type"] in ["SAME_SECURITY", "LIKELY_SAME_SECURITY"] else ("Strictly isolate into distinct security IDs" if r["relationship_type"] == "DIFFERENT_SECURITY" else "Apply restructuring adjustment or quarantine")
+        handling = (
+            "Stitch price series across gap"
+            if r["relationship_type"] in ["SAME_SECURITY", "LIKELY_SAME_SECURITY"]
+            else (
+                "Strictly isolate into distinct security IDs"
+                if r["relationship_type"] == "DIFFERENT_SECURITY"
+                else "Apply restructuring adjustment or quarantine"
+            )
+        )
         md_content += f"| `{r['relationship_type']}` | **{r['count']}** | {pct:.1f}% | {handling} |\n"
 
     md_content += """

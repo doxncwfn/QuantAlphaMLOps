@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+
 import polars as pl
 
 from src.market_data.config import (
@@ -36,15 +36,25 @@ def generate_market_coverage_report():
     total_queue_secs = df_queue["security_id"].n_unique()
 
     total_priced_records = df_prices.height
-    valid_priced_records = df_prices.filter(pl.col("price_state") == "PRICED_VALID").height
-    missing_records = df_prices.filter(pl.col("price_state") == "PRICE_MISSING_HALT_OR_DELISTED").height
-    corrupted_records = df_prices.filter(pl.col("price_state") == "CORRUPTED_DATE").height
+    valid_priced_records = df_prices.filter(
+        pl.col("price_state") == "PRICED_VALID"
+    ).height
+    missing_records = df_prices.filter(
+        pl.col("price_state") == "PRICE_MISSING_HALT_OR_DELISTED"
+    ).height
+    corrupted_records = df_prices.filter(
+        pl.col("price_state") == "CORRUPTED_DATE"
+    ).height
 
-    priced_secs = df_prices.filter(pl.col("price_state") == "PRICED_VALID")["security_id"].n_unique()
+    priced_secs = df_prices.filter(pl.col("price_state") == "PRICED_VALID")[
+        "security_id"
+    ].n_unique()
 
     # Priority breakdown
     p_counts = df_queue["source_priority"].value_counts().sort("count", descending=True)
-    p_dict = dict(zip(p_counts["source_priority"].to_list(), p_counts["count"].to_list()))
+    p_dict = dict(
+        zip(p_counts["source_priority"].to_list(), p_counts["count"].to_list())
+    )
 
     report_content = f"""# Security-Level Market Data Layer Coverage Report
 
@@ -64,9 +74,9 @@ The acquisition queue indexes **{total_queue_episodes:,} availability episodes**
 
 | Acquisition Priority Tier | Episode Count | Share | Target Universe & Rationale |
 | :--- | :---: | :---: | :--- |
-| **`PRIORITY_1_FIGI_ACTIVE`** | **{p_dict.get('PRIORITY_1_FIGI_ACTIVE', 0):,}** | {p_dict.get('PRIORITY_1_FIGI_ACTIVE', 0)/total_queue_episodes*100:.1f}% | **Confirmed Real-World Securities**: Authoritative FIGI-backed common stocks, S&P 500, and ETFs. Primary focus for cross-sectional factor modeling. |
-| **`PRIORITY_2_CIK_BACKED`** | **{p_dict.get('PRIORITY_2_CIK_BACKED', 0):,}** | {p_dict.get('PRIORITY_2_CIK_BACKED', 0)/total_queue_episodes*100:.1f}% | **Provisional CIK Identities**: Operating companies with active SEC filings awaiting share-class FIGI mapping. |
-| **`PRIORITY_3_UNRESOLVED`** | **{p_dict.get('PRIORITY_3_UNRESOLVED', 0):,}** | {p_dict.get('PRIORITY_3_UNRESOLVED', 0)/total_queue_episodes*100:.1f}% | **Synthetic Bookkeeping Buckets**: Delisted penny stocks, pre-2010 OTC, and expired warrants. |
+| **`PRIORITY_1_FIGI_ACTIVE`** | **{p_dict.get("PRIORITY_1_FIGI_ACTIVE", 0):,}** | {p_dict.get("PRIORITY_1_FIGI_ACTIVE", 0) / total_queue_episodes * 100:.1f}% | **Confirmed Real-World Securities**: Authoritative FIGI-backed common stocks, S&P 500, and ETFs. Primary focus for cross-sectional factor modeling. |
+| **`PRIORITY_2_CIK_BACKED`** | **{p_dict.get("PRIORITY_2_CIK_BACKED", 0):,}** | {p_dict.get("PRIORITY_2_CIK_BACKED", 0) / total_queue_episodes * 100:.1f}% | **Provisional CIK Identities**: Operating companies with active SEC filings awaiting share-class FIGI mapping. |
+| **`PRIORITY_3_UNRESOLVED`** | **{p_dict.get("PRIORITY_3_UNRESOLVED", 0):,}** | {p_dict.get("PRIORITY_3_UNRESOLVED", 0) / total_queue_episodes * 100:.1f}% | **Synthetic Bookkeeping Buckets**: Delisted penny stocks, pre-2010 OTC, and expired warrants. |
 
 ---
 
@@ -76,9 +86,9 @@ Across the audited candidate universe, **{total_priced_records:,} security-date 
 
 | Price State | Total Records | Percentage | Definition & Handling |
 | :--- | :---: | :---: | :--- |
-| **`PRICED_VALID`** | **{valid_priced_records:,}** | {valid_priced_records/total_priced_records*100:.1f}% | Passed all price sanity envelope checks (`low <= min(open, close)` and `high >= max(open, close)`). |
-| **`PRICE_MISSING_HALT_OR_DELISTED`** | **{missing_records:,}** | {missing_records/total_priced_records*100:.1f}% | Security expected in universe, but vendor reported no trading data (e.g. trading halt, post-merger delisting). |
-| **`CORRUPTED_DATE`** | **{corrupted_records:,}** | {corrupted_records/total_priced_records*100:.1f}% | On `2009-10-29`, `2010-03-30`, and `2010-03-31`, marked explicitly as corrupted outage dates. Zero data fabricated. |
+| **`PRICED_VALID`** | **{valid_priced_records:,}** | {valid_priced_records / total_priced_records * 100:.1f}% | Passed all price sanity envelope checks (`low <= min(open, close)` and `high >= max(open, close)`). |
+| **`PRICE_MISSING_HALT_OR_DELISTED`** | **{missing_records:,}** | {missing_records / total_priced_records * 100:.1f}% | Security expected in universe, but vendor reported no trading data (e.g. trading halt, post-merger delisting). |
+| **`CORRUPTED_DATE`** | **{corrupted_records:,}** | {corrupted_records / total_priced_records * 100:.1f}% | On `2009-10-29`, `2010-03-30`, and `2010-03-31`, marked explicitly as corrupted outage dates. Zero data fabricated. |
 
 ---
 
@@ -86,7 +96,7 @@ Across the audited candidate universe, **{total_priced_records:,} security-date 
 
 A total of **{df_splits.height:,} corporate actions / price split jumps** were detected in `data/quality/split_detection.parquet`:
 - Forward stock splits (e.g. 2:1, 3:1, 4:1) detected where unadjusted close dropped by ~50% or ~66%.
-- Reverse splits (e.g. 1:2, 1:10) detected where unadjusted price jumped by $\ge 1.85\times$.
+- Reverse splits (e.g. 1:2, 1:10) detected where unadjusted price jumped by $\\ge 1.85\times$.
 - Split detection ensures that unadjusted price jumps are not misconstrued by quantitative alphas as catastrophic loss or anomalous return shocks.
 
 ---
@@ -100,7 +110,7 @@ A total of **{df_splits.height:,} corporate actions / price split jumps** were d
 - Keying by `(security_id, date)` ensures that A.C. Moore's prices attach only to `UNRESOLVED_ACMR_01` and ACM Research's prices attach only to `BBG00HPSG942`.
 
 ### Q2: How many expected dates lack prices?
-- In the active sample, **{missing_records:,} date observations ({missing_records/total_priced_records*100:.1f}%)** lacked market prices.
+- In the active sample, **{missing_records:,} date observations ({missing_records / total_priced_records * 100:.1f}%)** lacked market prices.
 - These reflect exchange trading halts, localized liquidity dry-ups, or delisting lead-times.
 
 ### Q3: Are missing prices random, or concentrated in specific segments?

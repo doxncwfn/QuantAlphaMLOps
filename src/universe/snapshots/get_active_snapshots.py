@@ -1,16 +1,16 @@
 # Download command: modal volume get "US_market_universe" / ./data
+import json
+import logging
 import os
 import sys
-import json
 import time
-import logging
 from datetime import datetime
 from pathlib import Path
 
-import requests
-import polars as pl
-import pandas_market_calendars as pd_mcal
 import modal
+import pandas_market_calendars as pd_mcal
+import polars as pl
+import requests
 
 NUM_WORKERS = 9
 START_DATE = "2004-01-01"
@@ -64,16 +64,18 @@ class MassiveThrottledManager:
 
         page_num = 1
         while True:
-            added_tickers, next_url = self._fetch_page(target_date, page_num, url, params)
-            
+            added_tickers, next_url = self._fetch_page(
+                target_date, page_num, url, params
+            )
+
             for t in added_tickers:
                 if t not in seen:
                     seen.add(t)
                     active_symbols.append(t)
-            
+
             if next_url is None:
                 break
-                
+
             url = next_url
             params = {}
             if "apiKey" not in url:
@@ -83,7 +85,9 @@ class MassiveThrottledManager:
             time.sleep(INTER_PAGE_DELAY)
 
         if not active_symbols:
-            raise ExtractionError(f"[{target_date}] Extraction yielded zero tickers. Failing date.")
+            raise ExtractionError(
+                f"[{target_date}] Extraction yielded zero tickers. Failing date."
+            )
 
         return active_symbols
 
@@ -99,8 +103,15 @@ class MassiveThrottledManager:
                 if response.status_code == 429:
                     retries += 1
                     if retries >= MAX_REQUEST_RETRIES:
-                        raise ExtractionError(f"[{target_date}] Page {page_num} failed after {MAX_REQUEST_RETRIES} retries (HTTP 429)")
-                    logger.warning("[%s] HTTP 429 on page %d. Retrying in %.1f seconds.", target_date, page_num, backoff)
+                        raise ExtractionError(
+                            f"[{target_date}] Page {page_num} failed after {MAX_REQUEST_RETRIES} retries (HTTP 429)"
+                        )
+                    logger.warning(
+                        "[%s] HTTP 429 on page %d. Retrying in %.1f seconds.",
+                        target_date,
+                        page_num,
+                        backoff,
+                    )
                     time.sleep(backoff)
                     backoff = min(backoff * 2, MAX_BACKOFF)
                     continue
@@ -115,25 +126,38 @@ class MassiveThrottledManager:
                 extracted_symbols = []
                 for idx, item in enumerate(results):
                     if not isinstance(item, dict):
-                        raise ExtractionError(f"[{target_date}] Page {page_num}: result[{idx}] is not a dict. Aborting.")
+                        raise ExtractionError(
+                            f"[{target_date}] Page {page_num}: result[{idx}] is not a dict. Aborting."
+                        )
                     raw_ticker = item.get("ticker")
                     if not raw_ticker or not str(raw_ticker).strip():
-                        raise ExtractionError(f"[{target_date}] Page {page_num}: missing/empty ticker. Aborting.")
-                    
+                        raise ExtractionError(
+                            f"[{target_date}] Page {page_num}: missing/empty ticker. Aborting."
+                        )
+
                     t = str(raw_ticker).strip()
                     extracted_symbols.append(t)
-                
+
                 next_url = payload.get("next_url")
                 if next_url is not None and not isinstance(next_url, str):
-                    raise ExtractionError(f"[{target_date}] Page {page_num}: malformed next_url (got {type(next_url).__name__}). Aborting.")
+                    raise ExtractionError(
+                        f"[{target_date}] Page {page_num}: malformed next_url (got {type(next_url).__name__}). Aborting."
+                    )
                 return extracted_symbols, next_url
 
             except requests.exceptions.RequestException as exc:
                 retries += 1
                 if retries >= MAX_REQUEST_RETRIES:
-                    raise ExtractionError(f"[{target_date}] Page {page_num} network error after {MAX_REQUEST_RETRIES} retries: {exc}")
+                    raise ExtractionError(
+                        f"[{target_date}] Page {page_num} network error after {MAX_REQUEST_RETRIES} retries: {exc}"
+                    )
                 wait = 5.0 * retries
-                logger.warning("[%s] Network error on page %d. Retrying in %.1f s.", target_date, page_num, wait)
+                logger.warning(
+                    "[%s] Network error on page %d. Retrying in %.1f s.",
+                    target_date,
+                    page_num,
+                    wait,
+                )
                 time.sleep(wait)
 
 
@@ -155,8 +179,10 @@ def load_manifest(worker_id: int) -> pl.DataFrame:
         return pl.DataFrame(schema=schema)
     try:
         return pl.read_parquet(manifest_file)
-    except Exception as exc:
-        logger.critical("Manifest for worker %d is unreadable or corrupt: %s", worker_id, exc)
+    except (OSError, pl.exceptions.PolarsError, RuntimeError, ValueError) as exc:
+        logger.critical(
+            "Manifest for worker %d is unreadable or corrupt: %s", worker_id, exc
+        )
         sys.exit(1)
 
 
@@ -196,7 +222,7 @@ def upsert_manifest_row(
     )
     if manifest.is_empty():
         return new_row
-    
+
     manifest = manifest.filter(pl.col("date") != target_date)
     return pl.concat([manifest, new_row])
 
@@ -232,9 +258,8 @@ def get_xnys_trading_dates(start_date: str, end_date: str) -> list[str]:
 
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
 
-image = (
-    modal.Image.debian_slim(python_version="3.11")
-    .pip_install("requests", "polars", "pyarrow", "pandas_market_calendars")
+image = modal.Image.debian_slim(python_version="3.11").pip_install(
+    "requests", "polars", "pyarrow", "pandas_market_calendars"
 )
 
 app = modal.App(APP_NAME)
@@ -247,14 +272,18 @@ app = modal.App(APP_NAME)
     memory=256,
 )
 def validate_api_keys():
-    logger.info("Validating all %d API keys are present in the Modal Secret...", NUM_WORKERS)
+    logger.info(
+        "Validating all %d API keys are present in the Modal Secret...", NUM_WORKERS
+    )
     missing = []
     for i in range(1, NUM_WORKERS + 1):
         env_var_name = f"MASSIVE_API_KEY_{i}"
         if not os.environ.get(env_var_name):
             missing.append(env_var_name)
     if missing:
-        logger.critical("Missing API keys in Secret %s: %s", MODAL_SECRET_NAME, ", ".join(missing))
+        logger.critical(
+            "Missing API keys in Secret %s: %s", MODAL_SECRET_NAME, ", ".join(missing)
+        )
         sys.exit(1)
     logger.info("All %d API keys are present.", NUM_WORKERS)
 
@@ -272,21 +301,34 @@ def extract_worker(worker_id: int, assigned_dates: list[str]):
     logger.info("Worker %d STARTING", worker_id)
     logger.info("Assigned dates      : %d", len(assigned_dates))
     if assigned_dates:
-        logger.info("Date range          : %s -> %s", assigned_dates[0], assigned_dates[-1])
+        logger.info(
+            "Date range          : %s -> %s", assigned_dates[0], assigned_dates[-1]
+        )
     logger.info("Volume root         : %s", VOLUME_ROOT)
     logger.info("=" * 70)
 
     env_var_name = f"MASSIVE_API_KEY_{worker_id}"
     api_key = os.environ.get(env_var_name)
     if not api_key:
-        logger.critical("Worker %d API key missing. Ensure %s is set in the Secret.", worker_id, env_var_name)
+        logger.critical(
+            "Worker %d API key missing. Ensure %s is set in the Secret.",
+            worker_id,
+            env_var_name,
+        )
         sys.exit(1)
 
     ensure_directories()
     manifest = load_manifest(worker_id)
 
-    already_done = sum(1 for d in assigned_dates if is_date_already_successful(manifest, d))
-    logger.info("Worker %d: Already completed (will skip): %d / %d", worker_id, already_done, len(assigned_dates))
+    already_done = sum(
+        1 for d in assigned_dates if is_date_already_successful(manifest, d)
+    )
+    logger.info(
+        "Worker %d: Already completed (will skip): %d / %d",
+        worker_id,
+        already_done,
+        len(assigned_dates),
+    )
 
     manager = MassiveThrottledManager(api_key=api_key)
 
@@ -296,41 +338,67 @@ def extract_worker(worker_id: int, assigned_dates: list[str]):
 
     for i, target_date in enumerate(assigned_dates, start=1):
         if is_date_already_successful(manifest, target_date):
-            logger.debug("[Worker %d | %s] Already successful -- skipping.", worker_id, target_date)
+            logger.debug(
+                "[Worker %d | %s] Already successful -- skipping.",
+                worker_id,
+                target_date,
+            )
             n_skipped += 1
             continue
 
-        logger.info("[Worker %d | %s] Processing (%d / %d)...", worker_id, target_date, i, len(assigned_dates))
+        logger.info(
+            "[Worker %d | %s] Processing (%d / %d)...",
+            worker_id,
+            target_date,
+            i,
+            len(assigned_dates),
+        )
         processed_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
         try:
             tickers = manager.get_active_symbols_on_date(target_date)
             tickers = list(dict.fromkeys(tickers))
-            
+
             save_raw_snapshot(target_date, tickers)
-            
+
             manifest = upsert_manifest_row(
                 manifest, target_date, "success", len(tickers), processed_at, None
             )
             save_manifest(worker_id, manifest)
-            
+
             volume.commit()
-            logger.info("[Worker %d | %s] SUCCESS -- %d tickers. Volume committed.", worker_id, target_date, len(tickers))
+            logger.info(
+                "[Worker %d | %s] SUCCESS -- %d tickers. Volume committed.",
+                worker_id,
+                target_date,
+                len(tickers),
+            )
             n_success += 1
-            
+
         except Exception as exc:
             error_msg = f"{type(exc).__name__}: {exc}"
-            logger.error("[Worker %d | %s] FAILED: %s", worker_id, target_date, error_msg)
+            logger.exception(
+                "[Worker %d | %s] FAILED: %s", worker_id, target_date, error_msg
+            )
             manifest = upsert_manifest_row(
                 manifest, target_date, "failed", 0, processed_at, error_msg
             )
             try:
                 save_manifest(worker_id, manifest)
                 volume.commit()
-                logger.info("[Worker %d | %s] Failure state saved to manifest and volume committed.", worker_id, target_date)
-            except Exception as save_exc:
-                logger.error("[Worker %d | %s] Could not save manifest after failure: %s", worker_id, target_date, save_exc)
-            
+                logger.info(
+                    "[Worker %d | %s] Failure state saved to manifest and volume committed.",
+                    worker_id,
+                    target_date,
+                )
+            except (OSError, pl.exceptions.PolarsError) as save_exc:
+                logger.error(
+                    "[Worker %d | %s] Could not save manifest after failure: %s",
+                    worker_id,
+                    target_date,
+                    save_exc,
+                )
+
             n_failed += 1
 
     logger.info("=" * 70)
@@ -356,36 +424,47 @@ def merge_manifests(expected_dates: list[str]):
 
     manifest_dfs = []
     worker_ids_loaded = []
-    
+
     for worker_id in range(1, NUM_WORKERS + 1):
         worker_file = MANIFEST_DIR / f"worker_{worker_id}.parquet"
         if worker_file.exists():
             df = pl.read_parquet(worker_file)
             manifest_dfs.append(df)
             worker_ids_loaded.append(worker_id)
-            logger.info("Loaded manifest for Worker %d: %d records", worker_id, df.height)
+            logger.info(
+                "Loaded manifest for Worker %d: %d records", worker_id, df.height
+            )
         else:
-            logger.warning("Manifest for Worker %d not found at %s", worker_id, worker_file)
+            logger.warning(
+                "Manifest for Worker %d not found at %s", worker_id, worker_file
+            )
 
     if not manifest_dfs:
         logger.error("No worker manifests found to merge.")
         return
 
     merged_df = pl.concat(manifest_dfs)
-    
+
     dup_counts = merged_df.group_by("date").len().filter(pl.col("len") > 1)
     if not dup_counts.is_empty():
         duplicate_dates = dup_counts["date"].to_list()
-        logger.error("ERROR: %d duplicate dates found across worker manifests!", len(duplicate_dates))
-        
+        logger.error(
+            "ERROR: %d duplicate dates found across worker manifests!",
+            len(duplicate_dates),
+        )
+
         for dup in duplicate_dates:
             workers_with_dup = []
             for wid, df in zip(worker_ids_loaded, manifest_dfs):
                 if not df.filter(pl.col("date") == dup).is_empty():
                     workers_with_dup.append(f"worker_{wid}")
-            logger.error("Date %s is duplicated in: %s", dup, ", ".join(workers_with_dup))
-            
-        logger.error("Failing the merge due to duplicates. Fix the assignment bug or corrupted state.")
+            logger.error(
+                "Date %s is duplicated in: %s", dup, ", ".join(workers_with_dup)
+            )
+
+        logger.error(
+            "Failing the merge due to duplicates. Fix the assignment bug or corrupted state."
+        )
         sys.exit(1)
 
     merged_df = merged_df.sort("date")
@@ -394,17 +473,20 @@ def merge_manifests(expected_dates: list[str]):
     merged_df.write_parquet(tmp_path)
     tmp_path.replace(FINAL_MANIFEST_FILE)
     volume.commit()
-    logger.info("Canonical manifest updated and volume committed. Total records: %d", merged_df.height)
+    logger.info(
+        "Canonical manifest updated and volume committed. Total records: %d",
+        merged_df.height,
+    )
 
     expected_set = set(expected_dates)
     represented_set = set(merged_df["date"].to_list())
-    
+
     success_df = merged_df.filter(pl.col("status") == "success")
     failed_df = merged_df.filter(pl.col("status") == "failed")
-    
+
     successful_dates = set(success_df["date"].to_list())
     failed_dates = set(failed_df["date"].to_list())
-    
+
     missing_dates = expected_set - represented_set
 
     logger.info("--- Coverage Validation ---")
@@ -413,12 +495,18 @@ def merge_manifests(expected_dates: list[str]):
     logger.info("Failed dates      : %d", len(failed_dates))
     logger.info("Missing dates     : %d", len(missing_dates))
     logger.info("Duplicate dates   : 0 (verified)")
-    
+
     if missing_dates:
-        logger.warning("WARNING: There are %d expected dates missing from the manifests.", len(missing_dates))
-    
+        logger.warning(
+            "WARNING: There are %d expected dates missing from the manifests.",
+            len(missing_dates),
+        )
+
     if failed_dates:
-        logger.warning("WARNING: There are %d failed dates recorded in the manifests.", len(failed_dates))
+        logger.warning(
+            "WARNING: There are %d failed dates recorded in the manifests.",
+            len(failed_dates),
+        )
 
     logger.info("Merge and validation complete.")
 
@@ -442,23 +530,27 @@ def main():
     if sorted(trading_dates) != trading_dates:
         logger.critical("Trading dates are not sorted. Aborting.")
         sys.exit(1)
-        
+
     if len(set(trading_dates)) != total_sessions:
         logger.critical("Duplicate dates found in trading sessions. Aborting.")
         sys.exit(1)
-        
+
     logger.info("First session: %s", first_session)
     logger.info("Last session: %s", last_session)
     logger.info("Total sessions found: %d", total_sessions)
 
     if first_session > "2004-01-02":
-        logger.critical("First session %s is later than 2004-01-02. Aborting.", first_session)
+        logger.critical(
+            "First session %s is later than 2004-01-02. Aborting.", first_session
+        )
         sys.exit(1)
-        
+
     if last_session != "2026-09-01":
-        logger.critical("Last session %s is not exactly 2026-09-01. Aborting.", last_session)
+        logger.critical(
+            "Last session %s is not exactly 2026-09-01. Aborting.", last_session
+        )
         sys.exit(1)
-    
+
     chunk_size = total_sessions // NUM_WORKERS
     remainder = total_sessions % NUM_WORKERS
 
@@ -474,18 +566,24 @@ def main():
         worker_id = i + 1
         chunk = chunks[i]
         if chunk:
-            logger.info("Worker %d: %s -> %s, %d sessions", worker_id, chunk[0], chunk[-1], len(chunk))
+            logger.info(
+                "Worker %d: %s -> %s, %d sessions",
+                worker_id,
+                chunk[0],
+                chunk[-1],
+                len(chunk),
+            )
         else:
             logger.info("Worker %d: No sessions assigned", worker_id)
 
     logger.info("Spawning %d remote concurrent workers...", NUM_WORKERS)
-    
+
     calls = []
     for i in range(NUM_WORKERS):
         worker_id = i + 1
         call = extract_worker.spawn(worker_id, chunks[i])
         calls.append(call)
-    
+
     for call in calls:
         call.get()
 

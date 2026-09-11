@@ -12,16 +12,13 @@ Objective:
 
 from __future__ import annotations
 
-import glob
 import json
 import logging
-import os
 import re
 import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -74,8 +71,7 @@ def setup_logging() -> logging.Logger:
     logger.handlers.clear()
 
     formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)-7s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        "%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     file_handler = logging.FileHandler(LOG_FILE_PATH, mode="w", encoding="utf-8")
@@ -91,7 +87,7 @@ def setup_logging() -> logging.Logger:
     return logger
 
 
-def load_trading_calendar(start_date: str, end_date: str) -> List[str]:
+def load_trading_calendar(start_date: str, end_date: str) -> list[str]:
     """Retrieves full NYSE trading session dates using pandas_market_calendars."""
     nyse = mcal.get_calendar("NYSE")
     sched = nyse.schedule(start_date=start_date, end_date=end_date)
@@ -99,10 +95,8 @@ def load_trading_calendar(start_date: str, end_date: str) -> List[str]:
 
 
 def select_candidate_sample(
-    spells: pl.DataFrame,
-    session_dates: List[str],
-    logger: logging.Logger
-) -> Tuple[pl.DataFrame, List[str], pl.DataFrame, pl.DataFrame]:
+    spells: pl.DataFrame, session_dates: list[str], logger: logging.Logger
+) -> tuple[pl.DataFrame, list[str], pl.DataFrame, pl.DataFrame]:
     """
     Selects stratified sample of gaps across buckets and prioritizes living tickers.
     Also extracts candidates for the 3 corrupted snapshot dates and feed transitions.
@@ -111,25 +105,36 @@ def select_candidate_sample(
 
     # Identify living tickers in spells (active on dataset end boundary 2026-09-01)
     last_spells = spells.filter(pl.col("spell_seq") == pl.col("n_spells_total"))
-    living_tickers_set = set(last_spells.filter(pl.col("end_date") == "2026-09-01")["ticker"].to_list())
-    logger.info("Total unique tickers: %d. Living tickers active on 2026-09-01: %d",
-                spells["ticker"].n_unique(), len(living_tickers_set))
+    living_tickers_set = set(
+        last_spells.filter(pl.col("end_date") == "2026-09-01")["ticker"].to_list()
+    )
+    logger.info(
+        "Total unique tickers: %d. Living tickers active on 2026-09-01: %d",
+        spells["ticker"].n_unique(),
+        len(living_tickers_set),
+    )
 
     # Add next_start_date and is_living flag
-    spells_with_next = spells.with_columns([
-        pl.col("start_date").shift(-1).over("ticker").alias("next_start_date"),
-        pl.col("ticker").is_in(living_tickers_set).alias("is_living"),
-    ])
+    spells_with_next = spells.with_columns(
+        [
+            pl.col("start_date").shift(-1).over("ticker").alias("next_start_date"),
+            pl.col("ticker").is_in(living_tickers_set).alias("is_living"),
+        ]
+    )
 
     gaps = spells_with_next.filter(pl.col("gap_after_sessions").is_not_null())
 
     gaps = gaps.with_columns(
-        pl.when(pl.col("gap_after_sessions") <= 2).then(pl.lit("01. 1-2 sessions"))
-          .when(pl.col("gap_after_sessions") <= 20).then(pl.lit("02. 3-20 sessions"))
-          .when(pl.col("gap_after_sessions") <= 50).then(pl.lit("03. 21-50 sessions"))
-          .when(pl.col("gap_after_sessions") <= 252).then(pl.lit("04. 51-252 sessions"))
-          .otherwise(pl.lit("05. >252 sessions"))
-          .alias("gap_bucket")
+        pl.when(pl.col("gap_after_sessions") <= 2)
+        .then(pl.lit("01. 1-2 sessions"))
+        .when(pl.col("gap_after_sessions") <= 20)
+        .then(pl.lit("02. 3-20 sessions"))
+        .when(pl.col("gap_after_sessions") <= 50)
+        .then(pl.lit("03. 21-50 sessions"))
+        .when(pl.col("gap_after_sessions") <= 252)
+        .then(pl.lit("04. 51-252 sessions"))
+        .otherwise(pl.lit("05. >252 sessions"))
+        .alias("gap_bucket")
     )
 
     sampled_dfs = []
@@ -144,12 +149,22 @@ def select_candidate_sample(
         s_liv = b_liv.sample(n=n_liv, seed=RANDOM_SEED)
         s_dead = b_dead.sample(n=n_dead, seed=RANDOM_SEED)
         sampled_dfs.extend([s_liv, s_dead])
-        logger.info("Bucket %-18s: Sampled %3d living + %3d non-living gaps (available: %d liv / %d non-liv)",
-                    b_name, n_liv, n_dead, b_liv.height, b_dead.height)
+        logger.info(
+            "Bucket %-18s: Sampled %3d living + %3d non-living gaps (available: %d liv / %d non-liv)",
+            b_name,
+            n_liv,
+            n_dead,
+            b_liv.height,
+            b_dead.height,
+        )
 
     df_sampled = pl.concat(sampled_dfs)
     sampled_tickers = sorted(df_sampled["ticker"].unique().to_list())
-    logger.info("Total sampled gaps: %d across %d unique tickers.", df_sampled.height, len(sampled_tickers))
+    logger.info(
+        "Total sampled gaps: %d across %d unique tickers.",
+        df_sampled.height,
+        len(sampled_tickers),
+    )
 
     # Candidates for known problem dates: 2009-10-29, 2010-03-30, 2010-03-31
     # Sample prominent tickers active around those dates
@@ -158,38 +173,55 @@ def select_candidate_sample(
         p_year = pdate[:4]
         # Check active symbols before and after in raw JSON
         # For simplicity, look for tickers whose spells encompass or bound that date
-        t_around = spells.filter(
-            (pl.col("start_date") <= pdate) & (pl.col("end_date") >= pdate)
-        )["ticker"].unique().to_list()
+        t_around = (
+            spells.filter(
+                (pl.col("start_date") <= pdate) & (pl.col("end_date") >= pdate)
+            )["ticker"]
+            .unique()
+            .to_list()
+        )
         # Also sample tickers missing on that specific date from raw JSON
         raw_p_path = RAW_SNAPSHOTS_DIR / p_year / f"{pdate}.json"
         if raw_p_path.exists():
-            with open(raw_p_path, "r") as fp:
+            with open(raw_p_path) as fp:
                 present_on_date = set(json.load(fp).get("tickers", []))
             # Compare with preceding trading day
             prev_idx = session_dates.index(pdate) - 1 if pdate in session_dates else -1
             if prev_idx >= 0:
                 prev_date = session_dates[prev_idx]
-                with open(RAW_SNAPSHOTS_DIR / prev_date[:4] / f"{prev_date}.json") as fp:
+                with open(
+                    RAW_SNAPSHOTS_DIR / prev_date[:4] / f"{prev_date}.json"
+                ) as fp:
                     present_prev = set(json.load(fp).get("tickers", []))
-                missing_on_pdate = sorted(list(present_prev - present_on_date))
+                missing_on_pdate = sorted(present_prev - present_on_date)
                 # Sample 15 missing tickers
                 np.random.seed(RANDOM_SEED)
-                sampled_missing = list(np.random.choice(missing_on_pdate, min(15, len(missing_on_pdate)), replace=False))
+                sampled_missing = list(
+                    np.random.choice(
+                        missing_on_pdate, min(15, len(missing_on_pdate)), replace=False
+                    )
+                )
                 for t in sampled_missing:
-                    prob_candidates.append({
-                        "ticker": t,
-                        "problem_date": pdate,
-                        "status_in_massive": "MISSING_ON_DATE",
-                    })
+                    prob_candidates.append(
+                        {
+                            "ticker": t,
+                            "problem_date": pdate,
+                            "status_in_massive": "MISSING_ON_DATE",
+                        }
+                    )
 
     df_prob_candidates = pl.DataFrame(prob_candidates)
-    logger.info("Sampled %d ticker-date instances for known corrupted snapshot dates.", df_prob_candidates.height)
+    logger.info(
+        "Sampled %d ticker-date instances for known corrupted snapshot dates.",
+        df_prob_candidates.height,
+    )
 
     # Candidates for 2009-06-11 feed transition
     trans_spells = spells_with_next.filter(pl.col("next_start_date") == "2009-06-11")
     s_trans = trans_spells.sample(n=min(25, trans_spells.height), seed=RANDOM_SEED)
-    logger.info("Sampled %d gaps resuming on 2009-06-11 feed transition date.", s_trans.height)
+    logger.info(
+        "Sampled %d gaps resuming on 2009-06-11 feed transition date.", s_trans.height
+    )
 
     # Save configuration
     config_payload = {
@@ -215,11 +247,8 @@ def normalize_ticker_for_yahoo(ticker: str) -> str:
 
 
 def fetch_yahoo_market_data(
-    ticker: str,
-    start_date: str,
-    end_date: str,
-    logger: logging.Logger
-) -> Optional[pd.DataFrame]:
+    ticker: str, start_date: str, end_date: str, logger: logging.Logger
+) -> pd.DataFrame | None:
     """
     Fetches daily OHLCV from Yahoo Finance with persistent local disk caching.
     """
@@ -236,14 +265,18 @@ def fetch_yahoo_market_data(
                 c_max = cached_df.index.max().strftime("%Y-%m-%d")
                 if c_min <= start_date and c_max >= end_date:
                     return cached_df
-        except Exception:
-            pass
+        except (OSError, ValueError, KeyError) as err:
+            logger.debug("Failed reading cache file %s: %s", cache_file, err)
 
     # Query Yahoo Finance
     query_sym = normalize_ticker_for_yahoo(ticker)
     # yfinance end_date is exclusive, add 2 days buffer
-    dt_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=2)).strftime("%Y-%m-%d")
-    dt_start = (datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=2)).strftime("%Y-%m-%d")
+    dt_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=2)).strftime(
+        "%Y-%m-%d"
+    )
+    dt_start = (datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=2)).strftime(
+        "%Y-%m-%d"
+    )
 
     retries = 0
     backoff = INITIAL_BACKOFF
@@ -256,7 +289,7 @@ def fetch_yahoo_market_data(
                 end=dt_end,
                 auto_adjust=False,
                 progress=False,
-                timeout=15.0
+                timeout=15.0,
             )
             time.sleep(0.15)  # Throttle to avoid rate limits
 
@@ -269,7 +302,7 @@ def fetch_yahoo_market_data(
                         end=dt_end,
                         auto_adjust=False,
                         progress=False,
-                        timeout=15.0
+                        timeout=15.0,
                     )
                     time.sleep(0.15)
 
@@ -287,18 +320,34 @@ def fetch_yahoo_market_data(
                     try:
                         existing = pd.read_parquet(cache_file)
                         combined = pd.concat([existing, df])
-                        combined = combined[~combined.index.duplicated(keep="last")].sort_index()
+                        combined = combined[
+                            ~combined.index.duplicated(keep="last")
+                        ].sort_index()
                         combined.to_parquet(cache_file)
                         return combined
-                    except Exception:
-                        pass
+                    except (OSError, ValueError, KeyError) as err:
+                        logger.debug("Failed merging cache %s: %s", cache_file, err)
                 df.to_parquet(cache_file)
             return df
 
-        except Exception as exc:
+        except (
+            requests.RequestException,
+            OSError,
+            ValueError,
+            KeyError,
+            RuntimeError,
+        ) as exc:
             retries += 1
-            logger.warning("yfinance error for %s (%s..%s): %s. Retry %d/%d in %.1fs",
-                           query_sym, dt_start, dt_end, exc, retries, MAX_RETRIES, backoff)
+            logger.warning(
+                "yfinance error for %s (%s..%s): %s. Retry %d/%d in %.1fs",
+                query_sym,
+                dt_start,
+                dt_end,
+                exc,
+                retries,
+                MAX_RETRIES,
+                backoff,
+            )
             time.sleep(backoff)
             backoff *= 2.0
 
@@ -307,9 +356,9 @@ def fetch_yahoo_market_data(
 
 def evaluate_gap_dates(
     sampled_gaps: pl.DataFrame,
-    session_dates: List[str],
-    date_to_idx: Dict[str, int],
-    logger: logging.Logger
+    session_dates: list[str],
+    date_to_idx: dict[str, int],
+    logger: logging.Logger,
 ) -> pl.DataFrame:
     """
     Performs day-by-day cross-validation between Massive snapshot presence and
@@ -319,7 +368,7 @@ def evaluate_gap_dates(
     session_set = set(session_dates)
 
     # Collect ticker query bounding intervals
-    ticker_intervals: Dict[str, Tuple[str, str]] = {}
+    ticker_intervals: dict[str, tuple[str, str]] = {}
     for r in sampled_gaps.iter_rows(named=True):
         t = r["ticker"]
         sd = r["end_date"]
@@ -330,17 +379,23 @@ def evaluate_gap_dates(
             cur_sd, cur_ed = ticker_intervals[t]
             ticker_intervals[t] = (min(cur_sd, sd), max(cur_ed, ed))
 
-    logger.info("Fetching Yahoo history for %d unique tickers...", len(ticker_intervals))
+    logger.info(
+        "Fetching Yahoo history for %d unique tickers...", len(ticker_intervals)
+    )
     t0 = time.time()
-    yahoo_dfs: Dict[str, Optional[pd.DataFrame]] = {}
+    yahoo_dfs: dict[str, pd.DataFrame | None] = {}
     total_reqs = len(ticker_intervals)
     success_reqs = 0
     fail_reqs = 0
 
     for idx, (t, (start_d, end_d)) in enumerate(ticker_intervals.items(), 1):
         if idx % 50 == 0 or idx == total_reqs:
-            logger.info("  Progress: %d / %d tickers queried (%.1f%%)...",
-                        idx, total_reqs, (idx / total_reqs) * 100)
+            logger.info(
+                "  Progress: %d / %d tickers queried (%.1f%%)...",
+                idx,
+                total_reqs,
+                (idx / total_reqs) * 100,
+            )
 
         df_y = fetch_yahoo_market_data(t, start_d, end_d, logger)
         yahoo_dfs[t] = df_y
@@ -349,8 +404,12 @@ def evaluate_gap_dates(
         else:
             fail_reqs += 1
 
-    logger.info("Yahoo data extraction complete in %.2f s. Success: %d, No coverage/empty: %d",
-                time.time() - t0, success_reqs, fail_reqs)
+    logger.info(
+        "Yahoo data extraction complete in %.2f s. Success: %d, No coverage/empty: %d",
+        time.time() - t0,
+        success_reqs,
+        fail_reqs,
+    )
 
     # Build daily comparison records
     eval_rows = []
@@ -368,10 +427,15 @@ def evaluate_gap_dates(
 
         # Missing dates are strictly between gap_s_idx and gap_e_idx
         gap_dates = [session_dates[i] for i in range(gap_s_idx + 1, gap_e_idx)]
-        
+
         # Buffer dates
-        pre_buffer_dates = [session_dates[i] for i in range(max(0, gap_s_idx - 3), gap_s_idx + 1)]
-        post_buffer_dates = [session_dates[i] for i in range(gap_e_idx, min(len(session_dates), gap_e_idx + 4))]
+        pre_buffer_dates = [
+            session_dates[i] for i in range(max(0, gap_s_idx - 3), gap_s_idx + 1)
+        ]
+        post_buffer_dates = [
+            session_dates[i]
+            for i in range(gap_e_idx, min(len(session_dates), gap_e_idx + 4))
+        ]
 
         df_y = yahoo_dfs.get(t)
 
@@ -379,7 +443,9 @@ def evaluate_gap_dates(
         yahoo_has_any_coverage = False
         if df_y is not None and not df_y.empty:
             # Check overlap between df_y index and pre/post buffers
-            buf_overlap = set(df_y.index.strftime("%Y-%m-%d")) & (set(pre_buffer_dates) | set(post_buffer_dates))
+            buf_overlap = set(df_y.index.strftime("%Y-%m-%d")) & (
+                set(pre_buffer_dates) | set(post_buffer_dates)
+            )
             yahoo_has_any_coverage = len(buf_overlap) > 0 or len(df_y) > 0
 
         # Evaluate every gap date
@@ -400,7 +466,7 @@ def evaluate_gap_dates(
                     # Handle duplicate index rows if any
                     if isinstance(row_y, pd.DataFrame):
                         row_y = row_y.iloc[0]
-                    
+
                     yahoo_history_row = True
                     c_val = row_y.get("Close")
                     o_val = row_y.get("Open")
@@ -435,25 +501,29 @@ def evaluate_gap_dates(
                 # Yahoo has coverage in buffer, but NO row on date d
                 classification = "CROSS_SOURCE_AGREEMENT"
 
-            current_status = "ACTIVE_IN_UNIVERSE_2026" if is_living else "INACTIVE_AT_BOUNDARY"
+            current_status = (
+                "ACTIVE_IN_UNIVERSE_2026" if is_living else "INACTIVE_AT_BOUNDARY"
+            )
 
-            eval_rows.append({
-                "ticker": t,
-                "spell_seq": seq,
-                "gap_start_date": gap["end_date"],
-                "gap_end_date": gap["next_start_date"],
-                "gap_length_sessions": gap_len,
-                "gap_bucket": gap_bucket,
-                "date": d,
-                "massive_active": False,
-                "massive_snapshot_available": snap_available,
-                "yahoo_history_row": yahoo_history_row,
-                "yahoo_valid_ohlcv": yahoo_valid_ohlcv,
-                "yahoo_volume": yahoo_volume,
-                "current_ticker_status": current_status,
-                "identity_continuity_uncertain": identity_uncertain,
-                "evidence_classification": classification,
-            })
+            eval_rows.append(
+                {
+                    "ticker": t,
+                    "spell_seq": seq,
+                    "gap_start_date": gap["end_date"],
+                    "gap_end_date": gap["next_start_date"],
+                    "gap_length_sessions": gap_len,
+                    "gap_bucket": gap_bucket,
+                    "date": d,
+                    "massive_active": False,
+                    "massive_snapshot_available": snap_available,
+                    "yahoo_history_row": yahoo_history_row,
+                    "yahoo_valid_ohlcv": yahoo_valid_ohlcv,
+                    "yahoo_volume": yahoo_volume,
+                    "current_ticker_status": current_status,
+                    "identity_continuity_uncertain": identity_uncertain,
+                    "evidence_classification": classification,
+                }
+            )
 
     schema = {
         "ticker": pl.String,
@@ -474,18 +544,22 @@ def evaluate_gap_dates(
     }
 
     df_eval = pl.DataFrame(eval_rows, schema=schema)
-    logger.info("Generated %d date-level validation records across sampled gaps.", df_eval.height)
+    logger.info(
+        "Generated %d date-level validation records across sampled gaps.",
+        df_eval.height,
+    )
     return df_eval
 
 
 def evaluate_known_problem_dates(
-    prob_candidates: pl.DataFrame,
-    logger: logging.Logger
+    prob_candidates: pl.DataFrame, logger: logging.Logger
 ) -> pl.DataFrame:
     """
     Evaluates Yahoo market data for tickers on 2009-10-29, 2010-03-30, and 2010-03-31.
     """
-    logger.info("Evaluating Yahoo Finance market data on the 3 known corrupted snapshot dates...")
+    logger.info(
+        "Evaluating Yahoo Finance market data on the 3 known corrupted snapshot dates..."
+    )
     results = []
 
     for r in prob_candidates.iter_rows(named=True):
@@ -493,8 +567,12 @@ def evaluate_known_problem_dates(
         pdate = r["problem_date"]
 
         # Window: 3 days before, 3 days after
-        start_w = (datetime.strptime(pdate, "%Y-%m-%d") - timedelta(days=5)).strftime("%Y-%m-%d")
-        end_w = (datetime.strptime(pdate, "%Y-%m-%d") + timedelta(days=5)).strftime("%Y-%m-%d")
+        start_w = (datetime.strptime(pdate, "%Y-%m-%d") - timedelta(days=5)).strftime(
+            "%Y-%m-%d"
+        )
+        end_w = (datetime.strptime(pdate, "%Y-%m-%d") + timedelta(days=5)).strftime(
+            "%Y-%m-%d"
+        )
 
         df_y = fetch_yahoo_market_data(t, start_w, end_w, logger)
 
@@ -516,22 +594,28 @@ def evaluate_known_problem_dates(
                 if pd.notna(v_val):
                     vol = float(v_val)
 
-        results.append({
-            "ticker": t,
-            "problem_date": pdate,
-            "massive_status": r["status_in_massive"],
-            "yahoo_has_row": has_row,
-            "yahoo_valid_ohlcv": valid_ohlcv,
-            "yahoo_volume": vol,
-            "evidence": "MASSIVE_DROPOUT_CONFIRMED" if (has_row and valid_ohlcv and vol > 0) else "INCONCLUSIVE_OR_NO_YAHOO_DATA"
-        })
+        results.append(
+            {
+                "ticker": t,
+                "problem_date": pdate,
+                "massive_status": r["status_in_massive"],
+                "yahoo_has_row": has_row,
+                "yahoo_valid_ohlcv": valid_ohlcv,
+                "yahoo_volume": vol,
+                "evidence": "MASSIVE_DROPOUT_CONFIRMED"
+                if (has_row and valid_ohlcv and vol > 0)
+                else "INCONCLUSIVE_OR_NO_YAHOO_DATA",
+            }
+        )
 
     df_res = pl.DataFrame(results)
     logger.info("Evaluated %d problem-date test cases.", df_res.height)
     return df_res
 
 
-def generate_aggregated_summary(df_eval: pl.DataFrame, logger: logging.Logger) -> pl.DataFrame:
+def generate_aggregated_summary(
+    df_eval: pl.DataFrame, logger: logging.Logger
+) -> pl.DataFrame:
     """Generates the required summary statistics table grouped by gap length bucket."""
     logger.info("Generating aggregated summary by gap length bucket...")
 
@@ -545,22 +629,32 @@ def generate_aggregated_summary(df_eval: pl.DataFrame, logger: logging.Logger) -
         n_dates = b_df.height
 
         n_mass_abs_yah_pres = b_df.filter(
-            pl.col("evidence_classification").is_in(["MASSIVE_POSSIBLE_MISSING_SNAPSHOT", "IDENTITY_CONTINUITY_UNCERTAIN"])
+            pl.col("evidence_classification").is_in(
+                ["MASSIVE_POSSIBLE_MISSING_SNAPSHOT", "IDENTITY_CONTINUITY_UNCERTAIN"]
+            )
         ).height
-        n_both_absent = b_df.filter(pl.col("evidence_classification") == "CROSS_SOURCE_AGREEMENT").height
-        n_yah_ambiguous = b_df.filter(pl.col("evidence_classification") == "YAHOO_DATA_AMBIGUOUS").height
-        n_yah_no_cov = b_df.filter(pl.col("evidence_classification") == "YAHOO_NO_COVERAGE").height
+        n_both_absent = b_df.filter(
+            pl.col("evidence_classification") == "CROSS_SOURCE_AGREEMENT"
+        ).height
+        n_yah_ambiguous = b_df.filter(
+            pl.col("evidence_classification") == "YAHOO_DATA_AMBIGUOUS"
+        ).height
+        n_yah_no_cov = b_df.filter(
+            pl.col("evidence_classification") == "YAHOO_NO_COVERAGE"
+        ).height
 
-        summary_rows.append({
-            "gap_length_bucket": b,
-            "n_gaps": n_gaps,
-            "n_tickers": n_tickers,
-            "n_dates_checked": n_dates,
-            "n_massive_absent_yahoo_present": n_mass_abs_yah_pres,
-            "n_both_absent": n_both_absent,
-            "n_yahoo_ambiguous": n_yah_ambiguous,
-            "n_yahoo_no_coverage": n_yah_no_cov,
-        })
+        summary_rows.append(
+            {
+                "gap_length_bucket": b,
+                "n_gaps": n_gaps,
+                "n_tickers": n_tickers,
+                "n_dates_checked": n_dates,
+                "n_massive_absent_yahoo_present": n_mass_abs_yah_pres,
+                "n_both_absent": n_both_absent,
+                "n_yahoo_ambiguous": n_yah_ambiguous,
+                "n_yahoo_no_coverage": n_yah_no_cov,
+            }
+        )
 
     schema = {
         "gap_length_bucket": pl.String,
@@ -591,7 +685,7 @@ def write_diagnostic_report(
     df_eval: pl.DataFrame,
     df_summary: pl.DataFrame,
     df_prob: pl.DataFrame,
-    logger: logging.Logger
+    logger: logging.Logger,
 ):
     """Generates the markdown diagnostic report at report/quality/yahoo_gap_validation_report.md."""
     logger.info("Generating comprehensive markdown report at %s...", REPORT_MD_PATH)
@@ -602,28 +696,40 @@ def write_diagnostic_report(
     total_tickers = df_eval["ticker"].n_unique()
 
     # Living tickers breakdown
-    living_df = df_eval.filter(pl.col("current_ticker_status") == "ACTIVE_IN_UNIVERSE_2026")
+    living_df = df_eval.filter(
+        pl.col("current_ticker_status") == "ACTIVE_IN_UNIVERSE_2026"
+    )
     n_living_gaps = living_df.select(["ticker", "spell_seq"]).unique().height
     n_living_tickers = living_df["ticker"].n_unique()
 
     # Evidence breakdown
-    ev_counts = df_eval["evidence_classification"].value_counts().sort("count", descending=True)
-    ev_dict = dict(zip(ev_counts["evidence_classification"].to_list(), ev_counts["count"].to_list()))
+    ev_counts = (
+        df_eval["evidence_classification"].value_counts().sort("count", descending=True)
+    )
+    ev_dict = dict(
+        zip(
+            ev_counts["evidence_classification"].to_list(), ev_counts["count"].to_list()
+        )
+    )
 
     # Short gap stats (1-2 sessions)
     g12 = df_eval.filter(pl.col("gap_bucket") == "01. 1-2 sessions")
-    g12_yah_pres = g12.filter(pl.col("evidence_classification") == "MASSIVE_POSSIBLE_MISSING_SNAPSHOT").height
+    g12_yah_pres = g12.filter(
+        pl.col("evidence_classification") == "MASSIVE_POSSIBLE_MISSING_SNAPSHOT"
+    ).height
     g12_total = g12.height
     g12_pct = (g12_yah_pres / g12_total * 100) if g12_total > 0 else 0.0
 
     # Problem dates stats
     prob_total = df_prob.height
-    prob_confirmed = df_prob.filter(pl.col("evidence") == "MASSIVE_DROPOUT_CONFIRMED").height
+    prob_confirmed = df_prob.filter(
+        pl.col("evidence") == "MASSIVE_DROPOUT_CONFIRMED"
+    ).height
     prob_pct = (prob_confirmed / prob_total * 100) if prob_total > 0 else 0.0
 
     summary_table_md = format_pl_markdown(df_summary)
 
-    report_content = f"""# Cross-Source Gap Validation Report: Massive Active-Ticker Snapshots vs. Yahoo Finance
+    report_content = rf"""# Cross-Source Gap Validation Report: Massive Active-Ticker Snapshots vs. Yahoo Finance
 
 ## Executive Summary
 
@@ -676,11 +782,11 @@ The joint distribution of Massive snapshot presence vs. Yahoo Finance independen
 
 | Evidence Classification | Count (Dates) | Percentage | Interpretation |
 | :--- | :---: | :---: | :--- |
-| **`MASSIVE_POSSIBLE_MISSING_SNAPSHOT`** | {ev_dict.get('MASSIVE_POSSIBLE_MISSING_SNAPSHOT', 0):,} | {ev_dict.get('MASSIVE_POSSIBLE_MISSING_SNAPSHOT', 0)/total_dates*100:.1f}% | Massive inactive, but Yahoo shows valid OHLCV and non-zero volume |
-| **`IDENTITY_CONTINUITY_UNCERTAIN`** | {ev_dict.get('IDENTITY_CONTINUITY_UNCERTAIN', 0):,} | {ev_dict.get('IDENTITY_CONTINUITY_UNCERTAIN', 0)/total_dates*100:.1f}% | Multi-year gap (>252 sessions); Yahoo has data, but likely ticker reuse/corporate action |
-| **`CROSS_SOURCE_AGREEMENT`** | {ev_dict.get('CROSS_SOURCE_AGREEMENT', 0):,} | {ev_dict.get('CROSS_SOURCE_AGREEMENT', 0)/total_dates*100:.1f}% | Neither Massive nor Yahoo has market data; supports genuine market dormancy |
-| **`YAHOO_NO_COVERAGE`** | {ev_dict.get('YAHOO_NO_COVERAGE', 0):,} | {ev_dict.get('YAHOO_NO_COVERAGE', 0)/total_dates*100:.1f}% | Yahoo lacks historical coverage for this symbol (OTC, warrants, defunct pre-2010 tickers) |
-| **`YAHOO_DATA_AMBIGUOUS`** | {ev_dict.get('YAHOO_DATA_AMBIGUOUS', 0):,} | {ev_dict.get('YAHOO_DATA_AMBIGUOUS', 0)/total_dates*100:.1f}% | Yahoo has row but volume = 0 or prices are flat/stale |
+| **`MASSIVE_POSSIBLE_MISSING_SNAPSHOT`** | {ev_dict.get("MASSIVE_POSSIBLE_MISSING_SNAPSHOT", 0):,} | {ev_dict.get("MASSIVE_POSSIBLE_MISSING_SNAPSHOT", 0) / total_dates * 100:.1f}% | Massive inactive, but Yahoo shows valid OHLCV and non-zero volume |
+| **`IDENTITY_CONTINUITY_UNCERTAIN`** | {ev_dict.get("IDENTITY_CONTINUITY_UNCERTAIN", 0):,} | {ev_dict.get("IDENTITY_CONTINUITY_UNCERTAIN", 0) / total_dates * 100:.1f}% | Multi-year gap (>252 sessions); Yahoo has data, but likely ticker reuse/corporate action |
+| **`CROSS_SOURCE_AGREEMENT`** | {ev_dict.get("CROSS_SOURCE_AGREEMENT", 0):,} | {ev_dict.get("CROSS_SOURCE_AGREEMENT", 0) / total_dates * 100:.1f}% | Neither Massive nor Yahoo has market data; supports genuine market dormancy |
+| **`YAHOO_NO_COVERAGE`** | {ev_dict.get("YAHOO_NO_COVERAGE", 0):,} | {ev_dict.get("YAHOO_NO_COVERAGE", 0) / total_dates * 100:.1f}% | Yahoo lacks historical coverage for this symbol (OTC, warrants, defunct pre-2010 tickers) |
+| **`YAHOO_DATA_AMBIGUOUS`** | {ev_dict.get("YAHOO_DATA_AMBIGUOUS", 0):,} | {ev_dict.get("YAHOO_DATA_AMBIGUOUS", 0) / total_dates * 100:.1f}% | Yahoo has row but volume = 0 or prices are flat/stale |
 
 ---
 
@@ -752,12 +858,16 @@ def main():
         # Load NYSE trading calendar
         session_dates = load_trading_calendar(date_min, date_max)
         date_to_idx = {d: i for i, d in enumerate(session_dates)}
-        logger.info("Loaded NYSE session calendar: %d sessions (%s to %s)",
-                    len(session_dates), session_dates[0], session_dates[-1])
+        logger.info(
+            "Loaded NYSE session calendar: %d sessions (%s to %s)",
+            len(session_dates),
+            session_dates[0],
+            session_dates[-1],
+        )
 
         # Select candidate sample
-        df_sampled, sampled_tickers, df_prob_candidates, df_trans = select_candidate_sample(
-            spells, session_dates, logger
+        df_sampled, sampled_tickers, df_prob_candidates, df_trans = (
+            select_candidate_sample(spells, session_dates, logger)
         )
 
         # Evaluate gap dates against Yahoo
@@ -767,7 +877,11 @@ def main():
         OUTPUT_PARQUET_PATH.parent.mkdir(parents=True, exist_ok=True)
         df_eval.write_parquet(OUTPUT_PARQUET_PATH)
         df_eval.write_csv(OUTPUT_CSV_PATH)
-        logger.info("Saved main evaluation table to %s and %s", OUTPUT_PARQUET_PATH, OUTPUT_CSV_PATH)
+        logger.info(
+            "Saved main evaluation table to %s and %s",
+            OUTPUT_PARQUET_PATH,
+            OUTPUT_CSV_PATH,
+        )
 
         # Evaluate known problem dates
         df_prob_res = evaluate_known_problem_dates(df_prob_candidates, logger)
@@ -783,8 +897,8 @@ def main():
         logger.info("YAHOO GAP VALIDATION COMPLETED IN %.2f SECONDS.", t_elapsed)
         logger.info("=" * 80)
 
-    except Exception as exc:
-        logger.exception("Fatal error during Yahoo gap validation: %s", exc)
+    except Exception:
+        logger.exception("Fatal error during Yahoo gap validation")
         sys.exit(1)
 
 

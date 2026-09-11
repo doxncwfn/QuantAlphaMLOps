@@ -18,11 +18,9 @@ Key Architectural Guarantees:
 from __future__ import annotations
 
 import hashlib
-import json
-import logging
 import re
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
+
 
 # -----------------------------------------------------------------------------
 # Security Type & Research Universe Taxonomy
@@ -55,7 +53,7 @@ class IdentityStatus:
     EXCLUDED = "EXCLUDED"
 
 
-def normalize_security_type(raw_type: Optional[str]) -> str:
+def normalize_security_type(raw_type: str | None) -> str:
     """Normalizes vendor-specific security types into standardized taxonomy."""
     if not raw_type or not str(raw_type).strip():
         return SecurityType.UNKNOWN
@@ -116,15 +114,17 @@ def make_provisional_cik_id(cik: str, ticker: str, start_date: str) -> str:
     """
     clean_cik = str(cik).zfill(10)
     clean_tk = ticker.strip().upper()
-    raw = f"{clean_cik}_{clean_tk}_{start_date}".encode("utf-8")
+    raw = f"{clean_cik}_{clean_tk}_{start_date}".encode()
     scope_hash = hashlib.sha256(raw).hexdigest()[:8].upper()
     return f"PROVISIONAL_CIK_{clean_cik}_{clean_tk}_{scope_hash}"
 
 
-def make_deterministic_unresolved_id(ticker: str, spell_seq: int, start_date: str, end_date: Optional[str] = None) -> str:
+def make_deterministic_unresolved_id(
+    ticker: str, spell_seq: int, start_date: str, end_date: str | None = None
+) -> str:
     """Generates deterministic isolated ID for unresolved cases to prevent false merges."""
     clean_tk = ticker.strip()
-    raw = f"{clean_tk}_{spell_seq}_{start_date}_{end_date or ''}".encode("utf-8")
+    raw = f"{clean_tk}_{spell_seq}_{start_date}_{end_date or ''}".encode()
     h = hashlib.sha256(raw).hexdigest()[:10].upper()
     return f"UNRESOLVED_{clean_tk}_{spell_seq}_{h}"
 
@@ -132,25 +132,71 @@ def make_deterministic_unresolved_id(ticker: str, spell_seq: int, start_date: st
 # -----------------------------------------------------------------------------
 # Entity Token Extraction & Corporate Name Matching
 # -----------------------------------------------------------------------------
-def extract_entity_tokens(name: Optional[str]) -> Set[str]:
+def extract_entity_tokens(name: str | None) -> set[str]:
     """Extracts distinctive meaningful entity tokens, filtering out noise and stopwords."""
     if not name:
         return set()
     cleaned = re.sub(r"[^A-Z0-9\s]", " ", str(name).upper())
     tokens = set(cleaned.split())
     stopwords = {
-        "INC", "INCORPORATED", "CORP", "CORPORATION", "LTD", "LIMITED",
-        "CO", "COMPANY", "COMPANIES", "CLASS", "CL", "A", "B", "C", "D",
-        "ORD", "ORDINARY", "SHS", "SHARE", "SHARES", "COMMON", "STOCK",
-        "STK", "HLDGS", "HOLDING", "HOLDINGS", "GRP", "GROUP", "THE",
-        "OF", "AND", "DE", "NV", "PLC", "LP", "LLC", "ETF", "TRUST",
-        "SPON", "ADR", "ADS", "FD", "FUND", "CAPITAL", "GLOBAL", "US", "USA",
-        "COM", "FINANCIAL", "MANAGEMENT", "SERVICES", "SYSTEMS", "INVESTMENT"
+        "INC",
+        "INCORPORATED",
+        "CORP",
+        "CORPORATION",
+        "LTD",
+        "LIMITED",
+        "CO",
+        "COMPANY",
+        "COMPANIES",
+        "CLASS",
+        "CL",
+        "A",
+        "B",
+        "C",
+        "D",
+        "ORD",
+        "ORDINARY",
+        "SHS",
+        "SHARE",
+        "SHARES",
+        "COMMON",
+        "STOCK",
+        "STK",
+        "HLDGS",
+        "HOLDING",
+        "HOLDINGS",
+        "GRP",
+        "GROUP",
+        "THE",
+        "OF",
+        "AND",
+        "DE",
+        "NV",
+        "PLC",
+        "LP",
+        "LLC",
+        "ETF",
+        "TRUST",
+        "SPON",
+        "ADR",
+        "ADS",
+        "FD",
+        "FUND",
+        "CAPITAL",
+        "GLOBAL",
+        "US",
+        "USA",
+        "COM",
+        "FINANCIAL",
+        "MANAGEMENT",
+        "SERVICES",
+        "SYSTEMS",
+        "INVESTMENT",
     }
     return {t for t in tokens if t not in stopwords and len(t) > 1}
 
 
-def are_names_consistent(name1: Optional[str], name2: Optional[str]) -> bool:
+def are_names_consistent(name1: str | None, name2: str | None) -> bool:
     """Checks whether two entity names share distinctive corporate identity tokens."""
     if not name1 or not name2:
         return False
@@ -167,7 +213,15 @@ def are_names_consistent(name1: Optional[str], name2: Optional[str]) -> bool:
         return False
 
     common = t1.intersection(t2)
-    generic = {"ACQUISITION", "ACQUISTION", "VENTURES", "PARTNERS", "ENERGY", "HEALTHCARE", "MEDIA"}
+    generic = {
+        "ACQUISITION",
+        "ACQUISTION",
+        "VENTURES",
+        "PARTNERS",
+        "ENERGY",
+        "HEALTHCARE",
+        "MEDIA",
+    }
     non_generic = common - generic
     if len(non_generic) >= 1:
         return True
@@ -179,7 +233,7 @@ def are_names_consistent(name1: Optional[str], name2: Optional[str]) -> bool:
 # -----------------------------------------------------------------------------
 # Symbol-Alias Candidate Layer
 # -----------------------------------------------------------------------------
-def generate_symbol_aliases(ticker: str) -> List[Dict[str, Any]]:
+def generate_symbol_aliases(ticker: str) -> list[dict[str, Any]]:
     """
     Generates candidate normalized aliases without mutating the original ticker string.
     Preserves rule, confidence, and validation status.
@@ -189,21 +243,25 @@ def generate_symbol_aliases(ticker: str) -> List[Dict[str, Any]]:
     candidates = []
 
     # 1. Identity (original literal, preserving exact case)
-    candidates.append({
-        "candidate_symbol": raw_tk,
-        "rule": "ORIGINAL_LITERAL",
-        "confidence": 1.0,
-        "is_original": True
-    })
+    candidates.append(
+        {
+            "candidate_symbol": raw_tk,
+            "rule": "ORIGINAL_LITERAL",
+            "confidence": 1.0,
+            "is_original": True,
+        }
+    )
 
     # Uppercase normalized alias if original had lowercase characters
     if raw_tk != orig:
-        candidates.append({
-            "candidate_symbol": orig,
-            "rule": "UPPERCASE_NORMALIZED",
-            "confidence": 0.95,
-            "is_original": False
-        })
+        candidates.append(
+            {
+                "candidate_symbol": orig,
+                "rule": "UPPERCASE_NORMALIZED",
+                "confidence": 0.95,
+                "is_original": False,
+            }
+        )
 
     # 2. Dot notation conversions (.A, .B -> A, B or /A, /B)
     if "." in orig:
@@ -212,37 +270,45 @@ def generate_symbol_aliases(ticker: str) -> List[Dict[str, Any]]:
             base, ext = parts[0], parts[1]
             # Nasdaq 5-letter style: CMCS.A -> CMCSA
             if len(ext) == 1 and ext.isalpha():
-                candidates.append({
-                    "candidate_symbol": f"{base}{ext}",
-                    "rule": "NASDAQ_CLASS_CONCAT",
-                    "confidence": 0.85,
-                    "is_original": False
-                })
+                candidates.append(
+                    {
+                        "candidate_symbol": f"{base}{ext}",
+                        "rule": "NASDAQ_CLASS_CONCAT",
+                        "confidence": 0.85,
+                        "is_original": False,
+                    }
+                )
             # NYSE slash style: BRK.A -> BRK/A
-            candidates.append({
-                "candidate_symbol": f"{base}/{ext}",
-                "rule": "NYSE_SLASH_CLASS",
-                "confidence": 0.80,
-                "is_original": False
-            })
+            candidates.append(
+                {
+                    "candidate_symbol": f"{base}/{ext}",
+                    "rule": "NYSE_SLASH_CLASS",
+                    "confidence": 0.80,
+                    "is_original": False,
+                }
+            )
             # Bloomberg space style: BRK.A -> BRK A
-            candidates.append({
-                "candidate_symbol": f"{base} {ext}",
-                "rule": "BLOOMBERG_SPACE_CLASS",
-                "confidence": 0.75,
-                "is_original": False
-            })
+            candidates.append(
+                {
+                    "candidate_symbol": f"{base} {ext}",
+                    "rule": "BLOOMBERG_SPACE_CLASS",
+                    "confidence": 0.75,
+                    "is_original": False,
+                }
+            )
 
     # 3. Lowercase / suffix notation (e.g. pA for preferred, w for warrants)
     if re.search(r"p[A-Z]$", ticker):
         # Preferred share notation
         base = re.sub(r"p[A-Z]$", "", ticker)
         pref = ticker[-1].upper()
-        candidates.append({
-            "candidate_symbol": f"{base} PR{pref}",
-            "rule": "PREFERRED_STANDARD_ALIAS",
-            "confidence": 0.80,
-            "is_original": False
-        })
+        candidates.append(
+            {
+                "candidate_symbol": f"{base} PR{pref}",
+                "rule": "PREFERRED_STANDARD_ALIAS",
+                "confidence": 0.80,
+                "is_original": False,
+            }
+        )
 
     return candidates

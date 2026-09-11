@@ -15,7 +15,9 @@ from src.common.config import (
 
 class TestSpellsIntegrity(unittest.TestCase):
     def test_spells_file_exists(self):
-        self.assertTrue(SPELLS_CSV_PATH.exists(), f"Spells file not found: {SPELLS_CSV_PATH}")
+        self.assertTrue(
+            SPELLS_CSV_PATH.exists(), f"Spells file not found: {SPELLS_CSV_PATH}"
+        )
 
     def test_spells_sha256_immutable(self):
         actual_hash = hashlib.sha256(SPELLS_CSV_PATH.read_bytes()).hexdigest()

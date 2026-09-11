@@ -12,16 +12,16 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
-import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Dict
 
-import polars as pl
-
-from src.common.config import CANDIDATES_IDENTITY_DIR, CANDIDATES_UNIVERSE_DIR, LOG_DIR, QUALITY_DIR
+from src.common.config import (
+    CANDIDATES_IDENTITY_DIR,
+    CANDIDATES_UNIVERSE_DIR,
+    LOG_DIR,
+    QUALITY_DIR,
+)
 from src.identity.resolver.resolver import V3CandidateResolver
 
 LOG_FILE = LOG_DIR / "v3_determinism.log"
@@ -34,7 +34,9 @@ def setup_logger() -> logging.Logger:
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
 
-    formatter = logging.Formatter("%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(formatter)
@@ -51,15 +53,21 @@ def hash_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def get_candidate_hashes() -> Dict[str, str]:
+def get_candidate_hashes() -> dict[str, str]:
     files = {
-        "security_master": CANDIDATES_IDENTITY_DIR / "security_master_candidate.parquet",
+        "security_master": CANDIDATES_IDENTITY_DIR
+        / "security_master_candidate.parquet",
         "ticker_history": CANDIDATES_IDENTITY_DIR / "ticker_history_candidate.parquet",
-        "identity_evidence": CANDIDATES_IDENTITY_DIR / "identity_evidence_candidate.parquet",
-        "identity_conflicts": CANDIDATES_IDENTITY_DIR / "identity_conflicts_candidate.parquet",
-        "identity_aliases": CANDIDATES_IDENTITY_DIR / "identity_aliases_candidate.parquet",
-        "availability_episodes": CANDIDATES_UNIVERSE_DIR / "availability_episodes_candidate.parquet",
-        "expected_security_dates": CANDIDATES_UNIVERSE_DIR / "expected_security_dates_candidate.parquet",
+        "identity_evidence": CANDIDATES_IDENTITY_DIR
+        / "identity_evidence_candidate.parquet",
+        "identity_conflicts": CANDIDATES_IDENTITY_DIR
+        / "identity_conflicts_candidate.parquet",
+        "identity_aliases": CANDIDATES_IDENTITY_DIR
+        / "identity_aliases_candidate.parquet",
+        "availability_episodes": CANDIDATES_UNIVERSE_DIR
+        / "availability_episodes_candidate.parquet",
+        "expected_security_dates": CANDIDATES_UNIVERSE_DIR
+        / "expected_security_dates_candidate.parquet",
         "daily_universe": CANDIDATES_UNIVERSE_DIR / "daily_universe_candidate.parquet",
     }
     return {name: hash_file(p) for name, p in files.items() if p.exists()}
@@ -98,7 +106,7 @@ def run_determinism_test():
         h1 = run1_hashes[name]
         # In case timestamps or internal parquet metadata differ, compare DataFrame contents
         h2 = run2_hashes.get(name, "MISSING")
-        exact_byte_match = (h1 == h2)
+        exact_byte_match = h1 == h2
 
         # Also verify content equality if parquet file metadata differed
         p_path = CANDIDATES_IDENTITY_DIR / f"{name}_candidate.parquet"
@@ -107,23 +115,29 @@ def run_determinism_test():
 
         if not exact_byte_match:
             # Check content equality (excluding dynamic timestamp column if any)
-            logger.warning("[%s] Checksum mismatch! Investigating content equality...", name)
+            logger.warning(
+                "[%s] Checksum mismatch! Investigating content equality...", name
+            )
             all_matched = False
         else:
-            logger.info("[%s] PASSED: Bit-for-bit identical (SHA-256: %s...)", name, h1[:16])
+            logger.info(
+                "[%s] PASSED: Bit-for-bit identical (SHA-256: %s...)", name, h1[:16]
+            )
 
-        comparison_rows.append({
-            "artifact": name,
-            "run1_sha256": h1,
-            "run2_sha256": h2,
-            "matched": exact_byte_match
-        })
+        comparison_rows.append(
+            {
+                "artifact": name,
+                "run1_sha256": h1,
+                "run2_sha256": h2,
+                "matched": exact_byte_match,
+            }
+        )
 
     # Markdown report
     md = f"""# V3 Deterministic Rerun Verification Report
 
 ## 1. Executive Summary
-- **Evaluation Status**: **{'PASS' if all_matched else 'WARNING'}**
+- **Evaluation Status**: **{"PASS" if all_matched else "WARNING"}**
 - **Test Objective**: Verify bit-for-bit reproducibility of candidate identity and universe datasets.
 - **Run 2 Execution Time**: {t_elapsed:.2f} seconds
 - **Candidate Artifacts Evaluated**: {len(comparison_rows)}

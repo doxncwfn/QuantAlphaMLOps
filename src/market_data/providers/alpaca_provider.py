@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 import polars as pl
+
 from src.market_data.config import ALPACA_API_KEY, ALPACA_SECRET_KEY
 from src.market_data.providers.base import BaseMarketDataProvider
 
@@ -16,23 +16,25 @@ logger = logging.getLogger(__name__)
 class AlpacaProvider(BaseMarketDataProvider):
     name: str = "ALPACA"
 
-    def __init__(self, api_key: Optional[str] = ALPACA_API_KEY, secret_key: Optional[str] = ALPACA_SECRET_KEY):
+    def __init__(
+        self,
+        api_key: str | None = ALPACA_API_KEY,
+        secret_key: str | None = ALPACA_SECRET_KEY,
+    ):
         self.api_key = api_key
         self.secret_key = secret_key
         self.client = None
         if self.api_key and self.secret_key:
             try:
                 from alpaca.data.historical import StockHistoricalDataClient
+
                 self.client = StockHistoricalDataClient(self.api_key, self.secret_key)
-            except Exception as e:
+            except (ImportError, ValueError, RuntimeError, OSError) as e:
                 logger.debug("Alpaca client init error: %s", e)
 
     def fetch_daily_bars(
-        self,
-        ticker: str,
-        start_date: str,
-        end_date: str
-    ) -> Optional[pl.DataFrame]:
+        self, ticker: str, start_date: str, end_date: str
+    ) -> pl.DataFrame | None:
         if not self.client:
             return None
 
@@ -46,7 +48,7 @@ class AlpacaProvider(BaseMarketDataProvider):
                 timeframe=TimeFrame.Day,
                 start=datetime.strptime(start_date, "%Y-%m-%d"),
                 end=datetime.strptime(end_date, "%Y-%m-%d"),
-                feed=DataFeed.IEX
+                feed=DataFeed.IEX,
             )
             bars = self.client.get_stock_bars(req)
             if bars.df.empty:
@@ -56,16 +58,25 @@ class AlpacaProvider(BaseMarketDataProvider):
             df["date"] = df["timestamp"].dt.strftime("%Y-%m-%d")
             records = []
             for _, r in df.iterrows():
-                records.append({
-                    "date": r["date"],
-                    "open": float(r["open"]),
-                    "high": float(r["high"]),
-                    "low": float(r["low"]),
-                    "close": float(r["close"]),
-                    "adj_close": float(r["close"]),
-                    "volume": float(r["volume"])
-                })
+                records.append(
+                    {
+                        "date": r["date"],
+                        "open": float(r["open"]),
+                        "high": float(r["high"]),
+                        "low": float(r["low"]),
+                        "close": float(r["close"]),
+                        "adj_close": float(r["close"]),
+                        "volume": float(r["volume"]),
+                    }
+                )
             return pl.DataFrame(records)
-        except Exception as exc:
+        except (
+            ImportError,
+            ValueError,
+            KeyError,
+            AttributeError,
+            OSError,
+            RuntimeError,
+        ) as exc:
             logger.debug("Alpaca fetch failed for %s: %s", ticker, exc)
             return None

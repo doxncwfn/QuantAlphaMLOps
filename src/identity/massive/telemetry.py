@@ -9,21 +9,19 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-import numpy as np
 import polars as pl
 
 
 class WorkerTelemetry:
     """Thread-safe telemetry collector for multi-worker API execution."""
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, logger: logging.Logger | None = None):
         self._lock = threading.Lock()
         self.logger = logger or logging.getLogger("telemetry")
-        self.records: List[Dict[str, Any]] = []
-        self.worker_stats: Dict[str, Dict[str, Any]] = {}
+        self.records: list[dict[str, Any]] = []
+        self.worker_stats: dict[str, dict[str, Any]] = {}
         self.global_cache_hits = 0
         self.global_live_requests = 0
 
@@ -99,23 +97,25 @@ class WorkerTelemetry:
                 w["errors"] += 1
             w["retries"] += retry_count
 
-            self.records.append({
-                "worker_id": worker_id,
-                "spell_id": spell_id,
-                "ticker": ticker,
-                "query_date": query_date,
-                "request_timestamp": req_ts,
-                "response_timestamp": resp_ts,
-                "latency_ms": latency_ms,
-                "latency_sec": latency_ms / 1000.0,
-                "http_status": http_status,
-                "retry_count": retry_count,
-                "is_cache": is_cache,
-                "is_live": is_live,
-                "outcome_category": outcome_category,
-            })
+            self.records.append(
+                {
+                    "worker_id": worker_id,
+                    "spell_id": spell_id,
+                    "ticker": ticker,
+                    "query_date": query_date,
+                    "request_timestamp": req_ts,
+                    "response_timestamp": resp_ts,
+                    "latency_ms": latency_ms,
+                    "latency_sec": latency_ms / 1000.0,
+                    "http_status": http_status,
+                    "retry_count": retry_count,
+                    "is_cache": is_cache,
+                    "is_live": is_live,
+                    "outcome_category": outcome_category,
+                }
+            )
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         with self._lock:
             all_live_latencies = []
             for st in self.worker_stats.values():

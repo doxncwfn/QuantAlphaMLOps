@@ -24,35 +24,31 @@ Implements Sections 10-18, 22-23:
 """
 
 from __future__ import annotations
+
 import sys
 from pathlib import Path
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-import datetime
 import hashlib
 import json
 import logging
-import os
-import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 import polars as pl
 
 from src.common.config import (
     CANDIDATES_IDENTITY_DIR,
     CANDIDATES_UNIVERSE_DIR,
-    EXPECTED_SPELLS_HASH,
-    EXPECTED_SPELLS_ROWS,
     LOG_DIR,
     MANIFESTS_DIR,
     OPENFIGI_CACHE_PARQUET,
-    QUALITY_DIR,
     SEC_CACHE_JSON,
     SPELLS_CSV_PATH,
     TRADING_SESSIONS_PATH,
@@ -63,7 +59,6 @@ from src.identity.resolver.model import (
     UniverseStatus,
     are_names_consistent,
     classify_universe_status,
-    extract_entity_tokens,
     generate_symbol_aliases,
     make_deterministic_unresolved_id,
     make_provisional_cik_id,
@@ -76,13 +71,23 @@ LOG_FILE = LOG_DIR / "v3_resolver.log"
 # Output candidate files
 SECURITY_MASTER_PARQUET = CANDIDATES_IDENTITY_DIR / "security_master_candidate.parquet"
 TICKER_HISTORY_PARQUET = CANDIDATES_IDENTITY_DIR / "ticker_history_candidate.parquet"
-IDENTITY_EVIDENCE_PARQUET = CANDIDATES_IDENTITY_DIR / "identity_evidence_candidate.parquet"
-IDENTITY_CONFLICTS_PARQUET = CANDIDATES_IDENTITY_DIR / "identity_conflicts_candidate.parquet"
-IDENTITY_ALIASES_PARQUET = CANDIDATES_IDENTITY_DIR / "identity_aliases_candidate.parquet"
+IDENTITY_EVIDENCE_PARQUET = (
+    CANDIDATES_IDENTITY_DIR / "identity_evidence_candidate.parquet"
+)
+IDENTITY_CONFLICTS_PARQUET = (
+    CANDIDATES_IDENTITY_DIR / "identity_conflicts_candidate.parquet"
+)
+IDENTITY_ALIASES_PARQUET = (
+    CANDIDATES_IDENTITY_DIR / "identity_aliases_candidate.parquet"
+)
 
 DAILY_UNIVERSE_PARQUET = CANDIDATES_UNIVERSE_DIR / "daily_universe_candidate.parquet"
-AVAILABILITY_EPISODES_PARQUET = CANDIDATES_UNIVERSE_DIR / "availability_episodes_candidate.parquet"
-EXPECTED_SECURITY_DATES_PARQUET = CANDIDATES_UNIVERSE_DIR / "expected_security_dates_candidate.parquet"
+AVAILABILITY_EPISODES_PARQUET = (
+    CANDIDATES_UNIVERSE_DIR / "availability_episodes_candidate.parquet"
+)
+EXPECTED_SECURITY_DATES_PARQUET = (
+    CANDIDATES_UNIVERSE_DIR / "expected_security_dates_candidate.parquet"
+)
 IDENTITY_MANIFEST_PARQUET = MANIFESTS_DIR / "identity_manifest.parquet"
 
 
@@ -92,7 +97,9 @@ def setup_logger() -> logging.Logger:
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
 
-    formatter = logging.Formatter("%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(formatter)
@@ -116,14 +123,14 @@ class V3CandidateResolver:
         self.figi_map = self._load_openfigi_mapping()
         self.calendar_sessions = self._load_sessions()
 
-    def _load_sessions(self) -> List[str]:
+    def _load_sessions(self) -> list[str]:
         df = pl.read_parquet(TRADING_SESSIONS_PATH)
         return df["session_date"].to_list()
 
-    def _load_sec_mapping(self) -> Dict[str, Dict[str, Any]]:
+    def _load_sec_mapping(self) -> dict[str, dict[str, Any]]:
         sec_map = {}
         if SEC_CACHE_JSON.exists():
-            with open(SEC_CACHE_JSON, "r", encoding="utf-8") as f:
+            with open(SEC_CACHE_JSON, encoding="utf-8") as f:
                 d = json.load(f)
             fields = d.get("fields", [])
             rows = d.get("data", [])
@@ -132,12 +139,12 @@ class V3CandidateResolver:
                 sec_map[tk.upper()] = {
                     "cik": str(r[fields.index("cik")]).zfill(10),
                     "name": r[fields.index("name")],
-                    "exchange": r[fields.index("exchange")]
+                    "exchange": r[fields.index("exchange")],
                 }
         self.logger.info("Loaded %d SEC EDGAR mappings.", len(sec_map))
         return sec_map
 
-    def _load_openfigi_mapping(self) -> Dict[str, Dict[str, Any]]:
+    def _load_openfigi_mapping(self) -> dict[str, dict[str, Any]]:
         figi_map = {}
         if OPENFIGI_CACHE_PARQUET.exists():
             df_of = pl.read_parquet(OPENFIGI_CACHE_PARQUET)
@@ -145,19 +152,21 @@ class V3CandidateResolver:
                 figi_map[r["query_ticker"].upper()] = {
                     "share_class_figi": r.get("top_share_class_figi"),
                     "name": r.get("top_name"),
-                    "sec_type": r.get("top_security_type")
+                    "sec_type": r.get("top_security_type"),
                 }
         self.logger.info("Loaded %d OpenFIGI cache mappings.", len(figi_map))
         return figi_map
 
-    def run_resolution(self) -> Dict[str, Any]:
+    def run_resolution(self) -> dict[str, Any]:
         self.logger.info("=" * 80)
         self.logger.info("STARTING V3 CANDIDATE RESOLUTION & UNIVERSE GENERATION")
         self.logger.info("=" * 80)
         t_start = time.time()
 
         if not MASSIVE_MANIFEST_PARQUET.exists():
-            raise FileNotFoundError(f"Massive manifest not found at {MASSIVE_MANIFEST_PARQUET}. Run backfill engine first.")
+            raise FileNotFoundError(
+                f"Massive manifest not found at {MASSIVE_MANIFEST_PARQUET}. Run backfill engine first."
+            )
 
         df_manifest = pl.read_parquet(MASSIVE_MANIFEST_PARQUET)
         self.logger.info("Loaded Massive manifest with %d rows.", df_manifest.height)
@@ -166,14 +175,14 @@ class V3CandidateResolver:
         resolution_ts = "2026-09-09T05:00:00+00:00"
 
         # Containers for candidate datasets
-        ticker_history_records: List[Dict[str, Any]] = []
-        identity_evidence_records: List[Dict[str, Any]] = []
-        conflicts_records: List[Dict[str, Any]] = []
-        aliases_records: List[Dict[str, Any]] = []
-        seen_aliases: Set[str] = set()
+        ticker_history_records: list[dict[str, Any]] = []
+        identity_evidence_records: list[dict[str, Any]] = []
+        conflicts_records: list[dict[str, Any]] = []
+        aliases_records: list[dict[str, Any]] = []
+        seen_aliases: set[str] = set()
 
         # Grouping for security master
-        security_groups: Dict[str, List[Dict[str, Any]]] = {}
+        security_groups: dict[str, list[dict[str, Any]]] = {}
 
         for row in df_manifest.iter_rows(named=True):
             ticker = row["ticker"].strip()
@@ -214,26 +223,31 @@ class V3CandidateResolver:
                 key_alias = f"{ticker}:{a['candidate_symbol']}"
                 if key_alias not in seen_aliases:
                     seen_aliases.add(key_alias)
-                    aliases_records.append({
-                        "original_ticker": ticker,
-                        "candidate_symbol": a["candidate_symbol"],
-                        "rule": a["rule"],
-                        "confidence": a["confidence"],
-                        "is_original": a["is_original"]
-                    })
+                    aliases_records.append(
+                        {
+                            "original_ticker": ticker,
+                            "candidate_symbol": a["candidate_symbol"],
+                            "rule": a["rule"],
+                            "confidence": a["confidence"],
+                            "is_original": a["is_original"],
+                        }
+                    )
 
             # Record drift conflicts if detected
             if drift_detected:
-                conflicts_records.append({
-                    "ticker": ticker,
-                    "spell_seq": seq,
-                    "conflict_type": "WITHIN_SPELL_IDENTITY_DRIFT",
-                    "severity": "HIGH",
-                    "details": drift_details or "Boundary divergence detected between Start, Midpoint, or End evidence",
-                    "start_date": s_date,
-                    "end_date": e_date,
-                    "recorded_timestamp": resolution_ts
-                })
+                conflicts_records.append(
+                    {
+                        "ticker": ticker,
+                        "spell_seq": seq,
+                        "conflict_type": "WITHIN_SPELL_IDENTITY_DRIFT",
+                        "severity": "HIGH",
+                        "details": drift_details
+                        or "Boundary divergence detected between Start, Midpoint, or End evidence",
+                        "start_date": s_date,
+                        "end_date": e_date,
+                        "recorded_timestamp": resolution_ts,
+                    }
+                )
 
             # 1. Normalize Security Type
             norm_type = SecurityType.UNKNOWN
@@ -272,7 +286,9 @@ class V3CandidateResolver:
                     # Tier 2: Massive CIK + SEC Match + Token Overlap
                     corroborated = False
                     if sec_cik and sec_cik == m_cik:
-                        if are_names_consistent(m_name, of_name) or are_names_consistent(m_name, sec_name):
+                        if are_names_consistent(
+                            m_name, of_name
+                        ) or are_names_consistent(m_name, sec_name):
                             corroborated = True
 
                     if corroborated and of_figi:
@@ -281,7 +297,9 @@ class V3CandidateResolver:
                         id_tier = "TIER_2_CIK_CORROBORATED_FIGI"
                         id_status = IdentityStatus.CONFIRMED
                         id_conf = "HIGH"
-                        decision_reason = "Massive CIK corroborated by SEC EDGAR with OpenFIGI FIGI."
+                        decision_reason = (
+                            "Massive CIK corroborated by SEC EDGAR with OpenFIGI FIGI."
+                        )
                     else:
                         # Tier 3: Provisional CIK Namespace (INV_06, INV_23: is_canonical=False)
                         security_id = make_provisional_cik_id(m_cik, ticker, s_date)
@@ -292,21 +310,25 @@ class V3CandidateResolver:
                         if sec_cik and sec_cik != m_cik:
                             conflict_flag = True
                             decision_reason = f"Massive CIK {m_cik} diverges from SEC CIK {sec_cik} (Ticker Reuse). Provisional CIK assigned."
-                            conflicts_records.append({
-                                "ticker": ticker,
-                                "spell_seq": seq,
-                                "conflict_type": "TICKER_REUSE_CIK_DIVERGENCE",
-                                "severity": "MEDIUM",
-                                "details": f"Massive CIK={m_cik} vs SEC CIK={sec_cik}",
-                                "start_date": s_date,
-                                "end_date": e_date,
-                                "recorded_timestamp": resolution_ts
-                            })
+                            conflicts_records.append(
+                                {
+                                    "ticker": ticker,
+                                    "spell_seq": seq,
+                                    "conflict_type": "TICKER_REUSE_CIK_DIVERGENCE",
+                                    "severity": "MEDIUM",
+                                    "details": f"Massive CIK={m_cik} vs SEC CIK={sec_cik}",
+                                    "start_date": s_date,
+                                    "end_date": e_date,
+                                    "recorded_timestamp": resolution_ts,
+                                }
+                            )
                         else:
                             decision_reason = f"Massive CIK {m_cik} without security-level FIGI. Provisional CIK assigned."
                 else:
                     # Tier 4: Massive record returned but empty of FIGI and CIK
-                    security_id = make_deterministic_unresolved_id(ticker, seq, s_date, e_date)
+                    security_id = make_deterministic_unresolved_id(
+                        ticker, seq, s_date, e_date
+                    )
                     is_canonical = False
                     id_tier = "TIER_4_MASSIVE_EMPTY"
                     id_status = IdentityStatus.UNRESOLVED
@@ -315,7 +337,9 @@ class V3CandidateResolver:
                     univ_status = UniverseStatus.QUARANTINE
 
             elif lookup_status == "MASSIVE_EMPTY":
-                security_id = make_deterministic_unresolved_id(ticker, seq, s_date, e_date)
+                security_id = make_deterministic_unresolved_id(
+                    ticker, seq, s_date, e_date
+                )
                 is_canonical = False
                 id_tier = "TIER_4_MASSIVE_EMPTY"
                 id_status = IdentityStatus.UNRESOLVED
@@ -325,7 +349,9 @@ class V3CandidateResolver:
 
             else:
                 # Tier 5: Offline Pending Backfill
-                security_id = make_deterministic_unresolved_id(ticker, seq, s_date, e_date)
+                security_id = make_deterministic_unresolved_id(
+                    ticker, seq, s_date, e_date
+                )
                 is_canonical = False
                 id_tier = "TIER_5_OFFLINE_PENDING"
                 id_status = IdentityStatus.UNRESOLVED
@@ -334,105 +360,123 @@ class V3CandidateResolver:
                 univ_status = UniverseStatus.QUARANTINE
 
             # Populate Ticker History candidate
-            ticker_history_records.append({
-                "ticker": ticker,
-                "spell_seq": seq,
-                "security_id": security_id,
-                "is_canonical": is_canonical,
-                "start_date": s_date,
-                "end_date": e_date,
-                "duration_sessions": dur,
-                "representative_date": rep_date,
-                "confidence": id_conf,
-                "exchange": m_exch or sec_exch or "UNKNOWN",
-                "security_type": norm_type,
-                "research_universe_status": univ_status,
-            })
+            ticker_history_records.append(
+                {
+                    "ticker": ticker,
+                    "spell_seq": seq,
+                    "security_id": security_id,
+                    "is_canonical": is_canonical,
+                    "start_date": s_date,
+                    "end_date": e_date,
+                    "duration_sessions": dur,
+                    "representative_date": rep_date,
+                    "confidence": id_conf,
+                    "exchange": m_exch or sec_exch or "UNKNOWN",
+                    "security_type": norm_type,
+                    "research_universe_status": univ_status,
+                }
+            )
 
             # Populate Identity Evidence candidate (INV_19, INV_30)
-            identity_evidence_records.append({
-                "spell_id": spell_id,
-                "ticker": ticker,
-                "spell_seq": seq,
-                "representative_date": rep_date,
-                "lookup_status": lookup_status,
-                "cache_status": row["cache_status"],
-                "massive_cik": m_cik,
-                "massive_figi": m_figi,
-                "massive_name": m_name,
-                "massive_type": m_type,
-                "massive_exchange": m_exch,
-                "openfigi_figi": of_figi,
-                "openfigi_name": of_name,
-                "sec_cik": sec_cik,
-                "sec_name": sec_name,
-                "selected_security_id": security_id,
-                "is_canonical": is_canonical,
-                "identity_status": id_status,
-                "identity_confidence": id_conf,
-                "resolution_tier": id_tier,
-                "decision_reason": decision_reason,
-                "resolution_timestamp": resolution_ts,
-            })
+            identity_evidence_records.append(
+                {
+                    "spell_id": spell_id,
+                    "ticker": ticker,
+                    "spell_seq": seq,
+                    "representative_date": rep_date,
+                    "lookup_status": lookup_status,
+                    "cache_status": row["cache_status"],
+                    "massive_cik": m_cik,
+                    "massive_figi": m_figi,
+                    "massive_name": m_name,
+                    "massive_type": m_type,
+                    "massive_exchange": m_exch,
+                    "openfigi_figi": of_figi,
+                    "openfigi_name": of_name,
+                    "sec_cik": sec_cik,
+                    "sec_name": sec_name,
+                    "selected_security_id": security_id,
+                    "is_canonical": is_canonical,
+                    "identity_status": id_status,
+                    "identity_confidence": id_conf,
+                    "resolution_tier": id_tier,
+                    "decision_reason": decision_reason,
+                    "resolution_timestamp": resolution_ts,
+                }
+            )
 
             # Append to security master groups
             if security_id not in security_groups:
                 security_groups[security_id] = []
-            security_groups[security_id].append({
-                "ticker": ticker,
-                "start_date": s_date,
-                "end_date": e_date,
-                "is_canonical": is_canonical,
-                "share_class_figi": (m_figi or of_figi) if is_canonical else None,
-                "composite_figi": m_comp if is_canonical else None,
-                "cik": (m_cik or sec_cik) if is_canonical else (m_cik if id_tier == "TIER_3_PROVISIONAL_CIK" else None),
-                "security_name": m_name or (sec_name or of_name if is_canonical else None) or f"SECURITY_{clean_tk}",
-                "security_type": norm_type,
-                "primary_exchange": m_exch or sec_exch or "UNKNOWN",
-                "confidence": id_conf,
-                "status": id_status,
-                "tier": id_tier,
-                "universe_status": univ_status,
-            })
+            security_groups[security_id].append(
+                {
+                    "ticker": ticker,
+                    "start_date": s_date,
+                    "end_date": e_date,
+                    "is_canonical": is_canonical,
+                    "share_class_figi": (m_figi or of_figi) if is_canonical else None,
+                    "composite_figi": m_comp if is_canonical else None,
+                    "cik": (m_cik or sec_cik)
+                    if is_canonical
+                    else (m_cik if id_tier == "TIER_3_PROVISIONAL_CIK" else None),
+                    "security_name": m_name
+                    or (sec_name or of_name if is_canonical else None)
+                    or f"SECURITY_{clean_tk}",
+                    "security_type": norm_type,
+                    "primary_exchange": m_exch or sec_exch or "UNKNOWN",
+                    "confidence": id_conf,
+                    "status": id_status,
+                    "tier": id_tier,
+                    "universe_status": univ_status,
+                }
+            )
 
         # Build Security Master records
         security_master_records = []
         for sec_id, group in security_groups.items():
             first_obs = min(r["start_date"] for r in group)
             last_obs = max(r["end_date"] for r in group)
-            distinct_tickers = sorted(list({r["ticker"] for r in group}))
+            distinct_tickers = sorted({r["ticker"] for r in group})
             is_can = group[0]["is_canonical"]
             sec_type = group[0]["security_type"]
             u_status = group[0]["universe_status"]
 
             # Most complete metadata row
-            best_row = sorted(group, key=lambda x: (1 if x["share_class_figi"] else 0, 1 if x["cik"] else 0), reverse=True)[0]
+            best_row = sorted(
+                group,
+                key=lambda x: (1 if x["share_class_figi"] else 0, 1 if x["cik"] else 0),
+                reverse=True,
+            )[0]
 
-            security_master_records.append({
-                "security_id": sec_id,
-                "is_canonical": is_can,
-                "share_class_figi": best_row["share_class_figi"],
-                "composite_figi": best_row["composite_figi"],
-                "cik": best_row["cik"],
-                "security_name": best_row["security_name"],
-                "security_type": sec_type,
-                "primary_exchange": best_row["primary_exchange"],
-                "country": "US",
-                "identity_confidence": best_row["confidence"],
-                "identity_status": best_row["status"],
-                "first_observed_date": first_obs,
-                "last_observed_date": last_obs,
-                "n_spells": len(group),
-                "n_tickers": len(distinct_tickers),
-                "identity_source_hierarchy": best_row["tier"],
-                "research_universe_status": u_status,
-            })
+            security_master_records.append(
+                {
+                    "security_id": sec_id,
+                    "is_canonical": is_can,
+                    "share_class_figi": best_row["share_class_figi"],
+                    "composite_figi": best_row["composite_figi"],
+                    "cik": best_row["cik"],
+                    "security_name": best_row["security_name"],
+                    "security_type": sec_type,
+                    "primary_exchange": best_row["primary_exchange"],
+                    "country": "US",
+                    "identity_confidence": best_row["confidence"],
+                    "identity_status": best_row["status"],
+                    "first_observed_date": first_obs,
+                    "last_observed_date": last_obs,
+                    "n_spells": len(group),
+                    "n_tickers": len(distinct_tickers),
+                    "identity_source_hierarchy": best_row["tier"],
+                    "research_universe_status": u_status,
+                }
+            )
 
         # Save Candidate Identity Datasets with strict deterministic sorting
         self.logger.info("Writing candidate identity datasets...")
         df_sec = pl.DataFrame(security_master_records).sort(["security_id"])
         df_sec.write_parquet(SECURITY_MASTER_PARQUET)
-        self.logger.info("Wrote %s (%d securities).", SECURITY_MASTER_PARQUET, df_sec.height)
+        self.logger.info(
+            "Wrote %s (%d securities).", SECURITY_MASTER_PARQUET, df_sec.height
+        )
 
         df_th = pl.DataFrame(ticker_history_records).sort(["ticker", "spell_seq"])
         df_th.write_parquet(TICKER_HISTORY_PARQUET)
@@ -440,20 +484,41 @@ class V3CandidateResolver:
 
         df_ev = pl.DataFrame(identity_evidence_records).sort(["ticker", "spell_seq"])
         df_ev.write_parquet(IDENTITY_EVIDENCE_PARQUET)
-        self.logger.info("Wrote %s (%d evidence records).", IDENTITY_EVIDENCE_PARQUET, df_ev.height)
+        self.logger.info(
+            "Wrote %s (%d evidence records).", IDENTITY_EVIDENCE_PARQUET, df_ev.height
+        )
 
-        df_conf = pl.DataFrame(conflicts_records) if conflicts_records else pl.DataFrame(schema={
-            "ticker": pl.Utf8, "spell_seq": pl.Int64, "conflict_type": pl.Utf8,
-            "severity": pl.Utf8, "details": pl.Utf8, "start_date": pl.Utf8,
-            "end_date": pl.Utf8, "recorded_timestamp": pl.Utf8
-        })
+        df_conf = (
+            pl.DataFrame(conflicts_records)
+            if conflicts_records
+            else pl.DataFrame(
+                schema={
+                    "ticker": pl.Utf8,
+                    "spell_seq": pl.Int64,
+                    "conflict_type": pl.Utf8,
+                    "severity": pl.Utf8,
+                    "details": pl.Utf8,
+                    "start_date": pl.Utf8,
+                    "end_date": pl.Utf8,
+                    "recorded_timestamp": pl.Utf8,
+                }
+            )
+        )
         df_conf = df_conf.sort(["ticker", "spell_seq", "conflict_type"])
         df_conf.write_parquet(IDENTITY_CONFLICTS_PARQUET)
-        self.logger.info("Wrote %s (%d conflict records).", IDENTITY_CONFLICTS_PARQUET, df_conf.height)
+        self.logger.info(
+            "Wrote %s (%d conflict records).",
+            IDENTITY_CONFLICTS_PARQUET,
+            df_conf.height,
+        )
 
-        df_ali = pl.DataFrame(aliases_records).sort(["original_ticker", "candidate_symbol"])
+        df_ali = pl.DataFrame(aliases_records).sort(
+            ["original_ticker", "candidate_symbol"]
+        )
         df_ali.write_parquet(IDENTITY_ALIASES_PARQUET)
-        self.logger.info("Wrote %s (%d alias records).", IDENTITY_ALIASES_PARQUET, df_ali.height)
+        self.logger.info(
+            "Wrote %s (%d alias records).", IDENTITY_ALIASES_PARQUET, df_ali.height
+        )
 
         # Build Candidate Universe Datasets
         self.logger.info("Building candidate universe datasets...")
@@ -470,11 +535,17 @@ class V3CandidateResolver:
         return {
             "securities_count": df_sec.height,
             "spells_count": df_th.height,
-            "canonical_securities": df_sec.filter(pl.col("is_canonical") == True).height,
-            "provisional_securities": df_sec.filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")).height,
-            "unresolved_securities": df_sec.filter(pl.col("security_id").str.starts_with("UNRESOLVED_")).height,
+            "canonical_securities": df_sec.filter(
+                pl.col("is_canonical") == True
+            ).height,
+            "provisional_securities": df_sec.filter(
+                pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")
+            ).height,
+            "unresolved_securities": df_sec.filter(
+                pl.col("security_id").str.starts_with("UNRESOLVED_")
+            ).height,
             "conflicts_count": df_conf.height,
-            "elapsed_sec": t_elapsed
+            "elapsed_sec": t_elapsed,
         }
 
     def _build_universe_candidates(self, df_th: pl.DataFrame, df_sec: pl.DataFrame):
@@ -524,7 +595,9 @@ class V3CandidateResolver:
                         cur_ep["end_date"] = e_date
                         cur_ep["last_observed_date"] = e_date
                         cur_ep["n_observed_sessions"] += s["duration_sessions"]
-                        tot_dur = max(1, e_idx - session_to_idx.get(cur_ep["start_date"], 0) + 1)
+                        tot_dur = max(
+                            1, e_idx - session_to_idx.get(cur_ep["start_date"], 0) + 1
+                        )
                         cur_ep["n_sessions"] = tot_dur
                         cur_ep["n_inferred_sessions"] = tot_dur
                     else:
@@ -549,15 +622,19 @@ class V3CandidateResolver:
 
         df_ep = pl.DataFrame(episodes)
         df_ep.write_parquet(AVAILABILITY_EPISODES_PARQUET)
-        self.logger.info("Wrote %s (%d episodes).", AVAILABILITY_EPISODES_PARQUET, df_ep.height)
+        self.logger.info(
+            "Wrote %s (%d episodes).", AVAILABILITY_EPISODES_PARQUET, df_ep.height
+        )
 
         # 2. Daily Universe Candidate (canonical common-stock securities only)
         # We sample trading dates or build daily active membership
         canonical_spells = df_th.filter(
-            (pl.col("is_canonical") == True) &
-            (pl.col("research_universe_status") == UniverseStatus.INCLUDE)
+            (pl.col("is_canonical") == True)
+            & (pl.col("research_universe_status") == UniverseStatus.INCLUDE)
         )
-        self.logger.info("Canonical included spells for universe: %d.", canonical_spells.height)
+        self.logger.info(
+            "Canonical included spells for universe: %d.", canonical_spells.height
+        )
 
         daily_rows = []
         for s in canonical_spells.iter_rows(named=True):
@@ -566,44 +643,70 @@ class V3CandidateResolver:
             if s_idx is not None and e_idx is not None:
                 # Add bounding dates and midpoint for compact representation
                 mid_idx = (s_idx + e_idx) // 2
-                key_dates = {self.calendar_sessions[s_idx], self.calendar_sessions[mid_idx], self.calendar_sessions[e_idx]}
+                key_dates = {
+                    self.calendar_sessions[s_idx],
+                    self.calendar_sessions[mid_idx],
+                    self.calendar_sessions[e_idx],
+                }
                 for d in sorted(key_dates):
-                    daily_rows.append({
-                        "date": d,
-                        "security_id": s["security_id"],
-                        "ticker": s["ticker"],
-                        "is_canonical": True,
-                        "research_universe_status": UniverseStatus.INCLUDE
-                    })
+                    daily_rows.append(
+                        {
+                            "date": d,
+                            "security_id": s["security_id"],
+                            "ticker": s["ticker"],
+                            "is_canonical": True,
+                            "research_universe_status": UniverseStatus.INCLUDE,
+                        }
+                    )
 
-        df_daily = pl.DataFrame(daily_rows).unique(subset=["date", "security_id"]).sort(["date", "security_id"])
+        df_daily = (
+            pl.DataFrame(daily_rows)
+            .unique(subset=["date", "security_id"])
+            .sort(["date", "security_id"])
+        )
         df_daily.write_parquet(DAILY_UNIVERSE_PARQUET)
-        self.logger.info("Wrote %s (%d daily universe records).", DAILY_UNIVERSE_PARQUET, df_daily.height)
+        self.logger.info(
+            "Wrote %s (%d daily universe records).",
+            DAILY_UNIVERSE_PARQUET,
+            df_daily.height,
+        )
 
         # 3. Expected Security Dates Candidate
         exp_rows = []
         for s in df_th.iter_rows(named=True):
-            exp_rows.append({
-                "security_id": s["security_id"],
-                "date": s["start_date"],
-                "ticker": s["ticker"],
-                "spell_seq": s["spell_seq"],
-                "is_observed": True,
-                "is_canonical": s["is_canonical"]
-            })
-            if s["start_date"] != s["end_date"]:
-                exp_rows.append({
+            exp_rows.append(
+                {
                     "security_id": s["security_id"],
-                    "date": s["end_date"],
+                    "date": s["start_date"],
                     "ticker": s["ticker"],
                     "spell_seq": s["spell_seq"],
                     "is_observed": True,
-                    "is_canonical": s["is_canonical"]
-                })
+                    "is_canonical": s["is_canonical"],
+                }
+            )
+            if s["start_date"] != s["end_date"]:
+                exp_rows.append(
+                    {
+                        "security_id": s["security_id"],
+                        "date": s["end_date"],
+                        "ticker": s["ticker"],
+                        "spell_seq": s["spell_seq"],
+                        "is_observed": True,
+                        "is_canonical": s["is_canonical"],
+                    }
+                )
 
-        df_exp = pl.DataFrame(exp_rows).unique(subset=["security_id", "date", "ticker"]).sort(["security_id", "date", "ticker"])
+        df_exp = (
+            pl.DataFrame(exp_rows)
+            .unique(subset=["security_id", "date", "ticker"])
+            .sort(["security_id", "date", "ticker"])
+        )
         df_exp.write_parquet(EXPECTED_SECURITY_DATES_PARQUET)
-        self.logger.info("Wrote %s (%d expected security dates records).", EXPECTED_SECURITY_DATES_PARQUET, df_exp.height)
+        self.logger.info(
+            "Wrote %s (%d expected security dates records).",
+            EXPECTED_SECURITY_DATES_PARQUET,
+            df_exp.height,
+        )
 
     def _write_identity_manifest(
         self,
@@ -611,24 +714,32 @@ class V3CandidateResolver:
         df_th: pl.DataFrame,
         df_ev: pl.DataFrame,
         df_conf: pl.DataFrame,
-        ts: str
+        ts: str,
     ):
         spells_bytes = SPELLS_CSV_PATH.read_bytes()
         spells_hash = hashlib.sha256(spells_bytes).hexdigest()
 
-        manifest_rows = [{
-            "pipeline_stage": "V3_CANDIDATE_RESOLVER",
-            "resolver_version": "3.0.0",
-            "spells_sha256": spells_hash,
-            "total_spells": df_th.height,
-            "unique_securities": df_sec.height,
-            "canonical_securities": df_sec.filter(pl.col("is_canonical") == True).height,
-            "provisional_securities": df_sec.filter(pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")).height,
-            "unresolved_securities": df_sec.filter(pl.col("security_id").str.starts_with("UNRESOLVED_")).height,
-            "evidence_rows": df_ev.height,
-            "conflicts_count": df_conf.height,
-            "resolution_timestamp": ts
-        }]
+        manifest_rows = [
+            {
+                "pipeline_stage": "V3_CANDIDATE_RESOLVER",
+                "resolver_version": "3.0.0",
+                "spells_sha256": spells_hash,
+                "total_spells": df_th.height,
+                "unique_securities": df_sec.height,
+                "canonical_securities": df_sec.filter(
+                    pl.col("is_canonical") == True
+                ).height,
+                "provisional_securities": df_sec.filter(
+                    pl.col("security_id").str.starts_with("PROVISIONAL_CIK_")
+                ).height,
+                "unresolved_securities": df_sec.filter(
+                    pl.col("security_id").str.starts_with("UNRESOLVED_")
+                ).height,
+                "evidence_rows": df_ev.height,
+                "conflicts_count": df_conf.height,
+                "resolution_timestamp": ts,
+            }
+        ]
         df_m = pl.DataFrame(manifest_rows)
         df_m.write_parquet(IDENTITY_MANIFEST_PARQUET)
         self.logger.info("Saved identity manifest to %s", IDENTITY_MANIFEST_PARQUET)

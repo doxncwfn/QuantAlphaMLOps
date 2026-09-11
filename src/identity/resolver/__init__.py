@@ -13,8 +13,8 @@ from src.identity.resolver.model import (
 from src.identity.resolver.resolver import V3CandidateResolver as CandidateResolver
 
 __all__ = [
+    "CandidateResolver",
     "IdentityStatus",
     "SecurityType",
     "UniverseStatus",
-    "CandidateResolver",
 ]

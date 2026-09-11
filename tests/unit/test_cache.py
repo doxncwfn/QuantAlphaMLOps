@@ -19,7 +19,10 @@ class TestCacheManager(unittest.TestCase):
             shutil.rmtree(self.test_dir)
 
     def test_put_atomic_and_get(self):
-        payload = {"ticker": "AAPL", "results": [{"ticker": "AAPL", "cik": "0000320193"}]}
+        payload = {
+            "ticker": "AAPL",
+            "results": [{"ticker": "AAPL", "cik": "0000320193"}],
+        }
         saved_path = self.cache_mgr.put_atomic("AAPL", "2020-01-02", payload)
 
         self.assertTrue(saved_path.exists())

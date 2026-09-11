@@ -6,8 +6,10 @@ and master manifest generation.
 """
 
 from __future__ import annotations
+
 import sys
 from pathlib import Path
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -19,14 +21,13 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import polars as pl
 
 from src.common.config import (
     EXPECTED_SPELLS_HASH,
     LOG_DIR,
-    MANIFESTS_DIR,
     SPELLS_CSV_PATH,
 )
 from src.common.logging import setup_logger
@@ -40,14 +41,16 @@ class BackfillEngine:
     def __init__(
         self,
         worker_pool: ConcurrentKeyWorkerPool,
-        checkpoint_manager: Optional[CheckpointManager] = None,
+        checkpoint_manager: CheckpointManager | None = None,
         max_live_queries: int = 0,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self.worker_pool = worker_pool
         self.checkpoint_manager = checkpoint_manager or CheckpointManager()
         self.max_live_queries = max_live_queries
-        self.logger = logger or setup_logger("backfill_engine", LOG_DIR / "v3_backfill.log")
+        self.logger = logger or setup_logger(
+            "backfill_engine", LOG_DIR / "v3_backfill.log"
+        )
         self.live_queries_executed = 0
 
     def verify_spells_integrity(self) -> pl.DataFrame:
@@ -59,10 +62,16 @@ class BackfillEngine:
             actual_hash = hashlib.sha256(f.read()).hexdigest()
 
         if actual_hash != EXPECTED_SPELLS_HASH:
-            raise ValueError(f"Spells hash mismatch! Expected {EXPECTED_SPELLS_HASH}, got {actual_hash}")
+            raise ValueError(
+                f"Spells hash mismatch! Expected {EXPECTED_SPELLS_HASH}, got {actual_hash}"
+            )
 
         df = pl.read_csv(SPELLS_CSV_PATH)
-        self.logger.info("Spells SHA-256 verified (%s). Total spells: %d", actual_hash[:16], df.height)
+        self.logger.info(
+            "Spells SHA-256 verified (%s). Total spells: %d",
+            actual_hash[:16],
+            df.height,
+        )
         return df
 
     def run(
@@ -81,13 +90,19 @@ class BackfillEngine:
         # Pre-index local caches
         self.worker_pool.cache_manager.index_caches()
 
-        completed: Dict[str, Dict[str, Any]] = {}
+        completed: dict[str, dict[str, Any]] = {}
         if resume:
             completed = self.checkpoint_manager.load_completed_spells()
-            self.logger.info("Resuming: %d / %d spells already completed.", len(completed), total_spells)
+            self.logger.info(
+                "Resuming: %d / %d spells already completed.",
+                len(completed),
+                total_spells,
+            )
 
-        records: List[Dict[str, Any]] = []
-        chunk_idx = len(list(self.checkpoint_manager.checkpoints_dir.glob("checkpoint_*.parquet")))
+        records: list[dict[str, Any]] = []
+        chunk_idx = len(
+            list(self.checkpoint_manager.checkpoints_dir.glob("checkpoint_*.parquet"))
+        )
         num_workers = len(self.worker_pool.workers)
 
         t_start = time.time()
@@ -97,7 +112,9 @@ class BackfillEngine:
                 continue
 
             allow_live = self.live_queries_executed < self.max_live_queries
-            rec = self.worker_pool.process_spell(row, worker_idx=idx % num_workers, allow_live=allow_live)
+            rec = self.worker_pool.process_spell(
+                row, worker_idx=idx % num_workers, allow_live=allow_live
+            )
             if rec.get("cache_status") == "MISS":
                 self.live_queries_executed += 1
 
@@ -108,7 +125,12 @@ class BackfillEngine:
                 self.checkpoint_manager.save_checkpoint(records, chunk_idx)
                 chunk_idx += 1
                 records = []
-                self.logger.info("Progress: %d / %d spells (%.2f%%)", len(completed), total_spells, len(completed) / total_spells * 100)
+                self.logger.info(
+                    "Progress: %d / %d spells (%.2f%%)",
+                    len(completed),
+                    total_spells,
+                    len(completed) / total_spells * 100,
+                )
 
         if records:
             self.checkpoint_manager.save_checkpoint(records, chunk_idx)
@@ -121,11 +143,24 @@ class BackfillEngine:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Massive Point-in-Time Identity Backfill")
-    parser.add_argument("--batch-size", type=int, default=1000, help="Checkpoints batch size")
-    parser.add_argument("--max-live-queries", type=int, default=0, help="Limit on live queries (0 = cache/offline only)")
-    parser.add_argument("--no-resume", action="store_true", help="Do not load existing checkpoints")
-    parser.add_argument("--full-live", action="store_true", help="Allow unbounded live queries")
+    parser = argparse.ArgumentParser(
+        description="Massive Point-in-Time Identity Backfill"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=1000, help="Checkpoints batch size"
+    )
+    parser.add_argument(
+        "--max-live-queries",
+        type=int,
+        default=0,
+        help="Limit on live queries (0 = cache/offline only)",
+    )
+    parser.add_argument(
+        "--no-resume", action="store_true", help="Do not load existing checkpoints"
+    )
+    parser.add_argument(
+        "--full-live", action="store_true", help="Allow unbounded live queries"
+    )
     args = parser.parse_args()
 
     max_live = 999999 if args.full_live else args.max_live_queries

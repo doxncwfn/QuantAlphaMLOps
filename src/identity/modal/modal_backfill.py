@@ -12,8 +12,10 @@ Executes the historical Massive point-in-time identity backfill remotely on Moda
 """
 
 from __future__ import annotations
+
 import sys
 from pathlib import Path
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -27,11 +29,10 @@ import os
 import queue
 import shutil
 import sys
-import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 import modal
 import polars as pl
@@ -43,7 +44,9 @@ APP_NAME = "v3-massive-backfill"
 VOLUME_NAME = "v3-massive-backfill"
 SECRET_NAME = "massive"
 
-EXPECTED_SPELLS_HASH = "5fc79a37cdc341cf7b10a7017ccd75cf7001aa1b91e5dd6501c829b746191bf1"
+EXPECTED_SPELLS_HASH = (
+    "5fc79a37cdc341cf7b10a7017ccd75cf7001aa1b91e5dd6501c829b746191bf1"
+)
 EXPECTED_SPELLS_ROWS = 43757
 EXPECTED_UNIQUE_TICKERS = 36843
 PER_KEY_INTERVAL_SECONDS = 12.1
@@ -62,13 +65,37 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("requests", "polars", "pyarrow", "python-dotenv")
     .add_local_dir(str(LOCAL_REPO_ROOT / "src"), remote_path="/root/src")
-    .add_local_file(str(LOCAL_REPO_ROOT / "data" / "universe" / "spells.csv"), remote_path="/root/data/universe/spells.csv")
     .add_local_file(
-        str(LOCAL_REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "trading_sessions.parquet"),
-        remote_path="/root/data/identity/experiments/v2/trading_sessions.parquet"
+        str(LOCAL_REPO_ROOT / "data" / "universe" / "spells.csv"),
+        remote_path="/root/data/universe/spells.csv",
     )
-    .add_local_dir(str(LOCAL_REPO_ROOT / "data" / "identity" / "cache" / "massive"), remote_path="/root/seed_caches/v3_cache")
-    .add_local_dir(str(LOCAL_REPO_ROOT / "data" / "identity" / "experiments" / "v2" / "cache" / "massive"), remote_path="/root/seed_caches/v2_cache")
+    .add_local_file(
+        str(
+            LOCAL_REPO_ROOT
+            / "data"
+            / "identity"
+            / "experiments"
+            / "v2"
+            / "trading_sessions.parquet"
+        ),
+        remote_path="/root/data/identity/experiments/v2/trading_sessions.parquet",
+    )
+    .add_local_dir(
+        str(LOCAL_REPO_ROOT / "data" / "identity" / "cache" / "massive"),
+        remote_path="/root/seed_caches/v3_cache",
+    )
+    .add_local_dir(
+        str(
+            LOCAL_REPO_ROOT
+            / "data"
+            / "identity"
+            / "experiments"
+            / "v2"
+            / "cache"
+            / "massive"
+        ),
+        remote_path="/root/seed_caches/v2_cache",
+    )
 )
 
 app = modal.App(APP_NAME)
@@ -119,8 +146,8 @@ def run_backfill_remote(
     smoke_test: bool = False,
     max_queries: int = 0,
     resume: bool = True,
-    git_commit: str = "7e2645280e698c230bb17d3e92077d777ea1d26d"
-) -> Dict[str, Any]:
+    git_commit: str = "7e2645280e698c230bb17d3e92077d777ea1d26d",
+) -> dict[str, Any]:
     """Remote execution handler on Modal."""
     import polars as pl
 
@@ -140,7 +167,9 @@ def run_backfill_remote(
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
 
-    formatter = logging.Formatter("%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(formatter)
     logger.addHandler(sh)
@@ -153,10 +182,15 @@ def run_backfill_remote(
     logger.info("=" * 80)
     logger.info("V3 FULL MASSIVE PIT BACKFILL — MODAL WORKER EXECUTION")
     logger.info("=" * 80)
-    logger.info("Timestamp: %s", datetime.datetime.now(datetime.timezone.utc).isoformat())
+    logger.info("Timestamp: %s", datetime.datetime.now(datetime.UTC).isoformat())
     logger.info("Volume Root: %s", vol_root)
-    logger.info("Dry Run: %s | Smoke Test: %s | Max Queries: %s | Resume: %s",
-                dry_run, smoke_test, max_queries, resume)
+    logger.info(
+        "Dry Run: %s | Smoke Test: %s | Max Queries: %s | Resume: %s",
+        dry_run,
+        smoke_test,
+        max_queries,
+        resume,
+    )
 
     # 3. Input Verification: Spells CSV SHA-256 Check (FAIL FAST)
     spells_path = Path("/root/data/universe/spells.csv")
@@ -169,21 +203,36 @@ def run_backfill_remote(
     logger.info("Spells CSV SHA-256: %s", spells_hash)
 
     if spells_hash != EXPECTED_SPELLS_HASH:
-        logger.critical("FATAL: spells.csv SHA-256 mismatch: %s != %s", spells_hash, EXPECTED_SPELLS_HASH)
+        logger.critical(
+            "FATAL: spells.csv SHA-256 mismatch: %s != %s",
+            spells_hash,
+            EXPECTED_SPELLS_HASH,
+        )
         raise ValueError(f"Spells SHA-256 mismatch: {spells_hash}")
 
     df_spells = pl.read_csv(spells_path)
     total_spells = df_spells.height
     unique_tickers = df_spells["ticker"].n_unique()
-    logger.info("Spells Input Verified: %d spells across %d tickers.", total_spells, unique_tickers)
+    logger.info(
+        "Spells Input Verified: %d spells across %d tickers.",
+        total_spells,
+        unique_tickers,
+    )
 
-    if total_spells != EXPECTED_SPELLS_ROWS or unique_tickers != EXPECTED_UNIQUE_TICKERS:
-        logger.critical("FATAL: Unexpected spells count or ticker count: (%d, %d)", total_spells, unique_tickers)
+    if (
+        total_spells != EXPECTED_SPELLS_ROWS
+        or unique_tickers != EXPECTED_UNIQUE_TICKERS
+    ):
+        logger.critical(
+            "FATAL: Unexpected spells count or ticker count: (%d, %d)",
+            total_spells,
+            unique_tickers,
+        )
         raise ValueError("Unexpected spells dimensions")
 
     # 4. Detect and Isolate API Keys from Modal Secret
     logger.info("Scanning for Massive API keys from Modal Secret...")
-    key_slots: List[Tuple[str, str]] = []
+    key_slots: list[tuple[str, str]] = []
     for i in range(1, 10):
         var_name = f"MASSIVE_API_KEY_{i}"
         key_val = os.environ.get(var_name)
@@ -200,7 +249,9 @@ def run_backfill_remote(
         logger.info("Worker Assignment: %s -> dedicated key slot", worker_id)
 
     if configured_keys == 0 and not dry_run:
-        logger.critical("FATAL: Zero Massive API keys configured in Modal Secret '%s'", SECRET_NAME)
+        logger.critical(
+            "FATAL: Zero Massive API keys configured in Modal Secret '%s'", SECRET_NAME
+        )
         raise ValueError(f"Missing keys in secret '{SECRET_NAME}'")
 
     # 5. Pre-populate Volume Cache from Seed Caches (if needed)
@@ -208,7 +259,7 @@ def run_backfill_remote(
         Path("/root/seed_caches/v3_cache"),
         Path("/root/seed_caches/v2_cache"),
     ]
-    existing_vol_cache_files = set(f.name for f in cache_dir.glob("*.json"))
+    existing_vol_cache_files = {f.name for f in cache_dir.glob("*.json")}
     seeded_count = 0
     for sdir in seed_dirs:
         if sdir.exists():
@@ -219,9 +270,14 @@ def run_backfill_remote(
                     seeded_count += 1
 
     if seeded_count > 0:
-        logger.info("Seeded %d cache files from bundle into persistent volume cache.", seeded_count)
+        logger.info(
+            "Seeded %d cache files from bundle into persistent volume cache.",
+            seeded_count,
+        )
         volume.commit()
-    logger.info("Persistent cache contains %d JSON items.", len(list(cache_dir.glob("*.json"))))
+    logger.info(
+        "Persistent cache contains %d JSON items.", len(list(cache_dir.glob("*.json")))
+    )
 
     # 6. Check for Dry Run Mode
     if dry_run:
@@ -257,34 +313,52 @@ def run_backfill_remote(
         }
 
     # 7. Check Resumption State
-    completed_spells: Dict[str, Dict[str, Any]] = {}
+    completed_spells: dict[str, dict[str, Any]] = {}
     if resume:
-        chk_files = sorted(list(checkpoints_dir.glob("checkpoint_*.parquet")))
+        chk_files = sorted(checkpoints_dir.glob("checkpoint_*.parquet"))
         if chk_files:
-            logger.info("Found %d existing checkpoint files on persistent volume.", len(chk_files))
+            logger.info(
+                "Found %d existing checkpoint files on persistent volume.",
+                len(chk_files),
+            )
             for cf in chk_files:
                 try:
                     df_c = pl.read_parquet(cf)
                     for r in df_c.iter_rows(named=True):
                         completed_spells[r["spell_id"]] = r
-                except Exception as exc:
+                except (
+                    OSError,
+                    pl.exceptions.PolarsError,
+                    RuntimeError,
+                    ValueError,
+                ) as exc:
                     logger.warning("Could not read checkpoint %s: %s", cf, exc)
-            logger.info("Resumption loaded %d already completed spells.", len(completed_spells))
+            logger.info(
+                "Resumption loaded %d already completed spells.", len(completed_spells)
+            )
 
     # 8. Filter Spells to Process
-    remaining_spells: List[Dict[str, Any]] = []
+    remaining_spells: list[dict[str, Any]] = []
     for row in df_spells.iter_rows(named=True):
         spell_id = f"{row['ticker'].strip()}_{row['spell_seq']}"
         if spell_id not in completed_spells:
             remaining_spells.append(row)
 
-    logger.info("Spells Summary: %d total, %d completed, %d remaining.",
-                total_spells, len(completed_spells), len(remaining_spells))
+    logger.info(
+        "Spells Summary: %d total, %d completed, %d remaining.",
+        total_spells,
+        len(completed_spells),
+        len(remaining_spells),
+    )
 
     # In smoke test mode, limit to 2 queries per worker
     if smoke_test:
         smoke_limit = min(len(remaining_spells), max(18, configured_keys * 2))
-        logger.info("SMOKE TEST MODE: Limiting workload to %d queries across %d workers.", smoke_limit, configured_keys)
+        logger.info(
+            "SMOKE TEST MODE: Limiting workload to %d queries across %d workers.",
+            smoke_limit,
+            configured_keys,
+        )
         remaining_spells = remaining_spells[:smoke_limit]
     elif max_queries > 0:
         logger.info("MAX QUERIES MODE: Limiting workload to %d queries.", max_queries)
@@ -292,7 +366,10 @@ def run_backfill_remote(
 
     # If nothing to process, build master manifest and return
     if not remaining_spells and len(completed_spells) >= total_spells:
-        logger.info("All %d spells already completed! Building final master manifest...", total_spells)
+        logger.info(
+            "All %d spells already completed! Building final master manifest...",
+            total_spells,
+        )
         return _finalize_backfill(
             vol_root=vol_root,
             checkpoints_dir=checkpoints_dir,
@@ -305,24 +382,26 @@ def run_backfill_remote(
             git_commit=git_commit,
             logger=logger,
             start_ts=time.time(),
-            elapsed_sec=0.0
+            elapsed_sec=0.0,
         )
 
     # 9. Initialize Trading Sessions & Worker Pool
     sys.path.insert(0, "/root")
     from src.common.config import TRADING_SESSIONS_PATH
-    from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool as ConcurrentKeyWorkerPoolV3
+    from src.identity.massive.worker_pool import (
+        ConcurrentKeyWorkerPool as ConcurrentKeyWorkerPoolV3,
+    )
 
     pool = ConcurrentKeyWorkerPoolV3(
         min_per_key_interval=PER_KEY_INTERVAL_SECONDS,
         logger=logger,
         cache_dir=cache_dir,
-        api_keys=[k for _, k in key_slots]
+        api_keys=[k for _, k in key_slots],
     )
 
     df_sessions = pl.read_parquet(TRADING_SESSIONS_PATH)
-    all_sessions: List[str] = df_sessions["session_date"].to_list()
-    session_to_idx: Dict[str, int] = {d: i for i, d in enumerate(all_sessions)}
+    all_sessions: list[str] = df_sessions["session_date"].to_list()
+    session_to_idx: dict[str, int] = {d: i for i, d in enumerate(all_sessions)}
 
     def get_midpoint(s_date: str, e_date: str) -> str:
         s_i = session_to_idx.get(s_date)
@@ -337,7 +416,7 @@ def run_backfill_remote(
         work_queue.put(s)
 
     results_lock = threading.Lock()
-    newly_completed_records: List[Dict[str, Any]] = []
+    newly_completed_records: list[dict[str, Any]] = []
     chunk_counter = [len(list(checkpoints_dir.glob("checkpoint_*.parquet")))]
 
     # Progress tracking counters
@@ -373,7 +452,12 @@ def run_backfill_remote(
                 rep_date = mid_date
                 rep_method = "MIDPOINT_SESSION"
 
-                m_match, telem = pool.query(clean_tk, mid_date, spell_id=spell_id, preferred_worker_idx=worker_idx)
+                m_match, telem = pool.query(
+                    clean_tk,
+                    mid_date,
+                    spell_id=spell_id,
+                    preferred_worker_idx=worker_idx,
+                )
                 l1_status = telem.get("outcome", "UNKNOWN")
 
                 if telem.get("cached"):
@@ -391,14 +475,21 @@ def run_backfill_remote(
                 level2_end_match = None
 
                 # Level 2 Corroboration: Start / End dates if Level 1 is empty or weak
-                needs_l2 = (
-                    l1_status in ("MASSIVE_EMPTY", "NOT_FOUND") or
-                    (l1_status == "SUCCESS" and m_match and not m_match.get("share_class_figi") and not m_match.get("cik"))
+                needs_l2 = l1_status in ("MASSIVE_EMPTY", "NOT_FOUND") or (
+                    l1_status == "SUCCESS"
+                    and m_match
+                    and not m_match.get("share_class_figi")
+                    and not m_match.get("cik")
                 )
 
                 if needs_l2 and (s_date != mid_date or e_date != mid_date):
                     if s_date != mid_date:
-                        level2_start_match, s_telem = pool.query(clean_tk, s_date, spell_id=spell_id, preferred_worker_idx=worker_idx)
+                        level2_start_match, s_telem = pool.query(
+                            clean_tk,
+                            s_date,
+                            spell_id=spell_id,
+                            preferred_worker_idx=worker_idx,
+                        )
                         l2_s_status = s_telem.get("outcome", "UNKNOWN")
                         if s_telem.get("cached"):
                             with results_lock:
@@ -408,7 +499,12 @@ def run_backfill_remote(
                                 stat_live_reqs[0] += 1
 
                     if e_date != mid_date:
-                        level2_end_match, e_telem = pool.query(clean_tk, e_date, spell_id=spell_id, preferred_worker_idx=worker_idx)
+                        level2_end_match, e_telem = pool.query(
+                            clean_tk,
+                            e_date,
+                            spell_id=spell_id,
+                            preferred_worker_idx=worker_idx,
+                        )
                         l2_e_status = e_telem.get("outcome", "UNKNOWN")
                         if e_telem.get("cached"):
                             with results_lock:
@@ -418,12 +514,18 @@ def run_backfill_remote(
                                 stat_live_reqs[0] += 1
 
                     if not m_match or l1_status == "MASSIVE_EMPTY":
-                        if level2_start_match and (level2_start_match.get("cik") or level2_start_match.get("share_class_figi")):
+                        if level2_start_match and (
+                            level2_start_match.get("cik")
+                            or level2_start_match.get("share_class_figi")
+                        ):
                             m_match = level2_start_match
                             rep_date = s_date
                             rep_method = "BOUNDARY_START_FALLBACK"
                             telem = s_telem
-                        elif level2_end_match and (level2_end_match.get("cik") or level2_end_match.get("share_class_figi")):
+                        elif level2_end_match and (
+                            level2_end_match.get("cik")
+                            or level2_end_match.get("share_class_figi")
+                        ):
                             m_match = level2_end_match
                             rep_date = e_date
                             rep_method = "BOUNDARY_END_FALLBACK"
@@ -442,7 +544,11 @@ def run_backfill_remote(
 
                 if len(evidence_points) >= 2:
                     ciks = {p[2].get("cik") for p in evidence_points if p[2].get("cik")}
-                    figis = {p[2].get("share_class_figi") or p[2].get("composite_figi") for p in evidence_points if (p[2].get("share_class_figi") or p[2].get("composite_figi"))}
+                    figis = {
+                        p[2].get("share_class_figi") or p[2].get("composite_figi")
+                        for p in evidence_points
+                        if (p[2].get("share_class_figi") or p[2].get("composite_figi"))
+                    }
                     if len(ciks) > 1 or len(figis) > 1:
                         drift_detected = True
                         drift_details = f"Boundary divergence: CIKs={list(ciks)}, FIGIs={list(figis)}"
@@ -455,8 +561,16 @@ def run_backfill_remote(
                     with results_lock:
                         stat_failures[0] += 1
 
-                m_cik = str(m_match.get("cik")).zfill(10) if (m_match and m_match.get("cik")) else None
-                m_figi = (m_match.get("share_class_figi") or m_match.get("composite_figi")) if m_match else None
+                m_cik = (
+                    str(m_match.get("cik")).zfill(10)
+                    if (m_match and m_match.get("cik"))
+                    else None
+                )
+                m_figi = (
+                    (m_match.get("share_class_figi") or m_match.get("composite_figi"))
+                    if m_match
+                    else None
+                )
                 m_comp = m_match.get("composite_figi") if m_match else None
                 m_name = m_match.get("name") if m_match else None
                 m_type = m_match.get("type") if m_match else None
@@ -476,8 +590,12 @@ def run_backfill_remote(
                     "cache_status": "HIT" if telem.get("cached") else "MISS",
                     "attempt_count": 1,
                     "worker_slot": worker_id,
-                    "completion_timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    "error_category": "NONE" if outcome in ("SUCCESS", "MASSIVE_EMPTY") else outcome,
+                    "completion_timestamp": datetime.datetime.now(
+                        datetime.UTC
+                    ).isoformat(),
+                    "error_category": "NONE"
+                    if outcome in ("SUCCESS", "MASSIVE_EMPTY")
+                    else outcome,
                     "massive_cik": m_cik,
                     "massive_figi": m_figi,
                     "massive_composite_figi": m_comp,
@@ -502,29 +620,38 @@ def run_backfill_remote(
                             records=newly_completed_records,
                             checkpoints_dir=checkpoints_dir,
                             chunk_idx=chunk_counter[0],
-                            logger=logger
+                            logger=logger,
                         )
                         chunk_counter[0] += 1
                         newly_completed_records.clear()
                         volume.commit()
 
             except Exception as exc:
-                logger.error("[Worker %s] Unexpected exception on spell %s: %s", worker_id, s.get("ticker"), exc)
-                err_spell_id = f"{s.get('ticker', 'UNKNOWN').strip()}_{s.get('spell_seq', 1)}"
+                logger.exception(
+                    "[Worker %s] Unexpected exception on spell %s",
+                    worker_id,
+                    s.get("ticker"),
+                )
+                err_spell_id = (
+                    f"{s.get('ticker', 'UNKNOWN').strip()}_{s.get('spell_seq', 1)}"
+                )
                 err_rec = {
                     "spell_id": err_spell_id,
                     "ticker": s.get("ticker", "UNKNOWN").strip(),
                     "spell_seq": s.get("spell_seq", 1),
                     "start_date": s.get("start_date", ""),
                     "end_date": s.get("end_date", ""),
-                    "duration_sessions": s.get("n_sessions") or s.get("duration_sessions", 1),
+                    "duration_sessions": s.get("n_sessions")
+                    or s.get("duration_sessions", 1),
                     "representative_date": s.get("start_date", ""),
                     "representative_date_method": "FAILED_EXCEPTION",
                     "lookup_status": "WORKER_EXCEPTION",
                     "cache_status": "NONE",
                     "attempt_count": 1,
                     "worker_slot": worker_id,
-                    "completion_timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "completion_timestamp": datetime.datetime.now(
+                        datetime.UTC
+                    ).isoformat(),
                     "error_category": f"EXCEPTION: {type(exc).__name__}",
                     "massive_cik": None,
                     "massive_figi": None,
@@ -568,7 +695,7 @@ def run_backfill_remote(
                         records=newly_completed_records,
                         checkpoints_dir=checkpoints_dir,
                         chunk_idx=chunk_counter[0],
-                        logger=logger
+                        logger=logger,
                     )
                     chunk_counter[0] += 1
                     newly_completed_records.clear()
@@ -576,7 +703,12 @@ def run_backfill_remote(
 
             logger.info("------------------------------------------------------------")
             logger.info("V3 MODAL MASSIVE PIT BACKFILL HEARTBEAT")
-            logger.info("Completed       : %d / %d (%.2f%%)", done, total_spells, (done / total_spells * 100))
+            logger.info(
+                "Completed       : %d / %d (%.2f%%)",
+                done,
+                total_spells,
+                (done / total_spells * 100),
+            )
             logger.info("Remaining       : %d", rem)
             logger.info("Cache Hits      : %d", hits)
             logger.info("Live Requests   : %d", live)
@@ -589,7 +721,7 @@ def run_backfill_remote(
             logger.info("------------------------------------------------------------")
 
     # Launch threads
-    threads: List[threading.Thread] = []
+    threads: list[threading.Thread] = []
     hb_thread = threading.Thread(target=heartbeat_reporter, daemon=True)
     hb_thread.start()
 
@@ -613,7 +745,7 @@ def run_backfill_remote(
                 records=newly_completed_records,
                 checkpoints_dir=checkpoints_dir,
                 chunk_idx=chunk_counter[0],
-                logger=logger
+                logger=logger,
             )
             chunk_counter[0] += 1
             newly_completed_records.clear()
@@ -635,24 +767,30 @@ def run_backfill_remote(
         logger=logger,
         start_ts=t_start,
         elapsed_sec=total_elapsed,
-        telemetry_obj=pool.telemetry
+        telemetry_obj=pool.telemetry,
     )
 
 
 def _flush_checkpoint(
-    records: List[Dict[str, Any]],
+    records: list[dict[str, Any]],
     checkpoints_dir: Path,
     chunk_idx: int,
-    logger: logging.Logger
+    logger: logging.Logger,
 ):
     """Writes a checkpoint chunk atomically to parquet."""
     import polars as pl
+
     chk_file = checkpoints_dir / f"checkpoint_{chunk_idx:05d}.parquet"
     tmp_file = chk_file.with_suffix(".parquet.tmp")
     df_chk = pl.DataFrame(records, schema=MANIFEST_SCHEMA)
     df_chk.write_parquet(tmp_file)
     tmp_file.replace(chk_file)
-    logger.info("Persisted checkpoint chunk %d (%d spells) -> %s", chunk_idx, df_chk.height, chk_file.name)
+    logger.info(
+        "Persisted checkpoint chunk %d (%d spells) -> %s",
+        chunk_idx,
+        df_chk.height,
+        chk_file.name,
+    )
 
 
 def _finalize_backfill(
@@ -668,13 +806,15 @@ def _finalize_backfill(
     logger: logging.Logger,
     start_ts: float,
     elapsed_sec: float,
-    telemetry_obj: Any = None
-) -> Dict[str, Any]:
+    telemetry_obj: Any = None,
+) -> dict[str, Any]:
     """Concatenates checkpoints, runs validation checks, and saves manifests."""
     import polars as pl
 
-    chk_files = sorted(list(checkpoints_dir.glob("checkpoint_*.parquet")))
-    logger.info("Concatenating %d checkpoint chunks into master manifest...", len(chk_files))
+    chk_files = sorted(checkpoints_dir.glob("checkpoint_*.parquet"))
+    logger.info(
+        "Concatenating %d checkpoint chunks into master manifest...", len(chk_files)
+    )
     if not chk_files:
         raise RuntimeError("No checkpoints found to build master manifest")
 
@@ -685,16 +825,26 @@ def _finalize_backfill(
     tmp_master = master_manifest_path.with_suffix(".parquet.tmp")
     df_master.write_parquet(tmp_master)
     tmp_master.replace(master_manifest_path)
-    logger.info("Wrote master manifest (%d rows) to %s", df_master.height, master_manifest_path)
+    logger.info(
+        "Wrote master manifest (%d rows) to %s", df_master.height, master_manifest_path
+    )
 
     # Validation Checks
     unaccounted = total_spells - df_master.height
-    logger.info("Master Manifest Accounting: %d / %d (unaccounted: %d)",
-                df_master.height, total_spells, unaccounted)
+    logger.info(
+        "Master Manifest Accounting: %d / %d (unaccounted: %d)",
+        df_master.height,
+        total_spells,
+        unaccounted,
+    )
 
     # Save Telemetry
     telem_summary = telemetry_obj.get_summary() if telemetry_obj else {}
-    df_telem = pl.DataFrame(telemetry_obj.records) if telemetry_obj and telemetry_obj.records else pl.DataFrame()
+    df_telem = (
+        pl.DataFrame(telemetry_obj.records)
+        if telemetry_obj and telemetry_obj.records
+        else pl.DataFrame()
+    )
     telem_parquet = telemetry_dir / "worker_telemetry.parquet"
     if df_telem.height > 0:
         df_telem.write_parquet(telem_parquet)
@@ -705,8 +855,10 @@ def _finalize_backfill(
     cache_items = len(list((vol_root / "cache" / "massive").glob("*.json")))
     manifest_payload = {
         "run_id": f"modal_v3_{int(time.time())}",
-        "start_time": datetime.datetime.fromtimestamp(start_ts, tz=datetime.timezone.utc).isoformat(),
-        "end_time": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "start_time": datetime.datetime.fromtimestamp(
+            start_ts, tz=datetime.UTC
+        ).isoformat(),
+        "end_time": datetime.datetime.now(datetime.UTC).isoformat(),
         "git_commit": git_commit,
         "spells_sha256": spells_hash,
         "spell_count": total_spells,
@@ -716,11 +868,23 @@ def _finalize_backfill(
         "cache_items": cache_items,
         "live_requests": telem_summary.get("global_live_requests", 0),
         "cache_hits": telem_summary.get("global_cache_hits", 0),
-        "empty_results": df_master.filter(pl.col("lookup_status") == "MASSIVE_EMPTY").height,
-        "successful_results": df_master.filter(pl.col("lookup_status") == "SUCCESS").height,
-        "failed_requests": df_master.filter(~pl.col("lookup_status").is_in(["SUCCESS", "MASSIVE_EMPTY", "OFFLINE_PENDING"])).height,
-        "drift_cases_detected": df_master.filter(pl.col("drift_detected") == True).height,
-        "observed_throughput_rpm": (df_master.height / (elapsed_sec / 60.0)) if elapsed_sec > 0 else 0.0,
+        "empty_results": df_master.filter(
+            pl.col("lookup_status") == "MASSIVE_EMPTY"
+        ).height,
+        "successful_results": df_master.filter(
+            pl.col("lookup_status") == "SUCCESS"
+        ).height,
+        "failed_requests": df_master.filter(
+            ~pl.col("lookup_status").is_in(
+                ["SUCCESS", "MASSIVE_EMPTY", "OFFLINE_PENDING"]
+            )
+        ).height,
+        "drift_cases_detected": df_master.filter(
+            pl.col("drift_detected") == True
+        ).height,
+        "observed_throughput_rpm": (df_master.height / (elapsed_sec / 60.0))
+        if elapsed_sec > 0
+        else 0.0,
         "elapsed_seconds": elapsed_sec,
         "modal_volume": VOLUME_NAME,
         "status": "COMPLETED" if unaccounted == 0 else "PARTIAL",
@@ -734,25 +898,27 @@ def _finalize_backfill(
     summary_md = f"""# Modal V3 Massive PIT Backfill Execution Summary
 
 ## 1. Overview
-- **Status**: `{manifest_payload['status']}`
+- **Status**: `{manifest_payload["status"]}`
 - **Spells Accounted For**: **{df_master.height:,} / {total_spells:,}** (100.00%)
 - **Spells Input SHA-256**: `{spells_hash}`
 - **Configured Key Slots**: **{configured_keys}**
 - **Git Commit**: `{git_commit}`
-- **Elapsed Time**: {elapsed_sec:.2f} seconds ({elapsed_sec/3600.0:.2f} hours)
+- **Elapsed Time**: {elapsed_sec:.2f} seconds ({elapsed_sec / 3600.0:.2f} hours)
 - **Modal Volume**: `{VOLUME_NAME}`
 
 ## 2. Evidence Breakdown
-- **Successful Lookups**: **{manifest_payload['successful_results']:,}**
-- **Massive Empty Lookups**: **{manifest_payload['empty_results']:,}**
-- **Within-Spell Drift Detected**: **{manifest_payload['drift_cases_detected']:,}**
+- **Successful Lookups**: **{manifest_payload["successful_results"]:,}**
+- **Massive Empty Lookups**: **{manifest_payload["empty_results"]:,}**
+- **Within-Spell Drift Detected**: **{manifest_payload["drift_cases_detected"]:,}**
 - **Persistent Cache Items**: **{cache_items:,}**
 """
     (logs_dir / "v3_modal_summary.md").write_text(summary_md, encoding="utf-8")
 
     # Final Volume Commit
     volume.commit()
-    logger.info("Volume commit completed. All artifacts securely saved on '%s'.", VOLUME_NAME)
+    logger.info(
+        "Volume commit completed. All artifacts securely saved on '%s'.", VOLUME_NAME
+    )
     return manifest_payload
 
 
@@ -764,7 +930,7 @@ def main(
     dry_run: bool = False,
     smoke_test: bool = False,
     max_queries: int = 0,
-    resume: bool = True
+    resume: bool = True,
 ):
     """Local entrypoint called via `modal run src/identity/v3/modal_backfill.py`."""
     print("=" * 80)
@@ -780,10 +946,7 @@ def main(
     print("-" * 80)
 
     res = run_backfill_remote.remote(
-        dry_run=dry_run,
-        smoke_test=smoke_test,
-        max_queries=max_queries,
-        resume=resume
+        dry_run=dry_run, smoke_test=smoke_test, max_queries=max_queries, resume=resume
     )
 
     print("-" * 80)

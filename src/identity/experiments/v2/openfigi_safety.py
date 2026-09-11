@@ -11,36 +11,43 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import polars as pl
 
-from src.identity.resolver.model import (
-    IdentityStatus,
-    are_names_consistent,
-    extract_entity_tokens,
-    make_provisional_cik_id,
-    make_deterministic_unresolved_id,
-)
 from src.identity.massive.worker_pool import ConcurrentKeyWorkerPool
+from src.identity.resolver.model import (
+    are_names_consistent,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 SPELLS_PATH = REPO_ROOT / "data" / "universe" / "spells.csv"
 OUT_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "v2"
-SEC_CACHE_PATH = REPO_ROOT / "data" / "identity" / "experiments" / "resolver_v1" / "api_cache" / "sec" / "company_tickers_exchange.json"
+SEC_CACHE_PATH = (
+    REPO_ROOT
+    / "data"
+    / "identity"
+    / "experiments"
+    / "resolver_v1"
+    / "api_cache"
+    / "sec"
+    / "company_tickers_exchange.json"
+)
 OPENFIGI_CACHE_PATH = REPO_ROOT / "data" / "raw" / "openfigi" / "openfigi_cache.parquet"
 
 OUT_PARQUET = OUT_DIR / "openfigi_temporal_safety.parquet"
 OUT_MD = OUT_DIR / "openfigi_temporal_safety.md"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("openfigi_safety")
 
 
-def load_sec_mapping() -> Dict[str, Dict[str, Any]]:
+def load_sec_mapping() -> dict[str, dict[str, Any]]:
     sec_map = {}
     if SEC_CACHE_PATH.exists():
-        with open(SEC_CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(SEC_CACHE_PATH, encoding="utf-8") as f:
             d = json.load(f)
         fields = d.get("fields", [])
         rows = d.get("data", [])
@@ -49,12 +56,12 @@ def load_sec_mapping() -> Dict[str, Dict[str, Any]]:
             sec_map[tk.upper()] = {
                 "cik": str(r[fields.index("cik")]).zfill(10),
                 "name": r[fields.index("name")],
-                "exchange": r[fields.index("exchange")]
+                "exchange": r[fields.index("exchange")],
             }
     return sec_map
 
 
-def load_openfigi_mapping() -> Dict[str, Dict[str, Any]]:
+def load_openfigi_mapping() -> dict[str, dict[str, Any]]:
     figi_map = {}
     if OPENFIGI_CACHE_PATH.exists():
         df_of = pl.read_parquet(OPENFIGI_CACHE_PATH)
@@ -62,7 +69,7 @@ def load_openfigi_mapping() -> Dict[str, Dict[str, Any]]:
             figi_map[r["query_ticker"].upper()] = {
                 "share_class_figi": r.get("top_share_class_figi"),
                 "name": r.get("top_name"),
-                "sec_type": r.get("top_security_type")
+                "sec_type": r.get("top_security_type"),
             }
     return figi_map
 
@@ -80,14 +87,38 @@ def run_openfigi_safety_test():
     logger.info("Loaded %d total universe spells.", df_spells.height)
 
     # Focus on multi-spell tickers and negative control tickers where reuse is prominent
-    multi_spell_counts = df_spells.group_by("ticker").agg(pl.len().alias("spell_count")).filter(pl.col("spell_count") > 1)
+    multi_spell_counts = (
+        df_spells.group_by("ticker")
+        .agg(pl.len().alias("spell_count"))
+        .filter(pl.col("spell_count") > 1)
+    )
     multi_tickers = set(multi_spell_counts["ticker"].to_list())
 
-    controls = ["ACMR", "AAC", "MON", "META", "AAA", "CMCSA", "SIVB", "CELG", "FRC", "NOW", "SHOP", "TWTR", "BBBY"]
-    sample_tickers = sorted(list(set(controls).union(set(list(multi_tickers)[:60]))))
+    controls = [
+        "ACMR",
+        "AAC",
+        "MON",
+        "META",
+        "AAA",
+        "CMCSA",
+        "SIVB",
+        "CELG",
+        "FRC",
+        "NOW",
+        "SHOP",
+        "TWTR",
+        "BBBY",
+    ]
+    sample_tickers = sorted(set(controls).union(set(list(multi_tickers)[:60])))
 
-    df_sample = df_spells.filter(pl.col("ticker").is_in(sample_tickers)).sort(["ticker", "spell_seq"])
-    logger.info("Evaluating OpenFIGI temporal safety across %d spells in %d tickers...", df_sample.height, len(sample_tickers))
+    df_sample = df_spells.filter(pl.col("ticker").is_in(sample_tickers)).sort(
+        ["ticker", "spell_seq"]
+    )
+    logger.info(
+        "Evaluating OpenFIGI temporal safety across %d spells in %d tickers...",
+        df_sample.height,
+        len(sample_tickers),
+    )
 
     rows = []
     for s in df_sample.iter_rows(named=True):
@@ -114,13 +145,17 @@ def run_openfigi_safety_test():
 
         # Evaluate Temporal Divergence
         # Does contemporary OpenFIGI represent the contemporary SEC entity rather than historical Massive entity?
-        has_massive = (m_cik is not None or m_figi is not None)
-        has_openfigi = (of_figi is not None)
-        has_sec = (sec_cik is not None)
+        has_massive = m_cik is not None or m_figi is not None
+        has_openfigi = of_figi is not None
+        has_sec = sec_cik is not None
 
         cik_matches_sec = (m_cik == sec_cik) if (m_cik and sec_cik) else None
-        name_matches_openfigi = are_names_consistent(m_name, of_name) if (m_name and of_name) else None
-        openfigi_matches_sec = are_names_consistent(of_name, sec_name) if (of_name and sec_name) else None
+        name_matches_openfigi = (
+            are_names_consistent(m_name, of_name) if (m_name and of_name) else None
+        )
+        openfigi_matches_sec = (
+            are_names_consistent(of_name, sec_name) if (of_name and sec_name) else None
+        )
 
         # Determine if OpenFIGI is contemporary-contaminated
         is_contaminated = False
@@ -145,46 +180,55 @@ def run_openfigi_safety_test():
         # In V2: OpenFIGI is strictly rejected if CIK diverges from SEC or if name diverges
         v2_accepted_openfigi = False
         if has_openfigi and has_massive:
-            if m_figi and m_figi == of_figi:
-                v2_accepted_openfigi = True
-            elif m_cik and sec_cik and m_cik == sec_cik and (name_matches_openfigi or openfigi_matches_sec):
+            if (
+                m_figi
+                and m_figi == of_figi
+                or m_cik
+                and sec_cik
+                and m_cik == sec_cik
+                and (name_matches_openfigi or openfigi_matches_sec)
+            ):
                 v2_accepted_openfigi = True
 
         v2_false_merge = False  # V2 never accepts uncorroborated contemporary OpenFIGI
         if is_contaminated and v2_accepted_openfigi:
             v2_false_merge = True
 
-        rows.append({
-            "ticker": tk,
-            "spell_seq": seq,
-            "start_date": s_date,
-            "end_date": e_date,
-            "duration_sessions": dur,
-            "massive_cik": m_cik,
-            "massive_figi": m_figi,
-            "massive_name": m_name,
-            "openfigi_figi": of_figi,
-            "openfigi_name": of_name,
-            "sec_cik": sec_cik,
-            "sec_name": sec_name,
-            "has_massive": has_massive,
-            "has_openfigi": has_openfigi,
-            "has_sec": has_sec,
-            "cik_matches_sec": cik_matches_sec,
-            "name_matches_openfigi": name_matches_openfigi,
-            "openfigi_matches_sec": openfigi_matches_sec,
-            "is_contaminated": is_contaminated,
-            "contamination_type": contamination_type,
-            "v1_assigned_figi": v1_assigned_figi,
-            "v1_false_merge": v1_false_merge,
-            "v2_accepted_openfigi": v2_accepted_openfigi,
-            "v2_false_merge": v2_false_merge,
-        })
+        rows.append(
+            {
+                "ticker": tk,
+                "spell_seq": seq,
+                "start_date": s_date,
+                "end_date": e_date,
+                "duration_sessions": dur,
+                "massive_cik": m_cik,
+                "massive_figi": m_figi,
+                "massive_name": m_name,
+                "openfigi_figi": of_figi,
+                "openfigi_name": of_name,
+                "sec_cik": sec_cik,
+                "sec_name": sec_name,
+                "has_massive": has_massive,
+                "has_openfigi": has_openfigi,
+                "has_sec": has_sec,
+                "cik_matches_sec": cik_matches_sec,
+                "name_matches_openfigi": name_matches_openfigi,
+                "openfigi_matches_sec": openfigi_matches_sec,
+                "is_contaminated": is_contaminated,
+                "contamination_type": contamination_type,
+                "v1_assigned_figi": v1_assigned_figi,
+                "v1_false_merge": v1_false_merge,
+                "v2_accepted_openfigi": v2_accepted_openfigi,
+                "v2_false_merge": v2_false_merge,
+            }
+        )
 
     df_res = pl.DataFrame(rows)
     OUT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     df_res.write_parquet(OUT_PARQUET)
-    logger.info("Saved OpenFIGI safety parquet to %s (%d rows)", OUT_PARQUET, df_res.height)
+    logger.info(
+        "Saved OpenFIGI safety parquet to %s (%d rows)", OUT_PARQUET, df_res.height
+    )
 
     # Compute aggregate statistics
     total_spells = df_res.height
@@ -254,7 +298,9 @@ Resolver V2 codifies the following inviolable rules:
 | Ticker | Spell | Start Date | End Date | Massive CIK | Massive Name | OpenFIGI Name | V1 Assigned FIGI | V1 Status | V2 Assigned ID | V2 Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 """
-    for r in df_res.filter(pl.col("is_contaminated") == True).head(10).iter_rows(named=True):
+    for r in (
+        df_res.filter(pl.col("is_contaminated") == True).head(10).iter_rows(named=True)
+    ):
         report_md += f"| {r['ticker']} | {r['spell_seq']} | {r['start_date']} | {r['end_date']} | {r['massive_cik']} | {r['massive_name']} | {r['openfigi_name']} | {r['v1_assigned_figi']} | {'FALSE_MERGE' if r['v1_false_merge'] else 'OK'} | PROVISIONAL | PASS |\n"
 
     report_md += "\n**Conclusion**: V2 completely eliminates contemporary OpenFIGI contamination and prevents 100% of historical ticker-reuse false merges.\n"

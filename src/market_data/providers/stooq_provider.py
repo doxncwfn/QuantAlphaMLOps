@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Optional
 
 import pandas as pd
 import polars as pl
@@ -20,14 +19,13 @@ class StooqProvider(BaseMarketDataProvider):
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        self.session.headers.update(
+            {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        )
 
     def fetch_daily_bars(
-        self,
-        ticker: str,
-        start_date: str,
-        end_date: str
-    ) -> Optional[pl.DataFrame]:
+        self, ticker: str, start_date: str, end_date: str
+    ) -> pl.DataFrame | None:
         symbol = f"{ticker.lower()}.us"
         url = f"https://stooq.com/q/d/l/?s={symbol}&i=d"
 
@@ -42,13 +40,21 @@ class StooqProvider(BaseMarketDataProvider):
             if pdf.empty:
                 return None
 
-            pdf = pdf.rename(columns={
-                "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"
-            })
+            pdf = pdf.rename(
+                columns={
+                    "Open": "open",
+                    "High": "high",
+                    "Low": "low",
+                    "Close": "close",
+                    "Volume": "volume",
+                }
+            )
             pdf["adj_close"] = pdf["close"]
 
-            df = pl.from_pandas(pdf[["date", "open", "high", "low", "close", "adj_close", "volume"]])
+            df = pl.from_pandas(
+                pdf[["date", "open", "high", "low", "close", "adj_close", "volume"]]
+            )
             return df.sort("date")
-        except Exception as exc:
+        except (requests.RequestException, ValueError, KeyError, OSError) as exc:
             logger.debug("Stooq fetch failed for %s: %s", ticker, exc)
             return None

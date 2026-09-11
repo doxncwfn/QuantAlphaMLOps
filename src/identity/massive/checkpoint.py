@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import polars as pl
 
@@ -51,36 +51,40 @@ class CheckpointManager:
 
     def __init__(
         self,
-        checkpoints_dir: Optional[Path] = None,
-        master_manifest_path: Optional[Path] = None,
-        logger: Optional[logging.Logger] = None,
+        checkpoints_dir: Path | None = None,
+        master_manifest_path: Path | None = None,
+        logger: logging.Logger | None = None,
     ):
         self.checkpoints_dir = checkpoints_dir or (MANIFESTS_DIR / "checkpoints")
-        self.master_manifest_path = master_manifest_path or (MANIFESTS_DIR / "massive_manifest.parquet")
+        self.master_manifest_path = master_manifest_path or (
+            MANIFESTS_DIR / "massive_manifest.parquet"
+        )
         self.logger = logger or logging.getLogger("checkpoint_manager")
         self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
         self.master_manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def load_completed_spells(self) -> Dict[str, Dict[str, Any]]:
+    def load_completed_spells(self) -> dict[str, dict[str, Any]]:
         """Scans and reads existing checkpoint files to discover already-completed spells."""
-        completed: Dict[str, Dict[str, Any]] = {}
-        chk_files = sorted(list(self.checkpoints_dir.glob("checkpoint_*.parquet")))
+        completed: dict[str, dict[str, Any]] = {}
+        chk_files = sorted(self.checkpoints_dir.glob("checkpoint_*.parquet"))
         if not chk_files:
             return completed
 
-        self.logger.info("Found %d checkpoint chunks. Loading completed records...", len(chk_files))
+        self.logger.info(
+            "Found %d checkpoint chunks. Loading completed records...", len(chk_files)
+        )
         for f in chk_files:
             try:
                 df = pl.read_parquet(f)
                 for r in df.iter_rows(named=True):
                     completed[r["spell_id"]] = r
-            except Exception as e:
+            except (OSError, pl.exceptions.PolarsError, RuntimeError, ValueError) as e:
                 self.logger.warning("Could not read checkpoint %s: %s", f.name, e)
 
         self.logger.info("Loaded %d completed spells from checkpoints.", len(completed))
         return completed
 
-    def save_checkpoint(self, records: List[Dict[str, Any]], chunk_index: int) -> Path:
+    def save_checkpoint(self, records: list[dict[str, Any]], chunk_index: int) -> Path:
         """Atomically saves a batch of processed spell records to a checkpoint file."""
         df = pl.DataFrame(records, schema=MANIFEST_SCHEMA)
         target = self.checkpoints_dir / f"checkpoint_{chunk_index:05d}.parquet"
@@ -90,13 +94,19 @@ class CheckpointManager:
 
     def merge_all_checkpoints(self) -> pl.DataFrame:
         """Concatenates, deduplicates, and saves all checkpoints into master manifest."""
-        chk_files = sorted(list(self.checkpoints_dir.glob("checkpoint_*.parquet")))
+        chk_files = sorted(self.checkpoints_dir.glob("checkpoint_*.parquet"))
         if not chk_files:
-            raise FileNotFoundError(f"No checkpoint files found in {self.checkpoints_dir}")
+            raise FileNotFoundError(
+                f"No checkpoint files found in {self.checkpoints_dir}"
+            )
 
         frames = [pl.read_parquet(f) for f in chk_files]
         merged = pl.concat(frames).unique(subset=["spell_id"], keep="last")
         merged = merged.sort(["ticker", "spell_seq"])
         atomic_write_parquet(merged, self.master_manifest_path)
-        self.logger.info("Wrote master manifest (%d rows) -> %s", merged.height, self.master_manifest_path)
+        self.logger.info(
+            "Wrote master manifest (%d rows) -> %s",
+            merged.height,
+            self.master_manifest_path,
+        )
         return merged

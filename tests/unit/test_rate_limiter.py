@@ -16,7 +16,9 @@ class TestRateLimiter(unittest.TestCase):
         self.assertGreaterEqual(elapsed, 0.045)
 
     def test_backoff_handling(self):
-        limiter = PerKeyRateLimiter(initial_backoff_seconds=0.01, max_backoff_seconds=0.1)
+        limiter = PerKeyRateLimiter(
+            initial_backoff_seconds=0.01, max_backoff_seconds=0.1
+        )
         dur1 = limiter.handle_rate_limit()
         self.assertGreater(dur1, 0.0)
 

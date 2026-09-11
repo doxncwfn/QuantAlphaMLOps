@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import polars as pl
@@ -23,13 +22,10 @@ class YFinanceProvider(BaseMarketDataProvider):
         self.cache_dir = cache_dir
 
     def fetch_daily_bars(
-        self,
-        ticker: str,
-        start_date: str,
-        end_date: str
-    ) -> Optional[pl.DataFrame]:
+        self, ticker: str, start_date: str, end_date: str
+    ) -> pl.DataFrame | None:
         tk_clean = ticker.strip().upper()
-        
+
         # 1. Check existing local yfinance_cache
         cache_file = self.cache_dir / f"{tk_clean}.parquet"
         if cache_file.exists():
@@ -38,24 +34,35 @@ class YFinanceProvider(BaseMarketDataProvider):
                 if df.height > 0:
                     col_map = {c: c.lower().replace(" ", "_") for c in df.columns}
                     df = df.rename(col_map)
-                    if "date" in df.columns and df["date"].dtype in (pl.Datetime, pl.Date):
+                    if "date" in df.columns and df["date"].dtype in (
+                        pl.Datetime,
+                        pl.Date,
+                    ):
                         df = df.with_columns(pl.col("date").dt.strftime("%Y-%m-%d"))
 
                     filtered = df.filter(
                         (pl.col("date") >= start_date) & (pl.col("date") <= end_date)
                     )
                     if filtered.height > 0:
-                        return filtered.select([
-                            pl.col("date").cast(pl.Utf8),
-                            pl.col("open").cast(pl.Float64),
-                            pl.col("high").cast(pl.Float64),
-                            pl.col("low").cast(pl.Float64),
-                            pl.col("close").cast(pl.Float64),
-                            pl.col("adj_close").cast(pl.Float64) if "adj_close" in filtered.columns else pl.col("close").cast(pl.Float64).alias("adj_close"),
-                            pl.col("volume").cast(pl.Float64)
-                        ])
-            except Exception as e:
-                logger.warning("Error reading cached yfinance parquet for %s: %s", tk_clean, e)
+                        return filtered.select(
+                            [
+                                pl.col("date").cast(pl.Utf8),
+                                pl.col("open").cast(pl.Float64),
+                                pl.col("high").cast(pl.Float64),
+                                pl.col("low").cast(pl.Float64),
+                                pl.col("close").cast(pl.Float64),
+                                pl.col("adj_close").cast(pl.Float64)
+                                if "adj_close" in filtered.columns
+                                else pl.col("close")
+                                .cast(pl.Float64)
+                                .alias("adj_close"),
+                                pl.col("volume").cast(pl.Float64),
+                            ]
+                        )
+            except (OSError, pl.exceptions.PolarsError, KeyError, ValueError) as e:
+                logger.warning(
+                    "Error reading cached yfinance parquet for %s: %s", tk_clean, e
+                )
 
         # 2. Query yfinance API
         yf_symbol = tk_clean.replace(".", "-")
@@ -65,7 +72,7 @@ class YFinanceProvider(BaseMarketDataProvider):
                 start=start_date,
                 end=end_date,
                 auto_adjust=False,
-                progress=False
+                progress=False,
             )
             if pdf is None or pdf.empty:
                 return None
@@ -87,16 +94,24 @@ class YFinanceProvider(BaseMarketDataProvider):
                 "Low": "low",
                 "Close": "close",
                 "Adj Close": "adj_close",
-                "Volume": "volume"
+                "Volume": "volume",
             }
             pdf = pdf.rename(columns=cols_map)
-            
+
             if "adj_close" not in pdf.columns:
                 pdf["adj_close"] = pdf["close"]
 
-            df = pl.from_pandas(pdf[["date", "open", "high", "low", "close", "adj_close", "volume"]])
+            df = pl.from_pandas(
+                pdf[["date", "open", "high", "low", "close", "adj_close", "volume"]]
+            )
             return df
 
-        except Exception as exc:
+        except (
+            requests.RequestException,
+            OSError,
+            ValueError,
+            KeyError,
+            RuntimeError,
+        ) as exc:
             logger.warning("Error fetching yfinance bars for %s: %s", tk_clean, exc)
             return None

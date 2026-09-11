@@ -11,7 +11,6 @@ import logging
 import random
 import threading
 import time
-from typing import Optional
 
 
 class PerKeyRateLimiter:
@@ -22,7 +21,7 @@ class PerKeyRateLimiter:
         min_interval_seconds: float = 12.1,
         initial_backoff_seconds: float = 2.0,
         max_backoff_seconds: float = 60.0,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self.min_interval = min_interval_seconds
         self.initial_backoff = initial_backoff_seconds
@@ -43,7 +42,7 @@ class PerKeyRateLimiter:
             self._last_call_time = time.time()
             return sleep_time
 
-    def handle_rate_limit(self, retry_after: Optional[float] = None) -> float:
+    def handle_rate_limit(self, retry_after: float | None = None) -> float:
         """Applies exponential backoff with full jitter when HTTP 429 occurs. Returns wait duration."""
         with self._lock:
             if retry_after is not None and retry_after > 0:
@@ -51,9 +50,13 @@ class PerKeyRateLimiter:
             else:
                 jitter = random.uniform(0.5, 1.5)
                 wait_duration = min(self.max_backoff, self._current_backoff * jitter)
-                self._current_backoff = min(self.max_backoff, self._current_backoff * 2.0)
+                self._current_backoff = min(
+                    self.max_backoff, self._current_backoff * 2.0
+                )
 
-            self.logger.warning("Rate limit encountered. Backing off for %.2fs...", wait_duration)
+            self.logger.warning(
+                "Rate limit encountered. Backing off for %.2fs...", wait_duration
+            )
             time.sleep(wait_duration)
             self._last_call_time = time.time()
             return wait_duration

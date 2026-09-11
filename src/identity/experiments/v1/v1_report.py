@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-import polars as pl
 
+import polars as pl
 from src.identity.config import (
     IDENTITY_CONFLICTS_PARQUET,
-    IDENTITY_DIR,
     IDENTITY_EVIDENCE_PARQUET,
     IDENTITY_QUALITY_PARQUET,
     REPORT_MD_PATH,
@@ -22,7 +20,9 @@ logger = logging.getLogger(__name__)
 
 def generate_identity_report():
     """Reads identity artifacts and generates the comprehensive diagnostic report."""
-    logger.info("Generating identity resolution diagnostic report at %s...", REPORT_MD_PATH)
+    logger.info(
+        "Generating identity resolution diagnostic report at %s...", REPORT_MD_PATH
+    )
 
     df_spells = pl.read_csv(SPELLS_CSV_PATH)
     df_sec = pl.read_parquet(SECURITY_MASTER_PARQUET)
@@ -37,7 +37,9 @@ def generate_identity_report():
 
     # Confidence breakdown
     conf_counts = df_th["confidence"].value_counts().sort("count", descending=True)
-    conf_dict = dict(zip(conf_counts["confidence"].to_list(), conf_counts["count"].to_list()))
+    conf_dict = dict(
+        zip(conf_counts["confidence"].to_list(), conf_counts["count"].to_list())
+    )
     n_high = conf_dict.get("HIGH", 0)
     n_med = conf_dict.get("MEDIUM", 0)
     n_low = conf_dict.get("LOW", 0)
@@ -50,21 +52,27 @@ def generate_identity_report():
 
     # Security types breakdown
     type_counts = df_sec["security_type"].value_counts().sort("count", descending=True)
-    type_table_lines = [f"| `{row['security_type']}` | {row['count']:,} | {row['count']/n_securities*100:.1f}% |"
-                        for row in type_counts.iter_rows(named=True)]
+    type_table_lines = [
+        f"| `{row['security_type']}` | {row['count']:,} | {row['count'] / n_securities * 100:.1f}% |"
+        for row in type_counts.iter_rows(named=True)
+    ]
     type_table_md = "\n".join(type_table_lines)
 
     # Multi-spell and reuse stats
-    multi_spell_tickers = df_spells.group_by("ticker").len().filter(pl.col("len") > 1)["ticker"].to_list()
+    multi_spell_tickers = (
+        df_spells.group_by("ticker").len().filter(pl.col("len") > 1)["ticker"].to_list()
+    )
     n_multi = len(multi_spell_tickers)
 
     # Ticker history multi-sec analysis
-    ticker_sec_counts = df_th.group_by("ticker").agg(pl.col("security_id").n_unique().alias("n_sec"))
+    ticker_sec_counts = df_th.group_by("ticker").agg(
+        pl.col("security_id").n_unique().alias("n_sec")
+    )
     reused_tickers = ticker_sec_counts.filter(pl.col("n_sec") > 1)["ticker"].to_list()
     n_reused = len(reused_tickers)
     same_sec_multi = n_multi - n_reused
 
-    report_content = f"""# Candidate Security Identity Resolution Report
+    report_content = rf"""# Candidate Security Identity Resolution Report
 
 ## Executive Summary
 
@@ -84,10 +92,10 @@ No raw ticker observations in `data/universe/spells.csv` were merged, dropped, o
 | :--- | :---: | :---: | :--- |
 | **Total Ticker Spells** | **{total_spells:,}** | 100.0% | Unit of identity investigation (`ticker + spell_seq`) |
 | **Total Unique Tickers** | **{total_tickers:,}** | — | Historical symbol pool across 2004–2026 |
-| **Spells HIGH Confidence** | **{n_high:,}** | {n_high/total_spells*100:.1f}% | Multi-source agreement (OpenFIGI `share_class_figi` + SEC CIK corroboration) |
-| **Spells MEDIUM Confidence** | **{n_med:,}** | {n_med/total_spells*100:.1f}% | Single-source authoritative mapping (OpenFIGI or SEC CIK without full FIGI) |
-| **Spells LOW Confidence** | **{n_low:,}** | {n_low/total_spells*100:.1f}% | Weak matching or temporal ambiguity |
-| **Spells UNRESOLVED** | **{n_unresolved:,}** | {n_unresolved/total_spells*100:.1f}% | Delisted OTC/warrants/pre-2010 tickers lacking external identifiers |
+| **Spells HIGH Confidence** | **{n_high:,}** | {n_high / total_spells * 100:.1f}% | Multi-source agreement (OpenFIGI `share_class_figi` + SEC CIK corroboration) |
+| **Spells MEDIUM Confidence** | **{n_med:,}** | {n_med / total_spells * 100:.1f}% | Single-source authoritative mapping (OpenFIGI or SEC CIK without full FIGI) |
+| **Spells LOW Confidence** | **{n_low:,}** | {n_low / total_spells * 100:.1f}% | Weak matching or temporal ambiguity |
+| **Spells UNRESOLVED** | **{n_unresolved:,}** | {n_unresolved / total_spells * 100:.1f}% | Delisted OTC/warrants/pre-2010 tickers lacking external identifiers |
 
 ---
 
@@ -95,8 +103,8 @@ No raw ticker observations in `data/universe/spells.csv` were merged, dropped, o
 
 A total of **{n_securities:,} canonical securities** were identified and registered in `data/identity/security_master.parquet`.
 
-- **Securities with Authoritative `share_class_figi`**: **{n_with_figi:,}** ({n_with_figi/n_securities*100:.1f}%)
-- **Securities with Fallback Deterministic Identifiers (`UNRESOLVED_<hash>`)**: **{n_without_figi:,}** ({n_without_figi/n_securities*100:.1f}%)
+- **Securities with Authoritative `share_class_figi`**: **{n_with_figi:,}** ({n_with_figi / n_securities * 100:.1f}%)
+- **Securities with Fallback Deterministic Identifiers (`UNRESOLVED_<hash>`)**: **{n_without_figi:,}** ({n_without_figi / n_securities * 100:.1f}%)
 
 ### Breakdown by Standardized Security Type
 
@@ -109,8 +117,8 @@ A total of **{n_securities:,} canonical securities** were identified and registe
 ## 3. Core Audit Questions (Sections A – I)
 
 ### A. How many ticker spells can be confidently mapped to a security?
-- Exactly **{n_high + n_med:,} spells** ({ (n_high + n_med)/total_spells*100:.1f}%) possess HIGH or MEDIUM confidence mappings.
-- **{n_high:,} spells** ({n_high/total_spells*100:.1f}%) have confirmed multi-source agreement with matching share-class FIGIs and SEC CIKs.
+- Exactly **{n_high + n_med:,} spells** ({(n_high + n_med) / total_spells * 100:.1f}%) possess HIGH or MEDIUM confidence mappings.
+- **{n_high:,} spells** ({n_high / total_spells * 100:.1f}%) have confirmed multi-source agreement with matching share-class FIGIs and SEC CIKs.
 
 ### B. How many unique securities were identified?
 - Exactly **{n_securities:,} unique security entities** were registered in `data/identity/security_master.parquet`.
@@ -123,7 +131,7 @@ A total of **{n_securities:,} canonical securities** were identified and registe
   - Both spells correctly produced **two completely separate `security_id`s**, preventing artificial survivorship bias.
 
 ### D. How many multi-spell tickers actually represent the same security?
-- Out of {n_multi:,} multi-spell tickers, **{same_sec_multi:,} tickers ({same_sec_multi/n_multi*100:.1f}%)** represent the **identical underlying security** across their spells.
+- Out of {n_multi:,} multi-spell tickers, **{same_sec_multi:,} tickers ({same_sec_multi / n_multi * 100:.1f}%)** represent the **identical underlying security** across their spells.
 - **Flagship example**: **`CMCSA`** (Comcast Corporation)
   - Has 44 spells in `spells.csv` caused by transient 1-day Massive snapshot dropouts.
   - Across all 44 spells, `CMCSA` maps to the exact same `share_class_figi` (`BBG001S5PXL2`) and CIK (`0001166691`).
@@ -137,7 +145,7 @@ A total of **{n_securities:,} canonical securities** were identified and registe
 - All conflicts were classified with severity, conflicting sources, and resolution status.
 
 ### G. What proportion remains unresolved?
-- **{n_unresolved/total_spells*100:.1f}% of spells ({n_unresolved:,} spells)** remain `UNRESOLVED`.
+- **{n_unresolved / total_spells * 100:.1f}% of spells ({n_unresolved:,} spells)** remain `UNRESOLVED`.
 - Rather than forcing unverified guesses, these were assigned deterministic identifiers `UNRESOLVED_<hash>` and preserved for targeted manual/historical review.
 
 ### H. Problematic Case Studies

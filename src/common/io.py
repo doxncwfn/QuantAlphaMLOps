@@ -11,12 +11,12 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import polars as pl
 
 
-def atomic_write_parquet(df: pl.DataFrame, target_path: Union[str, Path]) -> None:
+def atomic_write_parquet(df: pl.DataFrame, target_path: str | Path) -> None:
     """Atomically write a Polars DataFrame to Parquet via temporary file rename."""
     target = Path(target_path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -30,31 +30,32 @@ def atomic_write_parquet(df: pl.DataFrame, target_path: Union[str, Path]) -> Non
         raise
 
 
-def atomic_write_json(data: Any, target_path: Union[str, Path], indent: int = 2) -> None:
+def atomic_write_json(data: Any, target_path: str | Path, indent: int = 2) -> None:
     """Atomically write Python data to JSON via temporary file rename with fsync."""
     target = Path(target_path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    tmp_file = tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        dir=target.parent,
-        prefix=f".{target.stem}_",
-        suffix=".tmp",
-        delete=False,
-    )
+    tmp_name: str | None = None
     try:
-        json.dump(data, tmp_file, indent=indent, ensure_ascii=False)
-        tmp_file.flush()
-        os.fsync(tmp_file.fileno())
-        tmp_file.close()
-        os.replace(tmp_file.name, target)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=target.parent,
+            prefix=f".{target.stem}_",
+            suffix=".tmp",
+            delete=False,
+        ) as tmp_file:
+            tmp_name = tmp_file.name
+            json.dump(data, tmp_file, indent=indent, ensure_ascii=False)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+        os.replace(tmp_name, target)
     except Exception:
-        if os.path.exists(tmp_file.name):
-            os.remove(tmp_file.name)
+        if tmp_name and os.path.exists(tmp_name):
+            os.remove(tmp_name)
         raise
 
 
-def atomic_write_csv(df: pl.DataFrame, target_path: Union[str, Path]) -> None:
+def atomic_write_csv(df: pl.DataFrame, target_path: str | Path) -> None:
     """Atomically write a Polars DataFrame to CSV via temporary file rename."""
     target = Path(target_path)
     target.parent.mkdir(parents=True, exist_ok=True)

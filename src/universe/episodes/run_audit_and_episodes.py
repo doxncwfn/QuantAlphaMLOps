@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import sys
 import time
-from pathlib import Path
 
 from src.universe.episodes.audit import run_identity_audit
 from src.universe.episodes.builder import AvailabilityEpisodeBuilder
@@ -20,8 +19,7 @@ def setup_logging() -> logging.Logger:
     logger.handlers.clear()
 
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)-7s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     console = logging.StreamHandler(sys.stdout)
@@ -59,11 +57,14 @@ def main():
 
         t_elapsed = time.time() - t_start
         logger.info("=" * 80)
-        logger.info("IDENTITY AUDIT & AVAILABILITY EPISODES COMPLETED IN %.2f SECONDS.", t_elapsed)
+        logger.info(
+            "IDENTITY AUDIT & AVAILABILITY EPISODES COMPLETED IN %.2f SECONDS.",
+            t_elapsed,
+        )
         logger.info("=" * 80)
 
-    except Exception as exc:
-        logger.exception("Fatal error during audit and episode construction: %s", exc)
+    except Exception:
+        logger.exception("Fatal error during audit and episode construction")
         sys.exit(1)
 
 

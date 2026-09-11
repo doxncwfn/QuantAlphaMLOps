@@ -37,15 +37,15 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from pathlib import Path
 import re
 import sys
 import time
-from typing import Any, Dict, List, Optional, Set, Tuple
+from pathlib import Path
+from typing import Any
 
-from dotenv import dotenv_values
 import polars as pl
 import requests
+from dotenv import dotenv_values
 
 # -----------------------------------------------------------------------------
 # Paths & Configuration
@@ -54,7 +54,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 ENV_PATH = REPO_ROOT / "src" / ".env"
 
 SPELLS_CSV_PATH = REPO_ROOT / "data" / "universe" / "spells.csv"
-SAMPLE_MANIFEST_PATH = REPO_ROOT / "data" / "identity" / "experiments" / "resolver_v1" / "sample_manifest.parquet"
+SAMPLE_MANIFEST_PATH = (
+    REPO_ROOT
+    / "data"
+    / "identity"
+    / "experiments"
+    / "resolver_v1"
+    / "sample_manifest.parquet"
+)
 
 EXPERIMENT_DIR = REPO_ROOT / "data" / "identity" / "experiments" / "resolver_v1"
 CACHE_DIR = EXPERIMENT_DIR / "api_cache"
@@ -93,8 +100,7 @@ def setup_logger() -> logging.Logger:
     logger.handlers.clear()
 
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)-7s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     ch = logging.StreamHandler(sys.stdout)
@@ -121,15 +127,21 @@ def compute_sha256(filepath: Path) -> str:
 # -----------------------------------------------------------------------------
 class MassiveKeyPoolManager:
     """Manages round-robin rotation across multiple Massive API keys with rate-limiting."""
-    def __init__(self, keys: List[str], min_per_key_interval: float = 12.2, logger: logging.Logger = None):
+
+    def __init__(
+        self,
+        keys: list[str],
+        min_per_key_interval: float = 12.2,
+        logger: logging.Logger = None,
+    ):
         self.keys = keys
         self.min_per_key_interval = min_per_key_interval
         self.logger = logger
-        self.last_used: Dict[str, float] = {k: 0.0 for k in keys}
-        self.key_backoff_until: Dict[str, float] = {k: 0.0 for k in keys}
+        self.last_used: dict[str, float] = {k: 0.0 for k in keys}
+        self.key_backoff_until: dict[str, float] = {k: 0.0 for k in keys}
         self.current_idx = 0
 
-    def get_key_for_request(self) -> Tuple[str, int]:
+    def get_key_for_request(self) -> tuple[str, int]:
         now = time.time()
         # Find next available key not in 429 backoff
         for _ in range(len(self.keys)):
@@ -152,21 +164,27 @@ class MassiveKeyPoolManager:
         earliest_backoff = min(self.key_backoff_until.values())
         wait_time = max(1.0, earliest_backoff - time.time())
         if self.logger:
-            self.logger.warning("All Massive keys currently in backoff. Waiting %.1fs...", wait_time)
+            self.logger.warning(
+                "All Massive keys currently in backoff. Waiting %.1fs...", wait_time
+            )
         time.sleep(wait_time)
         return self.get_key_for_request()
 
     def report_429(self, key: str, backoff_seconds: float = 30.0):
         self.key_backoff_until[key] = time.time() + backoff_seconds
         if self.logger:
-            self.logger.warning("Key %s... hit 429. Backing off for %.0fs.", key[:6], backoff_seconds)
+            self.logger.warning(
+                "Key %s... hit 429. Backing off for %.0fs.", key[:6], backoff_seconds
+            )
 
 
 # -----------------------------------------------------------------------------
 # Massive Reference Client
 # -----------------------------------------------------------------------------
 class MassivePITClient:
-    def __init__(self, pool: MassiveKeyPoolManager, cache_dir: Path, logger: logging.Logger):
+    def __init__(
+        self, pool: MassiveKeyPoolManager, cache_dir: Path, logger: logging.Logger
+    ):
         self.pool = pool
         self.cache_dir = cache_dir
         self.logger = logger
@@ -175,36 +193,36 @@ class MassivePITClient:
         self.cache_hits = 0
         self.cache_misses = 0
 
-    def query(self, ticker: str, query_date: str) -> Dict[str, Any]:
+    def query(self, ticker: str, query_date: str) -> dict[str, Any]:
         tk_clean = ticker.strip().upper()
         cache_file = self.cache_dir / f"{tk_clean}_{query_date}.json"
 
         if cache_file.exists():
             try:
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(cache_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self.cache_hits += 1
                     return {
                         "source": "CACHE",
                         "status_code": 200,
                         "data": data,
-                        "raw_path": str(cache_file)
+                        "raw_path": str(cache_file),
                     }
-            except Exception:
-                pass
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+                self.logger.debug("Failed reading cache file %s: %s", cache_file, e)
 
         self.cache_misses += 1
         max_attempts = 5
         for attempt in range(max_attempts):
             api_key, key_num = self.pool.get_key_for_request()
-            params = {
-                "ticker": tk_clean,
-                "date": query_date,
-                "apiKey": api_key
-            }
+            params = {"ticker": tk_clean, "date": query_date, "apiKey": api_key}
 
             try:
-                resp = self.session.get(MASSIVE_REFERENCE_URL, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
+                resp = self.session.get(
+                    MASSIVE_REFERENCE_URL,
+                    params=params,
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                )
                 if resp.status_code == 429:
                     self.pool.report_429(api_key, backoff_seconds=25.0 * (attempt + 1))
                     continue
@@ -219,12 +237,17 @@ class MassivePITClient:
                     "source": "NETWORK",
                     "status_code": resp.status_code,
                     "data": data,
-                    "raw_path": str(cache_file)
+                    "raw_path": str(cache_file),
                 }
 
-            except Exception as e:
-                self.logger.warning("Massive query error for '%s' on %s (attempt %d): %s",
-                                    tk_clean, query_date, attempt + 1, e)
+            except (requests.RequestException, json.JSONDecodeError, OSError) as e:
+                self.logger.warning(
+                    "Massive query error for '%s' on %s (attempt %d): %s",
+                    tk_clean,
+                    query_date,
+                    attempt + 1,
+                    e,
+                )
                 time.sleep(2.0)
 
         # Fallback empty structure
@@ -232,7 +255,7 @@ class MassivePITClient:
             "source": "ERROR",
             "status_code": 500,
             "data": {"results": [], "status": "ERROR"},
-            "raw_path": str(cache_file)
+            "raw_path": str(cache_file),
         }
 
 
@@ -240,13 +263,13 @@ class MassivePITClient:
 # OpenFIGI Client
 # -----------------------------------------------------------------------------
 class OpenFigiResolver:
-    def __init__(self, cache_dir: Path, api_key: Optional[str], logger: logging.Logger):
+    def __init__(self, cache_dir: Path, api_key: str | None, logger: logging.Logger):
         self.cache_dir = cache_dir
         self.api_key = api_key
         self.logger = logger
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_file = self.cache_dir / "openfigi_cache.parquet"
-        self.cache: Dict[str, List[Dict[str, Any]]] = {}
+        self.cache: dict[str, list[dict[str, Any]]] = {}
         self._load_cache()
 
     def _load_cache(self):
@@ -259,10 +282,16 @@ class OpenFigiResolver:
                     matches = json.loads(raw_str) if raw_str else []
                     self.cache[tk] = matches
                 self.logger.info("Loaded %d cached OpenFIGI records.", len(self.cache))
-            except Exception as e:
+            except (
+                OSError,
+                pl.exceptions.PolarsError,
+                json.JSONDecodeError,
+                KeyError,
+                ValueError,
+            ) as e:
                 self.logger.warning("Error reading OpenFIGI cache: %s", e)
 
-    def lookup(self, ticker: str) -> List[Dict[str, Any]]:
+    def lookup(self, ticker: str) -> list[dict[str, Any]]:
         tk_clean = ticker.strip().upper()
         # Direct lookup
         if tk_clean in self.cache:
@@ -281,15 +310,15 @@ class SecEdgarResolver:
     def __init__(self, cache_dir: Path, logger: logging.Logger):
         self.cache_dir = cache_dir
         self.logger = logger
-        self.exchange_tickers: Dict[str, Dict[str, Any]] = {}
-        self.mf_tickers: Dict[str, Dict[str, Any]] = {}
+        self.exchange_tickers: dict[str, dict[str, Any]] = {}
+        self.mf_tickers: dict[str, dict[str, Any]] = {}
         self._load_bulk_tables()
 
     def _load_bulk_tables(self):
         exch_file = self.cache_dir / "company_tickers_exchange.json"
         if exch_file.exists():
             try:
-                with open(exch_file, "r", encoding="utf-8") as f:
+                with open(exch_file, encoding="utf-8") as f:
                     data = json.load(f)
                 fields = data.get("fields", [])
                 rows = data.get("data", [])
@@ -303,16 +332,18 @@ class SecEdgarResolver:
                             "name": rec.get("name"),
                             "ticker": tk,
                             "exchange": rec.get("exchange"),
-                            "source": "SEC_EXCHANGE_TICKERS"
+                            "source": "SEC_EXCHANGE_TICKERS",
                         }
-                self.logger.info("Loaded %d SEC exchange tickers.", len(self.exchange_tickers))
-            except Exception as e:
+                self.logger.info(
+                    "Loaded %d SEC exchange tickers.", len(self.exchange_tickers)
+                )
+            except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                 self.logger.warning("Error loading SEC exchange tickers: %s", e)
 
         mf_file = self.cache_dir / "company_tickers_mf.json"
         if mf_file.exists():
             try:
-                with open(mf_file, "r", encoding="utf-8") as f:
+                with open(mf_file, encoding="utf-8") as f:
                     data = json.load(f)
                 fields = data.get("fields", [])
                 rows = data.get("data", [])
@@ -326,13 +357,15 @@ class SecEdgarResolver:
                             "seriesId": rec.get("seriesId"),
                             "classId": rec.get("classId"),
                             "symbol": sym,
-                            "source": "SEC_MF_TICKERS"
+                            "source": "SEC_MF_TICKERS",
                         }
-                self.logger.info("Loaded %d SEC mutual fund/ETF tickers.", len(self.mf_tickers))
-            except Exception as e:
+                self.logger.info(
+                    "Loaded %d SEC mutual fund/ETF tickers.", len(self.mf_tickers)
+                )
+            except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                 self.logger.warning("Error loading SEC MF tickers: %s", e)
 
-    def lookup(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def lookup(self, ticker: str) -> dict[str, Any] | None:
         tk_clean = ticker.strip().upper()
         if tk_clean in self.exchange_tickers:
             return self.exchange_tickers[tk_clean]
@@ -349,7 +382,7 @@ class SecEdgarResolver:
 # -----------------------------------------------------------------------------
 # Normalization & Decision Engine
 # -----------------------------------------------------------------------------
-def normalize_security_type(raw_type: Optional[str]) -> str:
+def normalize_security_type(raw_type: str | None) -> str:
     """Classifies vendor security type strings into standardized enum."""
     if not raw_type or not str(raw_type).strip():
         return "UNKNOWN"
@@ -375,31 +408,74 @@ def normalize_security_type(raw_type: Optional[str]) -> str:
     return "OTHER"
 
 
-def make_deterministic_unresolved_id(ticker: str, spell_seq: int, start_date: str) -> str:
-    raw = f"{ticker}_{spell_seq}_{start_date}".encode("utf-8")
+def make_deterministic_unresolved_id(
+    ticker: str, spell_seq: int, start_date: str
+) -> str:
+    raw = f"{ticker}_{spell_seq}_{start_date}".encode()
     h = hashlib.sha256(raw).hexdigest()[:10].upper()
     return f"UNRESOLVED_{ticker}_{spell_seq}_{h}"
 
 
-def extract_entity_tokens(name: Optional[str]) -> Set[str]:
+def extract_entity_tokens(name: str | None) -> set[str]:
     """Extracts distinctive meaningful entity tokens, filtering out noise/stopwords."""
     if not name:
         return set()
     cleaned = re.sub(r"[^A-Z0-9\s]", " ", name.upper())
     tokens = set(cleaned.split())
     stopwords = {
-        "INC", "INCORPORATED", "CORP", "CORPORATION", "LTD", "LIMITED",
-        "CO", "COMPANY", "COMPANIES", "CLASS", "CL", "A", "B", "C", "D",
-        "ORD", "ORDINARY", "SHS", "SHARE", "SHARES", "COMMON", "STOCK",
-        "STK", "HLDGS", "HOLDING", "HOLDINGS", "GRP", "GROUP", "THE",
-        "OF", "AND", "DE", "NV", "PLC", "LP", "LLC", "ETF", "TRUST",
-        "SPON", "ADR", "ADS", "FD", "FUND", "CAPITAL", "GLOBAL", "US", "USA",
-        "COM"
+        "INC",
+        "INCORPORATED",
+        "CORP",
+        "CORPORATION",
+        "LTD",
+        "LIMITED",
+        "CO",
+        "COMPANY",
+        "COMPANIES",
+        "CLASS",
+        "CL",
+        "A",
+        "B",
+        "C",
+        "D",
+        "ORD",
+        "ORDINARY",
+        "SHS",
+        "SHARE",
+        "SHARES",
+        "COMMON",
+        "STOCK",
+        "STK",
+        "HLDGS",
+        "HOLDING",
+        "HOLDINGS",
+        "GRP",
+        "GROUP",
+        "THE",
+        "OF",
+        "AND",
+        "DE",
+        "NV",
+        "PLC",
+        "LP",
+        "LLC",
+        "ETF",
+        "TRUST",
+        "SPON",
+        "ADR",
+        "ADS",
+        "FD",
+        "FUND",
+        "CAPITAL",
+        "GLOBAL",
+        "US",
+        "USA",
+        "COM",
     }
     return {t for t in tokens if t not in stopwords and len(t) > 1}
 
 
-def are_names_consistent(name1: Optional[str], name2: Optional[str]) -> bool:
+def are_names_consistent(name1: str | None, name2: str | None) -> bool:
     """Checks whether two entity names share distinctive corporate identity tokens."""
     if not name1 or not name2:
         return False
@@ -413,7 +489,16 @@ def are_names_consistent(name1: Optional[str], name2: Optional[str]) -> bool:
     if r1 != r2:
         return False
     common = t1.intersection(t2)
-    generic = {"ACQUISITION", "ACQUISTION", "FINANCIAL", "VENTURES", "PARTNERS", "ENERGY", "HEALTHCARE", "MEDIA"}
+    generic = {
+        "ACQUISITION",
+        "ACQUISTION",
+        "FINANCIAL",
+        "VENTURES",
+        "PARTNERS",
+        "ENERGY",
+        "HEALTHCARE",
+        "MEDIA",
+    }
     non_generic_common = common - generic
     if len(non_generic_common) >= 1:
         return True
@@ -423,12 +508,12 @@ def are_names_consistent(name1: Optional[str], name2: Optional[str]) -> bool:
 
 
 def resolve_spell(
-    spell: Dict[str, Any],
+    spell: dict[str, Any],
     massive_client: MassivePITClient,
     openfigi_resolver: OpenFigiResolver,
     sec_resolver: SecEdgarResolver,
-    logger: logging.Logger
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, Any]]:
+    logger: logging.Logger,
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     """
     Executes the multi-tiered resolution pipeline for a single spell.
     Returns:
@@ -453,14 +538,21 @@ def resolve_spell(
     if isinstance(m_results, list) and len(m_results) > 0:
         # Find exact ticker match
         for item in m_results:
-            if isinstance(item, dict) and item.get("ticker", "").upper() == ticker.upper():
+            if (
+                isinstance(item, dict)
+                and item.get("ticker", "").upper() == ticker.upper()
+            ):
                 m_record = item
                 break
         if not m_record and len(m_results) > 0 and isinstance(m_results[0], dict):
             m_record = m_results[0]
 
     # Massive raw extraction
-    massive_status = "SUCCESS" if m_record else ("MASSIVE_EMPTY" if m_resp["status_code"] == 200 else "ERROR")
+    massive_status = (
+        "SUCCESS"
+        if m_record
+        else ("MASSIVE_EMPTY" if m_resp["status_code"] == 200 else "ERROR")
+    )
     massive_cik = m_record.get("cik") if m_record else None
     if massive_cik:
         massive_cik = str(massive_cik).zfill(10)
@@ -513,7 +605,15 @@ def resolve_spell(
     # 4.2 Research Universe Status
     if identity_type == "COMMON_STOCK":
         research_universe_status = "INCLUDE"
-    elif identity_type in ("ETF", "UNIT", "WARRANT", "PREFERRED", "RIGHT", "ADR", "OTHER"):
+    elif identity_type in (
+        "ETF",
+        "UNIT",
+        "WARRANT",
+        "PREFERRED",
+        "RIGHT",
+        "ADR",
+        "OTHER",
+    ):
         research_universe_status = "EXCLUDE"
     else:
         research_universe_status = "UNRESOLVED"
@@ -526,14 +626,19 @@ def resolve_spell(
     # Primary: Massive share_class_figi (Authoritative PIT identifier)
     if massive_share_class_figi:
         security_id = massive_share_class_figi
-        if openfigi_share_class_figi and openfigi_share_class_figi == massive_share_class_figi:
+        if (
+            openfigi_share_class_figi
+            and openfigi_share_class_figi == massive_share_class_figi
+        ):
             identity_status = "CONFIRMED"
             identity_confidence = "HIGH"
             decision_reason = "Massive share_class_figi confirmed by OpenFIGI agreement"
         else:
             identity_status = "PROBABLE"
             identity_confidence = "HIGH"
-            decision_reason = "Authoritative Massive share_class_figi from point-in-time reference"
+            decision_reason = (
+                "Authoritative Massive share_class_figi from point-in-time reference"
+            )
 
     # Secondary: Massive CIK with OpenFIGI share_class_figi or SEC CIK match
     elif massive_cik:
@@ -542,14 +647,18 @@ def resolve_spell(
         # SEC CIK matches Massive CIK AND (OpenFIGI entity matches SEC entity OR Massive entity matches OpenFIGI entity)
         corroborated = False
         if sec_cik and sec_cik == massive_cik:
-            if are_names_consistent(openfigi_name, sec_name) or are_names_consistent(massive_name, openfigi_name):
+            if are_names_consistent(openfigi_name, sec_name) or are_names_consistent(
+                massive_name, openfigi_name
+            ):
                 corroborated = True
 
         if corroborated and openfigi_share_class_figi:
             security_id = openfigi_share_class_figi
             identity_status = "CONFIRMED"
             identity_confidence = "HIGH"
-            decision_reason = "Massive CIK corroborated by SEC EDGAR with OpenFIGI share_class_figi"
+            decision_reason = (
+                "Massive CIK corroborated by SEC EDGAR with OpenFIGI share_class_figi"
+            )
         else:
             security_id = f"SEC_{massive_cik}_{ticker}"
             identity_status = "PROBABLE"
@@ -562,34 +671,56 @@ def resolve_spell(
 
     # Tertiary: Massive Empty, fallback to OpenFIGI + SEC
     elif massive_status == "MASSIVE_EMPTY":
-        if openfigi_share_class_figi and sec_cik and are_names_consistent(sec_name, openfigi_name):
+        if (
+            openfigi_share_class_figi
+            and sec_cik
+            and are_names_consistent(sec_name, openfigi_name)
+        ):
             security_id = openfigi_share_class_figi
             identity_status = "PROBABLE"
             identity_confidence = "MEDIUM"
-            decision_reason = "Recovered from MASSIVE_EMPTY via OpenFIGI + SEC EDGAR corroboration"
+            decision_reason = (
+                "Recovered from MASSIVE_EMPTY via OpenFIGI + SEC EDGAR corroboration"
+            )
         elif openfigi_share_class_figi and not sec_cik:
-            security_id = make_deterministic_unresolved_id(ticker, spell_seq, start_date)
+            security_id = make_deterministic_unresolved_id(
+                ticker, spell_seq, start_date
+            )
             identity_status = "UNRESOLVED"
             identity_confidence = "LOW"
             decision_reason = "MASSIVE_EMPTY; uncorroborated contemporary OpenFIGI rejected to prevent false merge"
         else:
-            security_id = make_deterministic_unresolved_id(ticker, spell_seq, start_date)
+            security_id = make_deterministic_unresolved_id(
+                ticker, spell_seq, start_date
+            )
             identity_status = "UNRESOLVED"
             identity_confidence = "LOW"
             decision_reason = "MASSIVE_EMPTY and no external corroboration found; isolated to prevent false merge"
 
     # Quaternary: Massive has name/info but no CIK and no FIGI
     else:
-        if massive_name and openfigi_share_class_figi and are_names_consistent(massive_name, openfigi_name):
+        if (
+            massive_name
+            and openfigi_share_class_figi
+            and are_names_consistent(massive_name, openfigi_name)
+        ):
             security_id = openfigi_share_class_figi
             identity_status = "PROBABLE"
             identity_confidence = "LOW"
-            decision_reason = "Massive entity name matched contemporary OpenFIGI entity without CIK"
+            decision_reason = (
+                "Massive entity name matched contemporary OpenFIGI entity without CIK"
+            )
         else:
-            security_id = make_deterministic_unresolved_id(ticker, spell_seq, start_date)
+            security_id = make_deterministic_unresolved_id(
+                ticker, spell_seq, start_date
+            )
             identity_status = "UNRESOLVED"
             identity_confidence = "LOW"
-            if massive_name and openfigi_name and not are_names_consistent(massive_name, openfigi_name):
+            if (
+                massive_name
+                and openfigi_name
+                and not are_names_consistent(massive_name, openfigi_name)
+            ):
                 conflict_flag = True
                 decision_reason = "Massive entity name conflicts with contemporary OpenFIGI entity (Ticker Reuse Indication); isolated"
             else:
@@ -609,7 +740,6 @@ def resolve_spell(
         "duration_sessions": duration,
         "representative_date": rep_date,
         "sampling_category": cat_code,
-
         # Massive signals
         "massive_status": massive_status,
         "massive_cik": massive_cik,
@@ -618,7 +748,6 @@ def resolve_spell(
         "massive_name": massive_name,
         "massive_exchange": massive_exchange,
         "massive_type": massive_type_raw,
-
         # OpenFIGI signals
         "openfigi_status": openfigi_status,
         "openfigi_selected_figi": openfigi_figi,
@@ -626,20 +755,17 @@ def resolve_spell(
         "openfigi_security_type": openfigi_sec_type_raw,
         "openfigi_exchange": openfigi_exch,
         "openfigi_name": openfigi_name,
-
         # SEC signals
         "sec_status": sec_status,
         "sec_cik": sec_cik,
         "sec_name": sec_name,
         "sec_evidence_summary": sec_summary,
-
         # Final Decisions
         "security_id": security_id,
         "identity_type": identity_type,
         "identity_status": identity_status,
         "identity_confidence": identity_confidence,
         "research_universe_status": research_universe_status,
-
         # Provenance & Audit
         "decision_reason": decision_reason,
         "evidence_summary": f"Massive={massive_status}({massive_type_raw}), FIGI={openfigi_status}, SEC={sec_status}",
@@ -650,27 +776,31 @@ def resolve_spell(
     # Candidate records
     candidates = []
     if m_record:
-        candidates.append({
-            "ticker": ticker,
-            "spell_seq": spell_seq,
-            "source": "MASSIVE_PIT",
-            "candidate_id": massive_share_class_figi or massive_cik,
-            "candidate_name": massive_name,
-            "candidate_type": massive_type_raw,
-            "cik": massive_cik,
-            "figi": massive_share_class_figi,
-        })
+        candidates.append(
+            {
+                "ticker": ticker,
+                "spell_seq": spell_seq,
+                "source": "MASSIVE_PIT",
+                "candidate_id": massive_share_class_figi or massive_cik,
+                "candidate_name": massive_name,
+                "candidate_type": massive_type_raw,
+                "cik": massive_cik,
+                "figi": massive_share_class_figi,
+            }
+        )
     for c in figi_matches:
-        candidates.append({
-            "ticker": ticker,
-            "spell_seq": spell_seq,
-            "source": "OPENFIGI",
-            "candidate_id": c.get("shareClassFIGI") or c.get("figi"),
-            "candidate_name": c.get("name"),
-            "candidate_type": c.get("securityType"),
-            "cik": None,
-            "figi": c.get("shareClassFIGI"),
-        })
+        candidates.append(
+            {
+                "ticker": ticker,
+                "spell_seq": spell_seq,
+                "source": "OPENFIGI",
+                "candidate_id": c.get("shareClassFIGI") or c.get("figi"),
+                "candidate_name": c.get("name"),
+                "candidate_type": c.get("securityType"),
+                "cik": None,
+                "figi": c.get("shareClassFIGI"),
+            }
+        )
 
     evidence = {
         "ticker": ticker,
@@ -681,7 +811,7 @@ def resolve_spell(
         "openfigi_figi": openfigi_share_class_figi,
         "sec_cik": sec_cik,
         "identity_status": identity_status,
-        "security_id": security_id
+        "security_id": security_id,
     }
 
     return result_dict, candidates, evidence
@@ -710,23 +840,36 @@ def main():
         logger.error("Sample manifest not found: %s", SAMPLE_MANIFEST_PATH)
         sys.exit(1)
     df_manifest = pl.read_parquet(SAMPLE_MANIFEST_PATH)
-    logger.info("Loaded sample manifest with %d spells across %d tickers from %s.",
-                df_manifest.height, df_manifest["ticker"].n_unique(), SAMPLE_MANIFEST_PATH)
+    logger.info(
+        "Loaded sample manifest with %d spells across %d tickers from %s.",
+        df_manifest.height,
+        df_manifest["ticker"].n_unique(),
+        SAMPLE_MANIFEST_PATH,
+    )
 
     # Step 3: Load API Keys from .env
     env = dotenv_values(ENV_PATH)
-    massive_keys = [v for k, v in sorted(env.items()) if k.startswith("MASSIVE_API_KEY") and v]
+    massive_keys = [
+        v for k, v in sorted(env.items()) if k.startswith("MASSIVE_API_KEY") and v
+    ]
     if not massive_keys:
         fallback_key = env.get("MASSIVE_API_KEY") or "IbC9qw1ouX7vSkiyYpGVaDk9jCrk2t_K"
         massive_keys = [fallback_key]
-    logger.info("Initialized Massive Key Pool with %d active keys for high-throughput execution.", len(massive_keys))
+    logger.info(
+        "Initialized Massive Key Pool with %d active keys for high-throughput execution.",
+        len(massive_keys),
+    )
 
     openfigi_key = env.get("OPENFIGI_API_KEY")
 
     # Step 4: Initialize Clients
-    key_pool = MassiveKeyPoolManager(massive_keys, min_per_key_interval=12.2, logger=logger)
+    key_pool = MassiveKeyPoolManager(
+        massive_keys, min_per_key_interval=12.2, logger=logger
+    )
     massive_client = MassivePITClient(key_pool, MASSIVE_CACHE_DIR, logger=logger)
-    openfigi_resolver = OpenFigiResolver(OPENFIGI_CACHE_DIR, openfigi_key, logger=logger)
+    openfigi_resolver = OpenFigiResolver(
+        OPENFIGI_CACHE_DIR, openfigi_key, logger=logger
+    )
     sec_resolver = SecEdgarResolver(SEC_CACHE_DIR, logger=logger)
 
     # Step 5: Execute Resolution across all Sampled Spells
@@ -743,16 +886,27 @@ def main():
         rep_dt = spell["representative_date"]
         cat = spell.get("sampling_category", "")
 
-        res_dict, cands, evid = resolve_spell(spell, massive_client, openfigi_resolver, sec_resolver, logger)
+        res_dict, cands, evid = resolve_spell(
+            spell, massive_client, openfigi_resolver, sec_resolver, logger
+        )
         results.append(res_dict)
         all_candidates.extend(cands)
         all_evidence.append(evid)
 
         if idx % 25 == 0 or idx == total_spells:
-            logger.info("[%d/%d] Resolved '%s' (Seq %d, %s) -> ID: %s, Type: %s, Status: %s (Cache Hits: %d, Misses: %d)",
-                        idx, total_spells, tk, seq, rep_dt, res_dict["security_id"][:16],
-                        res_dict["identity_type"], res_dict["identity_status"],
-                        massive_client.cache_hits, massive_client.cache_misses)
+            logger.info(
+                "[%d/%d] Resolved '%s' (Seq %d, %s) -> ID: %s, Type: %s, Status: %s (Cache Hits: %d, Misses: %d)",
+                idx,
+                total_spells,
+                tk,
+                seq,
+                rep_dt,
+                res_dict["security_id"][:16],
+                res_dict["identity_type"],
+                res_dict["identity_status"],
+                massive_client.cache_hits,
+                massive_client.cache_misses,
+            )
 
     df_results = pl.DataFrame(results)
     df_candidates = pl.DataFrame(all_candidates) if all_candidates else pl.DataFrame()
@@ -771,8 +925,10 @@ def main():
     # Step 7: Evaluate Negative Controls & Ticker Reuse Separation
     logger.info("Evaluating dedicated negative controls and ticker-reuse separation...")
     neg_control_tickers = ["ACMR", "AAC", "MON", "META", "AAA"]
-    neg_df = df_results.filter(pl.col("ticker").is_in(neg_control_tickers)).sort(["ticker", "spell_seq"])
-    
+    neg_df = df_results.filter(pl.col("ticker").is_in(neg_control_tickers)).sort(
+        ["ticker", "spell_seq"]
+    )
+
     # Check pairwise separation
     neg_evals = []
     for tk in neg_control_tickers:
@@ -781,34 +937,48 @@ def main():
             for j in range(i + 1, len(tk_spells)):
                 s1 = tk_spells[i]
                 s2 = tk_spells[j]
-                same_id = (s1["security_id"] == s2["security_id"]) and (s1["security_id"] is not None)
-                neg_evals.append({
-                    "ticker": tk,
-                    "spell_1": s1["spell_seq"],
-                    "date_1": s1["representative_date"],
-                    "id_1": s1["security_id"],
-                    "name_1": s1["massive_name"] or s1["openfigi_name"],
-                    "spell_2": s2["spell_seq"],
-                    "date_2": s2["representative_date"],
-                    "id_2": s2["security_id"],
-                    "name_2": s2["massive_name"] or s2["openfigi_name"],
-                    "false_merge_detected": same_id,
-                    "separation_verdict": "PASS_SEPARATED" if not same_id else "FAIL_FALSE_MERGE"
-                })
+                same_id = (s1["security_id"] == s2["security_id"]) and (
+                    s1["security_id"] is not None
+                )
+                neg_evals.append(
+                    {
+                        "ticker": tk,
+                        "spell_1": s1["spell_seq"],
+                        "date_1": s1["representative_date"],
+                        "id_1": s1["security_id"],
+                        "name_1": s1["massive_name"] or s1["openfigi_name"],
+                        "spell_2": s2["spell_seq"],
+                        "date_2": s2["representative_date"],
+                        "id_2": s2["security_id"],
+                        "name_2": s2["massive_name"] or s2["openfigi_name"],
+                        "false_merge_detected": same_id,
+                        "separation_verdict": "PASS_SEPARATED"
+                        if not same_id
+                        else "FAIL_FALSE_MERGE",
+                    }
+                )
 
     df_neg_eval = pl.DataFrame(neg_evals)
     df_neg_eval.write_parquet(OUTPUT_NEG_CONTROLS_PARQUET)
-    logger.info("Saved negative controls evaluation to %s.", OUTPUT_NEG_CONTROLS_PARQUET)
+    logger.info(
+        "Saved negative controls evaluation to %s.", OUTPUT_NEG_CONTROLS_PARQUET
+    )
 
     # Step 8: Multi-Spell Continuity vs. Reuse Analysis across all Sampled Tickers
-    multi_spell_groups = df_results.group_by("ticker").agg(pl.len().alias("count")).filter(pl.col("count") > 1)
+    multi_spell_groups = (
+        df_results.group_by("ticker")
+        .agg(pl.len().alias("count"))
+        .filter(pl.col("count") > 1)
+    )
     multi_tickers = multi_spell_groups["ticker"].to_list()
     logger.info("Identified %d multi-spell tickers in the sample.", len(multi_tickers))
 
     n_separated = 0
     n_linked = 0
     for tk in multi_tickers:
-        t_spells = df_results.filter(pl.col("ticker") == tk).sort("spell_seq").to_dicts()
+        t_spells = (
+            df_results.filter(pl.col("ticker") == tk).sort("spell_seq").to_dicts()
+        )
         ids = [s["security_id"] for s in t_spells]
         if len(set(ids)) == len(ids):
             n_separated += 1
@@ -816,26 +986,38 @@ def main():
             n_linked += 1
 
     # Step 9: Synthesize Comprehensive Quality Report
-    generate_comprehensive_report(df_results, df_neg_eval, stats={
-        "total_spells": total_spells,
-        "cache_hits": massive_client.cache_hits,
-        "cache_misses": massive_client.cache_misses,
-        "n_multi_tickers": len(multi_tickers),
-        "n_separated": n_separated,
-        "n_linked": n_linked,
-        "elapsed": time.time() - start_time
-    }, logger=logger)
+    generate_comprehensive_report(
+        df_results,
+        df_neg_eval,
+        stats={
+            "total_spells": total_spells,
+            "cache_hits": massive_client.cache_hits,
+            "cache_misses": massive_client.cache_misses,
+            "n_multi_tickers": len(multi_tickers),
+            "n_separated": n_separated,
+            "n_linked": n_linked,
+            "elapsed": time.time() - start_time,
+        },
+        logger=logger,
+    )
 
     # Step 10: Final Immutability Check
     final_spells_hash = compute_sha256(SPELLS_CSV_PATH)
     if initial_spells_hash != final_spells_hash:
-        logger.critical("FATAL: spells.csv hash changed during execution! %s -> %s",
-                        initial_spells_hash, final_spells_hash)
+        logger.critical(
+            "FATAL: spells.csv hash changed during execution! %s -> %s",
+            initial_spells_hash,
+            final_spells_hash,
+        )
         sys.exit(1)
-    logger.info("VERIFIED: spells.csv remained 100%% unchanged (SHA-256: %s)", final_spells_hash)
+    logger.info(
+        "VERIFIED: spells.csv remained 100%% unchanged (SHA-256: %s)", final_spells_hash
+    )
 
     logger.info("=" * 80)
-    logger.info("EXPERIMENT COMPLETED SUCCESSFULLY IN %.2f SECONDS", time.time() - start_time)
+    logger.info(
+        "EXPERIMENT COMPLETED SUCCESSFULLY IN %.2f SECONDS", time.time() - start_time
+    )
     logger.info("=" * 80)
 
 
@@ -845,38 +1027,64 @@ def main():
 def generate_comprehensive_report(
     df_results: pl.DataFrame,
     df_neg_eval: pl.DataFrame,
-    stats: Dict[str, Any],
-    logger: logging.Logger
+    stats: dict[str, Any],
+    logger: logging.Logger,
 ):
     logger.info("Synthesizing comprehensive quality report: %s...", REPORT_MD_PATH)
 
     total = df_results.height
-    
+
     # Status breakdowns
-    status_counts = df_results["identity_status"].value_counts().sort("count", descending=True)
-    status_table = "\n".join([f"| **`{r['identity_status']}`** | {r['count']} | {r['count']/total*100:.1f}% |"
-                             for r in status_counts.iter_rows(named=True)])
+    status_counts = (
+        df_results["identity_status"].value_counts().sort("count", descending=True)
+    )
+    status_table = "\n".join(
+        [
+            f"| **`{r['identity_status']}`** | {r['count']} | {r['count'] / total * 100:.1f}% |"
+            for r in status_counts.iter_rows(named=True)
+        ]
+    )
 
     # Confidence breakdowns
-    conf_counts = df_results["identity_confidence"].value_counts().sort("count", descending=True)
-    conf_table = "\n".join([f"| **`{r['identity_confidence']}`** | {r['count']} | {r['count']/total*100:.1f}% |"
-                           for r in conf_counts.iter_rows(named=True)])
+    conf_counts = (
+        df_results["identity_confidence"].value_counts().sort("count", descending=True)
+    )
+    conf_table = "\n".join(
+        [
+            f"| **`{r['identity_confidence']}`** | {r['count']} | {r['count'] / total * 100:.1f}% |"
+            for r in conf_counts.iter_rows(named=True)
+        ]
+    )
 
     # Security Type breakdowns
-    type_counts = df_results["identity_type"].value_counts().sort("count", descending=True)
-    type_table = "\n".join([f"| **`{r['identity_type']}`** | {r['count']} | {r['count']/total*100:.1f}% |"
-                           for r in type_counts.iter_rows(named=True)])
+    type_counts = (
+        df_results["identity_type"].value_counts().sort("count", descending=True)
+    )
+    type_table = "\n".join(
+        [
+            f"| **`{r['identity_type']}`** | {r['count']} | {r['count'] / total * 100:.1f}% |"
+            for r in type_counts.iter_rows(named=True)
+        ]
+    )
 
     # Universe status
-    univ_counts = df_results["research_universe_status"].value_counts().sort("count", descending=True)
-    univ_table = "\n".join([f"| **`{r['research_universe_status']}`** | {r['count']} | {r['count']/total*100:.1f}% |"
-                           for r in univ_counts.iter_rows(named=True)])
+    univ_counts = (
+        df_results["research_universe_status"]
+        .value_counts()
+        .sort("count", descending=True)
+    )
+    univ_table = "\n".join(
+        [
+            f"| **`{r['research_universe_status']}`** | {r['count']} | {r['count'] / total * 100:.1f}% |"
+            for r in univ_counts.iter_rows(named=True)
+        ]
+    )
 
     # Negative control rows
     neg_rows = []
     for r in df_neg_eval.iter_rows(named=True):
-        n1 = (r['name_1'] or '—')[:20]
-        n2 = (r['name_2'] or '—')[:20]
+        n1 = (r["name_1"] or "—")[:20]
+        n2 = (r["name_2"] or "—")[:20]
         neg_rows.append(
             f"| `{r['ticker']}` | Spell {r['spell_1']} vs Spell {r['spell_2']} | `{r['date_1']}` vs `{r['date_2']}` | {n1} vs {n2} | `{r['id_1']}` vs `{r['id_2']}` | **{r['separation_verdict']}** |"
         )
@@ -888,17 +1096,43 @@ def generate_comprehensive_report(
     # Manual audit set: at least 70 cases (20 ordinary, 10 reuse, 10 empty, 10 delisted, 10 null-type, 10 non-common)
     audit_cases = []
     # 20 ordinary
-    audit_cases.extend(df_results.filter(pl.col("sampling_category").str.starts_with("A_ORDINARY")).head(20).to_dicts())
+    audit_cases.extend(
+        df_results.filter(pl.col("sampling_category").str.starts_with("A_ORDINARY"))
+        .head(20)
+        .to_dicts()
+    )
     # 10 ticker reuse
-    audit_cases.extend(df_results.filter(pl.col("sampling_category").str.starts_with("B_TICKER_REUSE")).head(10).to_dicts())
+    audit_cases.extend(
+        df_results.filter(pl.col("sampling_category").str.starts_with("B_TICKER_REUSE"))
+        .head(10)
+        .to_dicts()
+    )
     # 10 massive empty
-    audit_cases.extend(df_results.filter(pl.col("massive_status") == "MASSIVE_EMPTY").head(10).to_dicts())
+    audit_cases.extend(
+        df_results.filter(pl.col("massive_status") == "MASSIVE_EMPTY")
+        .head(10)
+        .to_dicts()
+    )
     # 10 delisted
-    audit_cases.extend(df_results.filter(pl.col("sampling_category") == "D_DELISTED_ACQUIRED").head(10).to_dicts())
+    audit_cases.extend(
+        df_results.filter(pl.col("sampling_category") == "D_DELISTED_ACQUIRED")
+        .head(10)
+        .to_dicts()
+    )
     # 10 pre-2010 null-type
-    audit_cases.extend(df_results.filter(pl.col("sampling_category") == "E_PRE_2010_NULL_TYPE_CANDIDATE").head(10).to_dicts())
+    audit_cases.extend(
+        df_results.filter(
+            pl.col("sampling_category") == "E_PRE_2010_NULL_TYPE_CANDIDATE"
+        )
+        .head(10)
+        .to_dicts()
+    )
     # 10 non-common
-    audit_cases.extend(df_results.filter(pl.col("sampling_category") == "F_NON_COMMON_INSTRUMENT").head(10).to_dicts())
+    audit_cases.extend(
+        df_results.filter(pl.col("sampling_category") == "F_NON_COMMON_INSTRUMENT")
+        .head(10)
+        .to_dicts()
+    )
 
     audit_rows_md = []
     for c in audit_cases[:75]:
@@ -909,7 +1143,11 @@ def generate_comprehensive_report(
         )
     audit_table_md = "\n".join(audit_rows_md)
 
-    verdict_str = "READY WITH CONDITIONS" if n_false_merges == 0 else "NOT READY (FALSE MERGE DETECTED)"
+    verdict_str = (
+        "READY WITH CONDITIONS"
+        if n_false_merges == 0
+        else "NOT READY (FALSE MERGE DETECTED)"
+    )
 
     report_content = f"""# Experimental Historical Security Identity Resolver (v1) Report
 ## Validation of Point-in-Time Multi-Tiered Security Identity Architecture
@@ -938,7 +1176,7 @@ reliably resolves historical securities while **strictly preventing false identi
 2. **Decoupled Common-Stock Classification**: The identity layer classified instruments independently of universe filtering. Non-common instruments (ETFs, Units, Warrants, Preferred) were explicitly identified and assigned `research_universe_status = EXCLUDE` while preserving full evidence.
 3. **No Corporate Suffix Guessing**: Pre-2010 records with null Massive `type` were left as `identity_type = UNKNOWN` unless corroborated by OpenFIGI. Zero unvalidated common stock inferences were made from `INC` or `CORP` suffixes.
 4. **Resilient Handling of `MASSIVE_EMPTY`**: Spells returning empty responses from Massive were explicitly tagged `MASSIVE_EMPTY` and evaluated against OpenFIGI and SEC, preventing false `INACTIVE` assumptions.
-5. **High-Throughput 9-Key Pool Execution**: Leveraging 9 Massive API keys in round-robin allowed all {total} spells to be processed in **{stats['elapsed']/60:.1f} minutes** ({stats['elapsed']:.1f}s), with **{stats['cache_hits']} cache hits** and **{stats['cache_misses']} live network requests** without a single unhandled HTTP 429 error.
+5. **High-Throughput 9-Key Pool Execution**: Leveraging 9 Massive API keys in round-robin allowed all {total} spells to be processed in **{stats["elapsed"] / 60:.1f} minutes** ({stats["elapsed"]:.1f}s), with **{stats["cache_hits"]} cache hits** and **{stats["cache_misses"]} live network requests** without a single unhandled HTTP 429 error.
 
 ---
 
@@ -997,9 +1235,9 @@ The resolver was subjected to a rigorous negative-control suite where identity d
 
 ## 3. Multi-Spell Continuity & Ticker-Reuse Overview
 
-Among the {total} sampled spells, there are **{stats['n_multi_tickers']} tickers with multiple observation spells**:
-- **{stats['n_separated']} tickers** exhibited ticker reuse (different companies/securities sharing the symbol over time), and the resolver successfully assigned distinct `security_id`s to each spell.
-- **{stats['n_linked']} tickers** exhibited same-company continuity across transient snapshot dropouts (e.g. `CMCSA`), where the underlying corporate entity and CIK remained identical before and after the gap.
+Among the {total} sampled spells, there are **{stats["n_multi_tickers"]} tickers with multiple observation spells**:
+- **{stats["n_separated"]} tickers** exhibited ticker reuse (different companies/securities sharing the symbol over time), and the resolver successfully assigned distinct `security_id`s to each spell.
+- **{stats["n_linked"]} tickers** exhibited same-company continuity across transient snapshot dropouts (e.g. `CMCSA`), where the underlying corporate entity and CIK remained identical before and after the gap.
 
 ---
 
@@ -1045,7 +1283,7 @@ The table below catalogs representative test cases across all experimental categ
 
 ### Mandatory Conditions Before Full 43,757-Spell Production Scale:
 1. **Multi-Key Rate Limiting**: Scale the 9-key pool architecture across production workers or Modal distributed workers to maintain steady 45 req/min throughput.
-2. **Dot-Notation Symbol Normalizer**: Integrate deterministic alias normalization (e.g. `CMCS.A` $\leftrightarrow$ `CMCSA`, `BRK.A` $\leftrightarrow$ `BRK/A` $\leftrightarrow$ `BRK A`) for OpenFIGI and Massive fallback lookups.
+2. **Dot-Notation Symbol Normalizer**: Integrate deterministic alias normalization (e.g. `CMCS.A` $\\leftrightarrow$ `CMCSA`, `BRK.A` $\\leftrightarrow$ `BRK/A` $\\leftrightarrow$ `BRK A`) for OpenFIGI and Massive fallback lookups.
 3. **Persistent Two-Level Caching**: Ensure all responses are written to persistent storage (`data/identity/cache/`) to allow safe pause/resumption over the ~15-hour full-universe execution.
 4. **Preserve Isolation for Unresolved Equities**: Retain `UNRESOLVED_{{ticker}}_{{spell_seq}}` provisional buckets for all ambiguous records rather than forcing false merges.
 

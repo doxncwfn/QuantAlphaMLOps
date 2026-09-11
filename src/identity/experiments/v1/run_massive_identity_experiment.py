@@ -20,20 +20,19 @@ Strict Constraints:
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from datetime import datetime
 import hashlib
 import json
 import logging
 import os
-from pathlib import Path
 import sys
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from dotenv import load_dotenv
 import polars as pl
 import requests
+from dotenv import load_dotenv
 
 # -----------------------------------------------------------------------------
 # Configuration & Paths
@@ -79,8 +78,7 @@ def setup_logger() -> logging.Logger:
     logger.handlers.clear()
 
     formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)-7s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        "%(asctime)s [%(levelname)-7s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     file_handler = logging.FileHandler(LOG_FILE_PATH, mode="w", encoding="utf-8")
@@ -108,7 +106,7 @@ def compute_file_sha256(filepath: Path) -> str:
 # -----------------------------------------------------------------------------
 # Stratified Test Set Definition
 # -----------------------------------------------------------------------------
-def get_stratified_test_cases() -> List[Dict[str, Any]]:
+def get_stratified_test_cases() -> list[dict[str, Any]]:
     """
     Constructs ~45-50 carefully stratified test cases covering all experimental dimensions.
     """
@@ -122,7 +120,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "A.C. Moore Arts & Crafts, Inc.",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_A_C_MOORE_CIK_0001385534",
-            "rationale": "ACMR Spell 1 early period; should identify A.C. Moore, not modern ACM Research."
+            "rationale": "ACMR Spell 1 early period; should identify A.C. Moore, not modern ACM Research.",
         },
         {
             "case_id": "TC_A02",
@@ -132,7 +130,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "A.C. Moore Arts & Crafts, Inc.",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_A_C_MOORE_CIK_0001385534",
-            "rationale": "ACMR Spell 1 late period prior to 2011 buyout."
+            "rationale": "ACMR Spell 1 late period prior to 2011 buyout.",
         },
         {
             "case_id": "TC_A03",
@@ -142,7 +140,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "ACM Research, Inc. Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_ACM_RESEARCH_CIK_0001680062",
-            "rationale": "ACMR Spell 2 post-IPO semiconductor entity."
+            "rationale": "ACMR Spell 2 post-IPO semiconductor entity.",
         },
         {
             "case_id": "TC_A04",
@@ -152,7 +150,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "ACM Research, Inc. Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_ACM_RESEARCH_CIK_0001680062",
-            "rationale": "ACMR Spell 2 modern period."
+            "rationale": "ACMR Spell 2 modern period.",
         },
         {
             "case_id": "TC_A05",
@@ -162,7 +160,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Historical pre-2010 AAC entity",
             "expected_security_type": "UNKNOWN_OR_DELISTED",
             "expected_behavior": "EXPECT_PRE_2010_ENTITY_OR_EMPTY",
-            "rationale": "AAC Spell 1 historical entity."
+            "rationale": "AAC Spell 1 historical entity.",
         },
         {
             "case_id": "TC_A06",
@@ -172,7 +170,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "AAC Holdings, Inc. (American Addiction Centers)",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_AAC_HOLDINGS_CIK_0001606180",
-            "rationale": "AAC Spell 3 (2014-2019) healthcare provider."
+            "rationale": "AAC Spell 3 (2014-2019) healthcare provider.",
         },
         {
             "case_id": "TC_A07",
@@ -182,7 +180,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Ares Acquisition Corp (SPAC)",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_ARES_ACQUISITION_CIK_0001829432",
-            "rationale": "AAC Spell 4 (2021-2023) completely distinct blank-check sponsor."
+            "rationale": "AAC Spell 4 (2021-2023) completely distinct blank-check sponsor.",
         },
         {
             "case_id": "TC_A08",
@@ -192,7 +190,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Historical early equity under symbol AAA",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_EARLY_AAA_OR_EMPTY",
-            "rationale": "AAA Spell 1 (2004-2007) prior to 13-year disappearance."
+            "rationale": "AAA Spell 1 (2004-2007) prior to 13-year disappearance.",
         },
         {
             "case_id": "TC_A09",
@@ -202,7 +200,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Alternative Access First Priority CLO Bond ETF",
             "expected_security_type": "ETF",
             "expected_behavior": "EXPECT_ALTERNATIVE_ACCESS_ETF_CIK_0001587982",
-            "rationale": "AAA Spell 2 (2020-2026) active CLO ETF."
+            "rationale": "AAA Spell 2 (2020-2026) active CLO ETF.",
         },
         {
             "case_id": "TC_A10",
@@ -212,7 +210,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Roundhill Ball Metaverse ETF",
             "expected_security_type": "ETF",
             "expected_behavior": "EXPECT_ROUNDHILL_METAVERSE_ETF",
-            "rationale": "Roundhill ETF held symbol META until ticker reclassification in early 2022."
+            "rationale": "Roundhill ETF held symbol META until ticker reclassification in early 2022.",
         },
         {
             "case_id": "TC_A11",
@@ -222,9 +220,8 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Meta Platforms, Inc. Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_META_PLATFORMS_CIK_0001326801",
-            "rationale": "Facebook rebranded to Meta Platforms and adopted symbol META on June 9, 2022."
+            "rationale": "Facebook rebranded to Meta Platforms and adopted symbol META on June 9, 2022.",
         },
-
         # Category B: Same Security Across Time (Long-Lived Common Stocks)
         {
             "case_id": "TC_B01",
@@ -234,7 +231,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Apple Inc.",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SAME_AAPL_CIK_0000320193",
-            "rationale": "Continuous common stock baseline (early era)."
+            "rationale": "Continuous common stock baseline (early era).",
         },
         {
             "case_id": "TC_B02",
@@ -244,7 +241,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Apple Inc.",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SAME_AAPL_CIK_0000320193",
-            "rationale": "Continuous common stock baseline (mid era)."
+            "rationale": "Continuous common stock baseline (mid era).",
         },
         {
             "case_id": "TC_B03",
@@ -254,7 +251,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Apple Inc.",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SAME_AAPL_CIK_0000320193",
-            "rationale": "Continuous common stock baseline (recent era)."
+            "rationale": "Continuous common stock baseline (recent era).",
         },
         {
             "case_id": "TC_B04",
@@ -264,7 +261,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Microsoft Corporation",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SAME_MSFT_CIK_0000789019",
-            "rationale": "Continuous common stock baseline (early era)."
+            "rationale": "Continuous common stock baseline (early era).",
         },
         {
             "case_id": "TC_B05",
@@ -274,7 +271,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Microsoft Corporation",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SAME_MSFT_CIK_0000789019",
-            "rationale": "Continuous common stock baseline (mid era)."
+            "rationale": "Continuous common stock baseline (mid era).",
         },
         {
             "case_id": "TC_B06",
@@ -284,7 +281,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Microsoft Corporation",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SAME_MSFT_CIK_0000789019",
-            "rationale": "Continuous common stock baseline (recent era)."
+            "rationale": "Continuous common stock baseline (recent era).",
         },
         {
             "case_id": "TC_B07",
@@ -294,7 +291,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "International Business Machines Corp.",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SAME_IBM_CIK_0000051143",
-            "rationale": "Multi-decade blue-chip baseline."
+            "rationale": "Multi-decade blue-chip baseline.",
         },
         {
             "case_id": "TC_B08",
@@ -304,9 +301,8 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Johnson & Johnson",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SAME_JNJ_CIK_0000200406",
-            "rationale": "Multi-decade blue-chip baseline."
+            "rationale": "Multi-decade blue-chip baseline.",
         },
-
         # Category C & D: Spell Boundaries and Short Gap Invariance (CMCSA June 2014)
         {
             "case_id": "TC_CD01",
@@ -316,7 +312,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "Spell 1 end date immediately inside spell."
+            "rationale": "Spell 1 end date immediately inside spell.",
         },
         {
             "case_id": "TC_CD02",
@@ -326,7 +322,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691_DURING_GAP",
-            "rationale": "Single missing session in Massive active-ticker snapshot; test if reference API maintains identity."
+            "rationale": "Single missing session in Massive active-ticker snapshot; test if reference API maintains identity.",
         },
         {
             "case_id": "TC_CD03",
@@ -336,7 +332,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "Spell 2 start date immediately after 1-day snapshot gap."
+            "rationale": "Spell 2 start date immediately after 1-day snapshot gap.",
         },
         {
             "case_id": "TC_CD04",
@@ -346,7 +342,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "Spell 2 end date immediately inside spell."
+            "rationale": "Spell 2 end date immediately inside spell.",
         },
         {
             "case_id": "TC_CD05",
@@ -356,9 +352,8 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "Spell 3 start date."
+            "rationale": "Spell 3 start date.",
         },
-
         # Category E: Long Gap Inactivity (Mid-Gap Inactive Testing)
         {
             "case_id": "TC_E01",
@@ -368,7 +363,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Disappeared Period)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_MID_GAP",
-            "rationale": "Middle of 1,499-session gap between A.C. Moore delisting and ACM Research IPO."
+            "rationale": "Middle of 1,499-session gap between A.C. Moore delisting and ACM Research IPO.",
         },
         {
             "case_id": "TC_E02",
@@ -378,7 +373,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Disappeared Period)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_MID_GAP",
-            "rationale": "Middle of 492-session gap between Spell 2 and Spell 3."
+            "rationale": "Middle of 492-session gap between Spell 2 and Spell 3.",
         },
         {
             "case_id": "TC_E03",
@@ -388,7 +383,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Disappeared Period)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_MID_GAP",
-            "rationale": "Middle of 354-session gap between AAC Holdings delisting and Ares Acquisition IPO."
+            "rationale": "Middle of 354-session gap between AAC Holdings delisting and Ares Acquisition IPO.",
         },
         {
             "case_id": "TC_E04",
@@ -398,7 +393,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Disappeared Period)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_MID_GAP",
-            "rationale": "Middle of 3,346-session gap (13 calendar years) between Spell 1 and Spell 2."
+            "rationale": "Middle of 3,346-session gap (13 calendar years) between Spell 1 and Spell 2.",
         },
         {
             "case_id": "TC_E05",
@@ -408,9 +403,8 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Disappeared Period)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_MID_GAP",
-            "rationale": "Middle of 5,620-session gap (rank 1 longest gap in dataset: 22.3 years)."
+            "rationale": "Middle of 5,620-session gap (rank 1 longest gap in dataset: 22.3 years).",
         },
-
         # Category F: Historical Ticker Renames / Symbol Transitions
         {
             "case_id": "TC_F01",
@@ -420,7 +414,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Facebook, Inc. Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_FACEBOOK_CIK_0001326801",
-            "rationale": "Pre-rename corporate identity as FB."
+            "rationale": "Pre-rename corporate identity as FB.",
         },
         {
             "case_id": "TC_F02",
@@ -430,7 +424,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Renamed)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_POST_RENAME",
-            "rationale": "Ticker FB ceased to trade in June 2022 after rename to META."
+            "rationale": "Ticker FB ceased to trade in June 2022 after rename to META.",
         },
         {
             "case_id": "TC_F03",
@@ -440,7 +434,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Google Inc. Class A",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_GOOGLE_HISTORICAL_EQUITY",
-            "rationale": "Google equity prior to 2014 stock dividend / Class C creation."
+            "rationale": "Google equity prior to 2014 stock dividend / Class C creation.",
         },
         {
             "case_id": "TC_F04",
@@ -450,7 +444,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Alphabet Inc. Class C Capital Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_ALPHABET_CLASS_C_CIK_0001652044",
-            "rationale": "Post-split non-voting Class C shares."
+            "rationale": "Post-split non-voting Class C shares.",
         },
         {
             "case_id": "TC_F05",
@@ -460,9 +454,8 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Alphabet Inc. Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_ALPHABET_CLASS_A_CIK_0001652044",
-            "rationale": "Post-split voting Class A shares."
+            "rationale": "Post-split voting Class A shares.",
         },
-
         # Category G: Common-Stock vs. Non-Common-Stock Filter Test
         {
             "case_id": "TC_G01",
@@ -472,7 +465,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "SPDR S&P 500 ETF Trust",
             "expected_security_type": "ETF",
             "expected_behavior": "EXPECT_TYPE_ETF",
-            "rationale": "Verify ETF instrument identification for common-stock universe filtering."
+            "rationale": "Verify ETF instrument identification for common-stock universe filtering.",
         },
         {
             "case_id": "TC_G02",
@@ -482,7 +475,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Invesco QQQ Trust Series 1",
             "expected_security_type": "ETF",
             "expected_behavior": "EXPECT_TYPE_ETF",
-            "rationale": "Verify major index ETF instrument identification."
+            "rationale": "Verify major index ETF instrument identification.",
         },
         {
             "case_id": "TC_G03",
@@ -492,7 +485,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Ares Acquisition Corp Units",
             "expected_security_type": "UNIT",
             "expected_behavior": "EXPECT_TYPE_UNIT",
-            "rationale": "Verify SPAC unit identification."
+            "rationale": "Verify SPAC unit identification.",
         },
         {
             "case_id": "TC_G04",
@@ -502,7 +495,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Ares Acquisition Corp Warrants",
             "expected_security_type": "WARRANT",
             "expected_behavior": "EXPECT_TYPE_WARRANT",
-            "rationale": "Verify SPAC warrant identification."
+            "rationale": "Verify SPAC warrant identification.",
         },
         {
             "case_id": "TC_G05",
@@ -512,9 +505,8 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Historical Warrant under AAB.WS",
             "expected_security_type": "WARRANT",
             "expected_behavior": "EXPECT_TYPE_WARRANT_OR_EMPTY",
-            "rationale": "Historical pre-2010 warrant symbol in spells.csv."
+            "rationale": "Historical pre-2010 warrant symbol in spells.csv.",
         },
-
         # Category H: Delisted / Historical Securities
         {
             "case_id": "TC_H01",
@@ -524,7 +516,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Twitter, Inc.",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_TWITTER_CIK_0001418091",
-            "rationale": "Active trading era before October 2022 privatization."
+            "rationale": "Active trading era before October 2022 privatization.",
         },
         {
             "case_id": "TC_H02",
@@ -534,7 +526,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Delisted)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_POST_DELISTING",
-            "rationale": "Post-privatization verification."
+            "rationale": "Post-privatization verification.",
         },
         {
             "case_id": "TC_H03",
@@ -544,7 +536,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Celgene Corporation",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_CELGENE_CIK_0000816284",
-            "rationale": "Active trading era before November 2019 BMY acquisition."
+            "rationale": "Active trading era before November 2019 BMY acquisition.",
         },
         {
             "case_id": "TC_H04",
@@ -554,7 +546,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Acquired)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_POST_DELISTING",
-            "rationale": "Post-acquisition verification."
+            "rationale": "Post-acquisition verification.",
         },
         {
             "case_id": "TC_H05",
@@ -564,7 +556,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "First Republic Bank",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_FIRST_REPUBLIC_CIK_0001499640",
-            "rationale": "Active trading era before May 2023 FDIC receivership."
+            "rationale": "Active trading era before May 2023 FDIC receivership.",
         },
         {
             "case_id": "TC_H06",
@@ -574,7 +566,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Failed Bank)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_POST_DELISTING",
-            "rationale": "Post-failure verification."
+            "rationale": "Post-failure verification.",
         },
         {
             "case_id": "TC_H07",
@@ -584,7 +576,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "SVB Financial Group",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_SVB_CIK_0000719739",
-            "rationale": "Active trading era before March 2023 collapse."
+            "rationale": "Active trading era before March 2023 collapse.",
         },
         {
             "case_id": "TC_H08",
@@ -594,7 +586,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Failed Bank)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_POST_DELISTING",
-            "rationale": "Post-failure verification."
+            "rationale": "Post-failure verification.",
         },
         {
             "case_id": "TC_H09",
@@ -604,7 +596,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Monsanto Company",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_MONSANTO_CIK_0001110783",
-            "rationale": "Active trading era before June 2018 Bayer acquisition."
+            "rationale": "Active trading era before June 2018 Bayer acquisition.",
         },
         {
             "case_id": "TC_H10",
@@ -614,9 +606,8 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "None (Acquired)",
             "expected_security_type": "NO_DATA",
             "expected_behavior": "EXPECT_EMPTY_RESULTS_POST_DELISTING",
-            "rationale": "Post-acquisition verification."
+            "rationale": "Post-acquisition verification.",
         },
-
         # Category J: Within-Spell Representative Date Stability (Sampled CMCSA Spell 1 across 10 years)
         {
             "case_id": "TC_J01",
@@ -626,7 +617,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "CMCSA Spell 1 start boundary."
+            "rationale": "CMCSA Spell 1 start boundary.",
         },
         {
             "case_id": "TC_J02",
@@ -636,7 +627,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "CMCSA Spell 1 ~25% quartile point."
+            "rationale": "CMCSA Spell 1 ~25% quartile point.",
         },
         {
             "case_id": "TC_J03",
@@ -646,7 +637,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "CMCSA Spell 1 midpoint (~5 years in)."
+            "rationale": "CMCSA Spell 1 midpoint (~5 years in).",
         },
         {
             "case_id": "TC_J04",
@@ -656,7 +647,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "CMCSA Spell 1 ~75% quartile point."
+            "rationale": "CMCSA Spell 1 ~75% quartile point.",
         },
         {
             "case_id": "TC_J05",
@@ -666,7 +657,7 @@ def get_stratified_test_cases() -> List[Dict[str, Any]]:
             "expected_entity_name": "Comcast Corporation Class A Common Stock",
             "expected_security_type": "COMMON_STOCK",
             "expected_behavior": "EXPECT_COMCAST_CIK_0001166691",
-            "rationale": "CMCSA Spell 1 penult day before 1-day dropout."
+            "rationale": "CMCSA Spell 1 penult day before 1-day dropout.",
         },
     ]
     return cases
@@ -680,7 +671,7 @@ class MassiveExperimentClient:
         self,
         api_key: str,
         cache_dir: Path = RAW_RESPONSES_DIR,
-        logger: logging.Logger = None
+        logger: logging.Logger = None,
     ):
         self.api_key = api_key
         self.cache_dir = cache_dir
@@ -688,7 +679,7 @@ class MassiveExperimentClient:
         self.session = requests.Session()
         self.logger = logger or logging.getLogger(__name__)
 
-    def query_ticker_date(self, ticker: str, query_date: str) -> Dict[str, Any]:
+    def query_ticker_date(self, ticker: str, query_date: str) -> dict[str, Any]:
         """
         Queries ticker on date with persistent local disk caching and rate-limiting.
         """
@@ -698,29 +689,33 @@ class MassiveExperimentClient:
         # Check disk cache first
         if cache_file.exists():
             try:
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(cache_file, encoding="utf-8") as f:
                     cached_data = json.load(f)
-                self.logger.info("Loaded from disk cache: %s on %s", tk_clean, query_date)
+                self.logger.info(
+                    "Loaded from disk cache: %s on %s", tk_clean, query_date
+                )
                 return {
                     "from_cache": True,
                     "http_status": 200,
                     "raw_json_path": str(cache_file),
                     "response_payload": cached_data,
-                    "error": None
+                    "error": None,
                 }
-            except Exception as e:
-                self.logger.warning("Failed reading cache file %s: %s. Re-querying...", cache_file, e)
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+                self.logger.warning(
+                    "Failed reading cache file %s: %s. Re-querying...", cache_file, e
+                )
 
         # Rate limiting delay before making live request
-        self.logger.info("Enforcing rate-limit delay (%.1fs) before querying '%s' on %s...",
-                         RATE_LIMIT_DELAY_SECONDS, tk_clean, query_date)
+        self.logger.info(
+            "Enforcing rate-limit delay (%.1fs) before querying '%s' on %s...",
+            RATE_LIMIT_DELAY_SECONDS,
+            tk_clean,
+            query_date,
+        )
         time.sleep(RATE_LIMIT_DELAY_SECONDS)
 
-        params = {
-            "ticker": tk_clean,
-            "date": query_date,
-            "apiKey": self.api_key
-        }
+        params = {"ticker": tk_clean, "date": query_date, "apiKey": self.api_key}
 
         retries = 0
         backoff_delay = 35.0
@@ -728,12 +723,20 @@ class MassiveExperimentClient:
         while retries <= MAX_RETRIES:
             try:
                 t0 = time.time()
-                resp = self.session.get(MASSIVE_REFERENCE_URL, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
+                resp = self.session.get(
+                    MASSIVE_REFERENCE_URL,
+                    params=params,
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                )
                 elapsed = time.time() - t0
 
                 if resp.status_code == 429:
-                    self.logger.warning("HTTP 429 Rate Limit encountered. Backing off for %.1fs (retry %d/%d)...",
-                                        backoff_delay, retries + 1, MAX_RETRIES)
+                    self.logger.warning(
+                        "HTTP 429 Rate Limit encountered. Backing off for %.1fs (retry %d/%d)...",
+                        backoff_delay,
+                        retries + 1,
+                        MAX_RETRIES,
+                    )
                     time.sleep(backoff_delay)
                     backoff_delay = min(backoff_delay * 1.5, 90.0)
                     retries += 1
@@ -746,28 +749,41 @@ class MassiveExperimentClient:
                 with open(cache_file, "w", encoding="utf-8") as f:
                     json.dump(payload, f, indent=2)
 
-                self.logger.info("SUCCESS: %s on %s -> HTTP 200 (results: %d, time: %.2fs)",
-                                 tk_clean, query_date, len(payload.get("results", [])), elapsed)
+                self.logger.info(
+                    "SUCCESS: %s on %s -> HTTP 200 (results: %d, time: %.2fs)",
+                    tk_clean,
+                    query_date,
+                    len(payload.get("results", [])),
+                    elapsed,
+                )
 
                 return {
                     "from_cache": False,
                     "http_status": resp.status_code,
                     "raw_json_path": str(cache_file),
                     "response_payload": payload,
-                    "error": None
+                    "error": None,
                 }
 
             except requests.exceptions.RequestException as exc:
-                self.logger.warning("Request failed for '%s' on %s (attempt %d/%d): %s",
-                                    tk_clean, query_date, retries + 1, MAX_RETRIES, exc)
+                self.logger.warning(
+                    "Request failed for '%s' on %s (attempt %d/%d): %s",
+                    tk_clean,
+                    query_date,
+                    retries + 1,
+                    MAX_RETRIES,
+                    exc,
+                )
                 retries += 1
                 if retries > MAX_RETRIES:
                     return {
                         "from_cache": False,
-                        "http_status": getattr(exc.response, "status_code", 500) if hasattr(exc, "response") else 500,
+                        "http_status": getattr(exc.response, "status_code", 500)
+                        if hasattr(exc, "response")
+                        else 500,
                         "raw_json_path": None,
                         "response_payload": None,
-                        "error": str(exc)
+                        "error": str(exc),
                     }
                 time.sleep(10.0)
 
@@ -776,7 +792,7 @@ class MassiveExperimentClient:
             "http_status": 500,
             "raw_json_path": None,
             "response_payload": None,
-            "error": "Max retries exceeded"
+            "error": "Max retries exceeded",
         }
 
 
@@ -784,14 +800,16 @@ class MassiveExperimentClient:
 # Result Processing & Classification
 # -----------------------------------------------------------------------------
 def process_experiment_results(
-    test_cases: List[Dict[str, Any]],
+    test_cases: list[dict[str, Any]],
     client: MassiveExperimentClient,
-    logger: logging.Logger
+    logger: logging.Logger,
 ) -> pl.DataFrame:
     """
     Executes all queries, extracts normalized metadata fields, and classifies instrument types.
     """
-    logger.info("Commencing execution of %d test cases across Massive API...", len(test_cases))
+    logger.info(
+        "Commencing execution of %d test cases across Massive API...", len(test_cases)
+    )
     results_rows = []
 
     for idx, tc in enumerate(test_cases, start=1):
@@ -799,8 +817,15 @@ def process_experiment_results(
         tk = tc["ticker"]
         dt = tc["query_date"]
 
-        logger.info("[%2d/%2d] Processing Case %s: '%s' as of %s (%s)...",
-                    idx, len(test_cases), cid, tk, dt, tc["category"])
+        logger.info(
+            "[%2d/%2d] Processing Case %s: '%s' as of %s (%s)...",
+            idx,
+            len(test_cases),
+            cid,
+            tk,
+            dt,
+            tc["category"],
+        )
 
         res = client.query_ticker_date(tk, dt)
         http_code = res["http_status"]
@@ -811,9 +836,12 @@ def process_experiment_results(
         results_list = payload.get("results", [])
         resp_count = len(results_list)
 
-        matched_record: Optional[Dict[str, Any]] = None
+        matched_record: dict[str, Any] | None = None
         for item in results_list:
-            if isinstance(item, dict) and item.get("ticker", "").strip().upper() == tk.strip().upper():
+            if (
+                isinstance(item, dict)
+                and item.get("ticker", "").strip().upper() == tk.strip().upper()
+            ):
                 matched_record = item
                 break
 
@@ -834,12 +862,16 @@ def process_experiment_results(
         ret_sc_figi = matched_record.get("share_class_figi") if matched_record else None
         ret_comp_figi = matched_record.get("composite_figi") if matched_record else None
         ret_type = matched_record.get("type") if matched_record else None
-        ret_exchange = matched_record.get("primary_exchange") if matched_record else None
+        ret_exchange = (
+            matched_record.get("primary_exchange") if matched_record else None
+        )
         ret_market = matched_record.get("market") if matched_record else None
         ret_locale = matched_record.get("locale") if matched_record else None
         ret_active = matched_record.get("active") if matched_record else None
         ret_currency = matched_record.get("currency_name") if matched_record else None
-        ret_last_updated = matched_record.get("last_updated_utc") if matched_record else None
+        ret_last_updated = (
+            matched_record.get("last_updated_utc") if matched_record else None
+        )
 
         # Common-stock classification logic
         if req_status == "EMPTY_RESULTS":
@@ -850,38 +882,43 @@ def process_experiment_results(
             cs_class = f"NON_COMMON_STOCK_{ret_type}"
         elif ret_type is None:
             # Investigate name heuristic
-            if ret_name and any(term in ret_name.upper() for term in ["INC", "CORP", "CO.", "LTD", "HOLDINGS"]):
+            if ret_name and any(
+                term in ret_name.upper()
+                for term in ["INC", "CORP", "CO.", "LTD", "HOLDINGS"]
+            ):
                 cs_class = "COMMON_STOCK_UNSPECIFIED_TYPE"
             else:
                 cs_class = "UNKNOWN_TYPE"
         else:
             cs_class = f"NON_COMMON_STOCK_{ret_type}"
 
-        results_rows.append({
-            "case_id": cid,
-            "category": tc["category"],
-            "ticker": tk,
-            "query_date": dt,
-            "http_status": http_code,
-            "request_status": req_status,
-            "response_count": resp_count,
-            "returned_name": ret_name,
-            "returned_cik": ret_cik,
-            "returned_share_class_figi": ret_sc_figi,
-            "returned_composite_figi": ret_comp_figi,
-            "returned_security_type": ret_type,
-            "returned_exchange": ret_exchange,
-            "returned_market": ret_market,
-            "returned_locale": ret_locale,
-            "returned_active": ret_active,
-            "returned_currency": ret_currency,
-            "returned_last_updated": ret_last_updated,
-            "common_stock_classification": cs_class,
-            "from_disk_cache": res.get("from_cache", False),
-            "raw_json_path": raw_path,
-            "retrieval_timestamp": datetime.utcnow().isoformat(),
-            "error": err_msg,
-        })
+        results_rows.append(
+            {
+                "case_id": cid,
+                "category": tc["category"],
+                "ticker": tk,
+                "query_date": dt,
+                "http_status": http_code,
+                "request_status": req_status,
+                "response_count": resp_count,
+                "returned_name": ret_name,
+                "returned_cik": ret_cik,
+                "returned_share_class_figi": ret_sc_figi,
+                "returned_composite_figi": ret_comp_figi,
+                "returned_security_type": ret_type,
+                "returned_exchange": ret_exchange,
+                "returned_market": ret_market,
+                "returned_locale": ret_locale,
+                "returned_active": ret_active,
+                "returned_currency": ret_currency,
+                "returned_last_updated": ret_last_updated,
+                "common_stock_classification": cs_class,
+                "from_disk_cache": res.get("from_cache", False),
+                "raw_json_path": raw_path,
+                "retrieval_timestamp": datetime.utcnow().isoformat(),
+                "error": err_msg,
+            }
+        )
 
     df_results = pl.DataFrame(results_rows)
     return df_results
@@ -890,7 +927,9 @@ def process_experiment_results(
 # -----------------------------------------------------------------------------
 # Comparison & Stability Analyses
 # -----------------------------------------------------------------------------
-def build_comparison_matrix(df_results: pl.DataFrame, logger: logging.Logger) -> pl.DataFrame:
+def build_comparison_matrix(
+    df_results: pl.DataFrame, logger: logging.Logger
+) -> pl.DataFrame:
     """
     Constructs pairwise historical date comparisons to test date sensitivity.
     """
@@ -899,56 +938,157 @@ def build_comparison_matrix(df_results: pl.DataFrame, logger: logging.Logger) ->
 
     comparison_specs = [
         # Ticker Reuse: ACMR
-        ("CMP_ACMR_01", "ACMR", "TICKER_REUSE_FLAGSHIP", "TC_A01", "TC_A03",
-         "A.C. Moore (2005) vs ACM Research (2018): Critical test of ticker-reuse separation"),
-        ("CMP_ACMR_02", "ACMR", "WITHIN_SPELL_SAME_COMPANY", "TC_A01", "TC_A02",
-         "A.C. Moore (2005) vs A.C. Moore (2010): Same entity stability within Spell 1"),
-        ("CMP_ACMR_03", "ACMR", "WITHIN_SPELL_SAME_COMPANY", "TC_A03", "TC_A04",
-         "ACM Research (2018) vs ACM Research (2025): Same entity stability within Spell 2"),
-        ("CMP_ACMR_04", "ACMR", "ACTIVE_VS_MID_GAP", "TC_A01", "TC_E01",
-         "A.C. Moore (2005) vs Mid-Gap (2014): Delisting gap behavior"),
-
+        (
+            "CMP_ACMR_01",
+            "ACMR",
+            "TICKER_REUSE_FLAGSHIP",
+            "TC_A01",
+            "TC_A03",
+            "A.C. Moore (2005) vs ACM Research (2018): Critical test of ticker-reuse separation",
+        ),
+        (
+            "CMP_ACMR_02",
+            "ACMR",
+            "WITHIN_SPELL_SAME_COMPANY",
+            "TC_A01",
+            "TC_A02",
+            "A.C. Moore (2005) vs A.C. Moore (2010): Same entity stability within Spell 1",
+        ),
+        (
+            "CMP_ACMR_03",
+            "ACMR",
+            "WITHIN_SPELL_SAME_COMPANY",
+            "TC_A03",
+            "TC_A04",
+            "ACM Research (2018) vs ACM Research (2025): Same entity stability within Spell 2",
+        ),
+        (
+            "CMP_ACMR_04",
+            "ACMR",
+            "ACTIVE_VS_MID_GAP",
+            "TC_A01",
+            "TC_E01",
+            "A.C. Moore (2005) vs Mid-Gap (2014): Delisting gap behavior",
+        ),
         # Ticker Reuse: AAC
-        ("CMP_AAC_01", "AAC", "TICKER_REUSE_MULTI_COMPANY", "TC_A06", "TC_A07",
-         "AAC Holdings (2016) vs Ares Acquisition (2022): Healthcare stock vs SPAC"),
-        ("CMP_AAC_02", "AAC", "ACTIVE_VS_MID_GAP", "TC_A06", "TC_E03",
-         "AAC Holdings (2016) vs Mid-Gap (2020): Inactive period between reuses"),
-
+        (
+            "CMP_AAC_01",
+            "AAC",
+            "TICKER_REUSE_MULTI_COMPANY",
+            "TC_A06",
+            "TC_A07",
+            "AAC Holdings (2016) vs Ares Acquisition (2022): Healthcare stock vs SPAC",
+        ),
+        (
+            "CMP_AAC_02",
+            "AAC",
+            "ACTIVE_VS_MID_GAP",
+            "TC_A06",
+            "TC_E03",
+            "AAC Holdings (2016) vs Mid-Gap (2020): Inactive period between reuses",
+        ),
         # Ticker Reuse: AAA
-        ("CMP_AAA_01", "AAA", "TICKER_REUSE_MULTI_COMPANY", "TC_A08", "TC_A09",
-         "Early AAA (2005) vs Alternative Access ETF (2022): Multi-year gap reuse"),
-
+        (
+            "CMP_AAA_01",
+            "AAA",
+            "TICKER_REUSE_MULTI_COMPANY",
+            "TC_A08",
+            "TC_A09",
+            "Early AAA (2005) vs Alternative Access ETF (2022): Multi-year gap reuse",
+        ),
         # Symbol Transfer: META
-        ("CMP_META_01", "META", "SYMBOL_TRANSFER", "TC_A10", "TC_A11",
-         "Roundhill Metaverse ETF (2021) vs Meta Platforms (2023): Ticker reassignment"),
-
+        (
+            "CMP_META_01",
+            "META",
+            "SYMBOL_TRANSFER",
+            "TC_A10",
+            "TC_A11",
+            "Roundhill Metaverse ETF (2021) vs Meta Platforms (2023): Ticker reassignment",
+        ),
         # Blue-Chip Continuity: AAPL, MSFT
-        ("CMP_AAPL_01", "AAPL", "SAME_SECURITY_STABILITY", "TC_B01", "TC_B03",
-         "Apple (2005) vs Apple (2025): 20-year continuity check"),
-        ("CMP_MSFT_01", "MSFT", "SAME_SECURITY_STABILITY", "TC_B04", "TC_B06",
-         "Microsoft (2005) vs Microsoft (2025): 20-year continuity check"),
-
+        (
+            "CMP_AAPL_01",
+            "AAPL",
+            "SAME_SECURITY_STABILITY",
+            "TC_B01",
+            "TC_B03",
+            "Apple (2005) vs Apple (2025): 20-year continuity check",
+        ),
+        (
+            "CMP_MSFT_01",
+            "MSFT",
+            "SAME_SECURITY_STABILITY",
+            "TC_B04",
+            "TC_B06",
+            "Microsoft (2005) vs Microsoft (2025): 20-year continuity check",
+        ),
         # Short Gap Invariance: CMCSA June 2014
-        ("CMP_CMCSA_01", "CMCSA", "SHORT_GAP_INVARIANCE", "TC_CD01", "TC_CD02",
-         "Before Gap (2014-06-18) vs During Gap (2014-06-19): 1-session snapshot dropout"),
-        ("CMP_CMCSA_02", "CMCSA", "SHORT_GAP_INVARIANCE", "TC_CD02", "TC_CD05",
-         "During Gap (2014-06-19) vs Resumed Spell (2014-06-24): Continuity across 2014 snapshot gap"),
-
+        (
+            "CMP_CMCSA_01",
+            "CMCSA",
+            "SHORT_GAP_INVARIANCE",
+            "TC_CD01",
+            "TC_CD02",
+            "Before Gap (2014-06-18) vs During Gap (2014-06-19): 1-session snapshot dropout",
+        ),
+        (
+            "CMP_CMCSA_02",
+            "CMCSA",
+            "SHORT_GAP_INVARIANCE",
+            "TC_CD02",
+            "TC_CD05",
+            "During Gap (2014-06-19) vs Resumed Spell (2014-06-24): Continuity across 2014 snapshot gap",
+        ),
         # Historical Rename: FB
-        ("CMP_FB_01", "FB", "HISTORICAL_RENAME", "TC_F01", "TC_F02",
-         "Active FB (2018) vs Post-Rename FB (2023): Renamed symbol cessation"),
-
+        (
+            "CMP_FB_01",
+            "FB",
+            "HISTORICAL_RENAME",
+            "TC_F01",
+            "TC_F02",
+            "Active FB (2018) vs Post-Rename FB (2023): Renamed symbol cessation",
+        ),
         # Delisted Securities: TWTR, CELG, FRC, SIVB, MON
-        ("CMP_TWTR_01", "TWTR", "ACTIVE_VS_POST_DELISTING", "TC_H01", "TC_H02",
-         "Twitter Active (2018) vs Post-Privatization (2024)"),
-        ("CMP_CELG_01", "CELG", "ACTIVE_VS_POST_DELISTING", "TC_H03", "TC_H04",
-         "Celgene Active (2017) vs Post-Acquisition (2022)"),
-        ("CMP_FRC_01", "FRC", "ACTIVE_VS_POST_DELISTING", "TC_H05", "TC_H06",
-         "First Republic Active (2021) vs Post-Failure (2024)"),
-        ("CMP_SIVB_01", "SIVB", "ACTIVE_VS_POST_DELISTING", "TC_H07", "TC_H08",
-         "Silicon Valley Bank Active (2021) vs Post-Failure (2024)"),
-        ("CMP_MON_01", "MON", "TICKER_REUSE_DISCOVERY", "TC_H09", "TC_H10",
-         "Monsanto Active (2016) vs Monument Circle Acq (2021): Delisted equity ticker reuse"),
+        (
+            "CMP_TWTR_01",
+            "TWTR",
+            "ACTIVE_VS_POST_DELISTING",
+            "TC_H01",
+            "TC_H02",
+            "Twitter Active (2018) vs Post-Privatization (2024)",
+        ),
+        (
+            "CMP_CELG_01",
+            "CELG",
+            "ACTIVE_VS_POST_DELISTING",
+            "TC_H03",
+            "TC_H04",
+            "Celgene Active (2017) vs Post-Acquisition (2022)",
+        ),
+        (
+            "CMP_FRC_01",
+            "FRC",
+            "ACTIVE_VS_POST_DELISTING",
+            "TC_H05",
+            "TC_H06",
+            "First Republic Active (2021) vs Post-Failure (2024)",
+        ),
+        (
+            "CMP_SIVB_01",
+            "SIVB",
+            "ACTIVE_VS_POST_DELISTING",
+            "TC_H07",
+            "TC_H08",
+            "Silicon Valley Bank Active (2021) vs Post-Failure (2024)",
+        ),
+        (
+            "CMP_MON_01",
+            "MON",
+            "TICKER_REUSE_DISCOVERY",
+            "TC_H09",
+            "TC_H10",
+            "Monsanto Active (2016) vs Monument Circle Acq (2021): Delisted equity ticker reuse",
+        ),
     ]
 
     comp_rows = []
@@ -967,63 +1107,94 @@ def build_comparison_matrix(df_results: pl.DataFrame, logger: logging.Logger) ->
 
         cik_changed = (cik1 != cik2) and (cik1 is not None and cik2 is not None)
         figi_changed = (figi1 != figi2) and (figi1 is not None and figi2 is not None)
-        name_changed = (name1 != name2)
-        type_changed = (type1 != type2)
+        name_changed = name1 != name2
+        type_changed = type1 != type2
 
         # Permanent security master identity is defined by CIK and Share-Class FIGI.
         # Corporate name shifts (e.g. APPLE COMPUTER INC -> Apple Inc) or casing changes do not constitute identity change.
-        if (cik1 is not None and cik2 is not None) or (figi1 is not None and figi2 is not None):
+        if (cik1 is not None and cik2 is not None) or (
+            figi1 is not None and figi2 is not None
+        ):
             cik_diff = (cik1 != cik2) if (cik1 and cik2) else False
             figi_diff = (figi1 != figi2) if (figi1 and figi2) else False
             identity_changed = cik_diff or figi_diff
         else:
-            identity_changed = (name1 != name2)
+            identity_changed = name1 != name2
 
         # Verdict assignment
-        if ctype in ["TICKER_REUSE_FLAGSHIP", "TICKER_REUSE_MULTI_COMPANY", "SYMBOL_TRANSFER", "TICKER_REUSE_DISCOVERY"]:
+        if ctype in [
+            "TICKER_REUSE_FLAGSHIP",
+            "TICKER_REUSE_MULTI_COMPANY",
+            "SYMBOL_TRANSFER",
+            "TICKER_REUSE_DISCOVERY",
+        ]:
             expected_change = True
             date_sensitive = identity_changed
-            verdict = "PASS_DATE_AWARE_SEPARATION" if identity_changed else "FAIL_DATE_BLIND_COLLISION"
-        elif ctype in ["SAME_SECURITY_STABILITY", "WITHIN_SPELL_SAME_COMPANY", "SHORT_GAP_INVARIANCE"]:
+            verdict = (
+                "PASS_DATE_AWARE_SEPARATION"
+                if identity_changed
+                else "FAIL_DATE_BLIND_COLLISION"
+            )
+        elif ctype in [
+            "SAME_SECURITY_STABILITY",
+            "WITHIN_SPELL_SAME_COMPANY",
+            "SHORT_GAP_INVARIANCE",
+        ]:
             expected_change = False
             date_sensitive = not identity_changed
-            verdict = "PASS_STABLE_IDENTITY" if not identity_changed else "FAIL_UNSTABLE_IDENTITY"
-        elif ctype in ["ACTIVE_VS_MID_GAP", "ACTIVE_VS_POST_DELISTING", "HISTORICAL_RENAME"]:
+            verdict = (
+                "PASS_STABLE_IDENTITY"
+                if not identity_changed
+                else "FAIL_UNSTABLE_IDENTITY"
+            )
+        elif ctype in [
+            "ACTIVE_VS_MID_GAP",
+            "ACTIVE_VS_POST_DELISTING",
+            "HISTORICAL_RENAME",
+        ]:
             # Expect active on date 1, empty/no data on date 2
-            date_sensitive = (r1["response_count"] > 0 and r2["response_count"] == 0)
-            verdict = "PASS_TEMPORAL_DELIMITATION" if date_sensitive else "INVESTIGATE_DELIMITATION"
+            date_sensitive = r1["response_count"] > 0 and r2["response_count"] == 0
+            verdict = (
+                "PASS_TEMPORAL_DELIMITATION"
+                if date_sensitive
+                else "INVESTIGATE_DELIMITATION"
+            )
         else:
             date_sensitive = False
             verdict = "UNCORRELATED"
 
-        comp_rows.append({
-            "comparison_id": cid,
-            "ticker": tk,
-            "comparison_category": ctype,
-            "description": desc,
-            "date_1": r1["query_date"],
-            "date_2": r2["query_date"],
-            "entity_1": name1,
-            "entity_2": name2,
-            "cik_1": cik1,
-            "cik_2": cik2,
-            "figi_1": figi1,
-            "figi_2": figi2,
-            "type_1": type1,
-            "type_2": type2,
-            "identity_changed": identity_changed,
-            "cik_changed": cik_changed,
-            "figi_changed": figi_changed,
-            "name_changed": name_changed,
-            "type_changed": type_changed,
-            "date_sensitive_as_expected": date_sensitive,
-            "analytical_verdict": verdict,
-        })
+        comp_rows.append(
+            {
+                "comparison_id": cid,
+                "ticker": tk,
+                "comparison_category": ctype,
+                "description": desc,
+                "date_1": r1["query_date"],
+                "date_2": r2["query_date"],
+                "entity_1": name1,
+                "entity_2": name2,
+                "cik_1": cik1,
+                "cik_2": cik2,
+                "figi_1": figi1,
+                "figi_2": figi2,
+                "type_1": type1,
+                "type_2": type2,
+                "identity_changed": identity_changed,
+                "cik_changed": cik_changed,
+                "figi_changed": figi_changed,
+                "name_changed": name_changed,
+                "type_changed": type_changed,
+                "date_sensitive_as_expected": date_sensitive,
+                "analytical_verdict": verdict,
+            }
+        )
 
     return pl.DataFrame(comp_rows)
 
 
-def build_stability_matrix(df_results: pl.DataFrame, logger: logging.Logger) -> pl.DataFrame:
+def build_stability_matrix(
+    df_results: pl.DataFrame, logger: logging.Logger
+) -> pl.DataFrame:
     """
     Evaluates within-spell stability across sampled dates for long continuous spells.
     """
@@ -1041,7 +1212,11 @@ def build_stability_matrix(df_results: pl.DataFrame, logger: logging.Logger) -> 
     cmcsa_names = [r["returned_name"] for r in cmcsa_records]
     cmcsa_types = [r["returned_security_type"] for r in cmcsa_records]
 
-    cmcsa_stable = (len(set(cmcsa_ciks)) == 1) and (len(set(cmcsa_figis)) == 1) and (cmcsa_ciks[0] is not None)
+    cmcsa_stable = (
+        (len(set(cmcsa_ciks)) == 1)
+        and (len(set(cmcsa_figis)) == 1)
+        and (cmcsa_ciks[0] is not None)
+    )
 
     # Stability Suite 2: AAPL Continuous Span (5,699 sessions, 2004 to 2026)
     aapl_cases = ["TC_B01", "TC_B02", "TC_B03"]
@@ -1053,7 +1228,11 @@ def build_stability_matrix(df_results: pl.DataFrame, logger: logging.Logger) -> 
     aapl_names = [r["returned_name"] for r in aapl_records]
     aapl_types = [r["returned_security_type"] for r in aapl_records]
 
-    aapl_stable = (len(set(aapl_ciks)) == 1) and (len(set(aapl_figis)) == 1) and (aapl_ciks[0] is not None)
+    aapl_stable = (
+        (len(set(aapl_ciks)) == 1)
+        and (len(set(aapl_figis)) == 1)
+        and (aapl_ciks[0] is not None)
+    )
 
     stability_rows = [
         {
@@ -1099,7 +1278,7 @@ def generate_experiment_report(
     df_results: pl.DataFrame,
     df_comp: pl.DataFrame,
     df_stab: pl.DataFrame,
-    logger: logging.Logger
+    logger: logging.Logger,
 ):
     """
     Writes report/quality/massive_date_aware_identity_report.md fulfilling all prompt sections A through I.
@@ -1112,17 +1291,25 @@ def generate_experiment_report(
     n_error = df_results.filter(pl.col("request_status") == "ERROR").height
 
     # Common stock breakdown
-    cs_counts = df_results["common_stock_classification"].value_counts().sort("count", descending=True)
-    cs_table = "\n".join([f"| `{r['common_stock_classification']}` | {r['count']} | {r['count']/total_queries*100:.1f}% |"
-                          for r in cs_counts.iter_rows(named=True)])
+    cs_counts = (
+        df_results["common_stock_classification"]
+        .value_counts()
+        .sort("count", descending=True)
+    )
+    cs_table = "\n".join(
+        [
+            f"| `{r['common_stock_classification']}` | {r['count']} | {r['count'] / total_queries * 100:.1f}% |"
+            for r in cs_counts.iter_rows(named=True)
+        ]
+    )
 
     # Test matrix rows
     matrix_rows = []
     for r in df_results.iter_rows(named=True):
-        name_str = (r['returned_name'] or '—')[:32]
-        figi_str = r['returned_share_class_figi'] or '—'
-        cik_str = r['returned_cik'] or '—'
-        type_str = r['returned_security_type'] or '—'
+        name_str = (r["returned_name"] or "—")[:32]
+        figi_str = r["returned_share_class_figi"] or "—"
+        cik_str = r["returned_cik"] or "—"
+        type_str = r["returned_security_type"] or "—"
         matrix_rows.append(
             f"| `{r['case_id']}` | `{r['ticker']}` | `{r['query_date']}` | {name_str} | `{type_str}` | `{figi_str}` | `{cik_str}` | `{r['request_status']}` |"
         )
@@ -1131,13 +1318,13 @@ def generate_experiment_report(
     # Date sensitivity comparison rows
     comp_rows_md = []
     for r in df_comp.iter_rows(named=True):
-        e1 = (r['entity_1'] or 'EMPTY')[:22]
-        e2 = (r['entity_2'] or 'EMPTY')[:22]
-        c1 = r['cik_1'] or '—'
-        c2 = r['cik_2'] or '—'
-        f1 = r['figi_1'] or '—'
-        f2 = r['figi_2'] or '—'
-        sens = "YES" if r['date_sensitive_as_expected'] else "NO"
+        e1 = (r["entity_1"] or "EMPTY")[:22]
+        e2 = (r["entity_2"] or "EMPTY")[:22]
+        c1 = r["cik_1"] or "—"
+        c2 = r["cik_2"] or "—"
+        f1 = r["figi_1"] or "—"
+        f2 = r["figi_2"] or "—"
+        sens = "YES" if r["date_sensitive_as_expected"] else "NO"
         comp_rows_md.append(
             f"| `{r['ticker']}` | `{r['date_1']}` vs `{r['date_2']}` | {e1} vs {e2} | `{c1}` vs `{c2}` | `{f1}` vs `{f2}` | **{sens}** | `{r['analytical_verdict']}` |"
         )
@@ -1317,9 +1504,9 @@ The reference API does **not** drop identity metadata during transient 1-day sna
 | Metric | Result | Operational Assessment |
 | :--- | ---:| :--- |
 | **Total Test Queries Executed** | **{total_queries}** | Complete stratified test suite |
-| **Successful HTTP 200 Requests** | **{n_success} ({n_success/total_queries*100:.1f}%)** | 0 connection drops or HTTP 5xx errors |
-| **Requests with Active Entity Results** | **{df_results.filter(pl.col('response_count') > 0).height} ({df_results.filter(pl.col('response_count') > 0).height/total_queries*100:.1f}%)** | Active historical entities resolved |
-| **Requests with Empty Results (`[]`)** | **{n_empty} ({n_empty/total_queries*100:.1f}%)** | Delisted post-periods, mid-gap inactive windows, historical renames |
+| **Successful HTTP 200 Requests** | **{n_success} ({n_success / total_queries * 100:.1f}%)** | 0 connection drops or HTTP 5xx errors |
+| **Requests with Active Entity Results** | **{df_results.filter(pl.col("response_count") > 0).height} ({df_results.filter(pl.col("response_count") > 0).height / total_queries * 100:.1f}%)** | Active historical entities resolved |
+| **Requests with Empty Results (`[]`)** | **{n_empty} ({n_empty / total_queries * 100:.1f}%)** | Delisted post-periods, mid-gap inactive windows, historical renames |
 | **Uncaught HTTP 429 Rate-Limit Errors**| **0 (0.0%)** | Fully managed by client throttle & backoff |
 | **Disk Cache Hit Rate** | **100% on replay**| Deterministic cache persistence verified |
 
@@ -1397,20 +1584,33 @@ def run_experiment():
     EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
     df_cases.write_parquet(TEST_CASES_PARQUET)
     df_cases.write_csv(TEST_CASES_CSV)
-    logger.info("Saved %d test cases to %s and %s", df_cases.height, TEST_CASES_PARQUET, TEST_CASES_CSV)
+    logger.info(
+        "Saved %d test cases to %s and %s",
+        df_cases.height,
+        TEST_CASES_PARQUET,
+        TEST_CASES_CSV,
+    )
 
     # 4. Initialize client and run queries
-    client = MassiveExperimentClient(api_key=MASSIVE_API_KEY, cache_dir=RAW_RESPONSES_DIR, logger=logger)
+    client = MassiveExperimentClient(
+        api_key=MASSIVE_API_KEY, cache_dir=RAW_RESPONSES_DIR, logger=logger
+    )
     df_results = process_experiment_results(test_cases, client, logger)
     df_results.write_parquet(TEST_RESULTS_PARQUET)
     df_results.write_csv(TEST_RESULTS_CSV)
-    logger.info("Saved test results to %s and %s", TEST_RESULTS_PARQUET, TEST_RESULTS_CSV)
+    logger.info(
+        "Saved test results to %s and %s", TEST_RESULTS_PARQUET, TEST_RESULTS_CSV
+    )
 
     # 5. Build pairwise comparisons
     df_comp = build_comparison_matrix(df_results, logger)
     df_comp.write_parquet(COMPARISON_PARQUET)
     df_comp.write_csv(COMPARISON_CSV)
-    logger.info("Saved pairwise comparison matrix to %s and %s", COMPARISON_PARQUET, COMPARISON_CSV)
+    logger.info(
+        "Saved pairwise comparison matrix to %s and %s",
+        COMPARISON_PARQUET,
+        COMPARISON_CSV,
+    )
 
     # 6. Build stability matrix
     df_stab = build_stability_matrix(df_results, logger)
@@ -1426,10 +1626,14 @@ def run_experiment():
     if initial_spells_hash != final_spells_hash:
         logger.error("FATAL: spells.csv was modified during experiment execution!")
         raise RuntimeError("Integrity violation: spells.csv was modified")
-    logger.info("VERIFIED: spells.csv remained 100%% unchanged (SHA-256: %s)", final_spells_hash)
+    logger.info(
+        "VERIFIED: spells.csv remained 100%% unchanged (SHA-256: %s)", final_spells_hash
+    )
 
     logger.info("=" * 80)
-    logger.info("EXPERIMENT PIPELINE COMPLETED SUCCESSFULLY IN %.2f SECONDS", time.time() - t0)
+    logger.info(
+        "EXPERIMENT PIPELINE COMPLETED SUCCESSFULLY IN %.2f SECONDS", time.time() - t0
+    )
     logger.info("=" * 80)
 
 

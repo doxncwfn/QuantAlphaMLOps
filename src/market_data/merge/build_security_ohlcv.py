@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
 
 import polars as pl
 
@@ -48,30 +46,44 @@ class SecurityMarketDataConsolidator:
             row["security_id"]: row for row in self.sec_master_df.to_dicts()
         }
 
-    def consolidate(self, max_securities_to_process: Optional[int] = None) -> pl.DataFrame:
+    def consolidate(self, max_securities_to_process: int | None = None) -> pl.DataFrame:
         """Consolidates market data across available provider data."""
         logger.info("Starting security market data consolidation...")
 
         # Find which tickers/securities have cached market data in yfinance_cache
         cached_files = list(YFINANCE_CACHE_DIR.glob("*.parquet"))
         cached_tickers = {p.stem.upper() for p in cached_files}
-        logger.info("Found %d cached ticker files in %s", len(cached_tickers), YFINANCE_CACHE_DIR)
+        logger.info(
+            "Found %d cached ticker files in %s",
+            len(cached_tickers),
+            YFINANCE_CACHE_DIR,
+        )
 
         # Filter queue to available candidates
-        queue_matches = self.queue_df.filter(pl.col("ticker").is_in(list(cached_tickers)))
+        queue_matches = self.queue_df.filter(
+            pl.col("ticker").is_in(list(cached_tickers))
+        )
         if max_securities_to_process:
             queue_matches = queue_matches.head(max_securities_to_process)
 
         target_sec_ids = set(queue_matches["security_id"].unique().to_list())
-        logger.info("Processing market data for %d distinct security IDs (%d queue episodes)...",
-                    len(target_sec_ids), queue_matches.height)
+        logger.info(
+            "Processing market data for %d distinct security IDs (%d queue episodes)...",
+            len(target_sec_ids),
+            queue_matches.height,
+        )
 
         # Scan expected dates for these target securities
         logger.info("Scanning expected security dates for target securities...")
-        target_expected_df = pl.scan_parquet(EXPECTED_SECURITY_DATES_PARQUET).filter(
-            pl.col("security_id").is_in(list(target_sec_ids))
-        ).collect()
-        logger.info("Loaded %d expected date records for target securities.", target_expected_df.height)
+        target_expected_df = (
+            pl.scan_parquet(EXPECTED_SECURITY_DATES_PARQUET)
+            .filter(pl.col("security_id").is_in(list(target_sec_ids)))
+            .collect()
+        )
+        logger.info(
+            "Loaded %d expected date records for target securities.",
+            target_expected_df.height,
+        )
 
         # Build raw prices table from cache
         raw_price_records = []
@@ -94,21 +106,29 @@ class SecurityMarketDataConsolidator:
                     df = df.with_columns(pl.col("date").dt.strftime("%Y-%m-%d"))
 
                 for p_row in df.iter_rows(named=True):
-                    raw_price_records.append({
-                        "security_id": sec_id,
-                        "date": str(p_row["date"]),
-                        "ticker": tk,
-                        "open": float(p_row["open"]),
-                        "high": float(p_row["high"]),
-                        "low": float(p_row["low"]),
-                        "close": float(p_row["close"]),
-                        "adj_close": float(p_row.get("adj_close", p_row["close"])),
-                        "volume": float(p_row["volume"]),
-                        "episode_id": ep_id,
-                        "source": "YFINANCE",
-                        "source_confidence": "HIGH"
-                    })
-            except Exception as e:
+                    raw_price_records.append(
+                        {
+                            "security_id": sec_id,
+                            "date": str(p_row["date"]),
+                            "ticker": tk,
+                            "open": float(p_row["open"]),
+                            "high": float(p_row["high"]),
+                            "low": float(p_row["low"]),
+                            "close": float(p_row["close"]),
+                            "adj_close": float(p_row.get("adj_close", p_row["close"])),
+                            "volume": float(p_row["volume"]),
+                            "episode_id": ep_id,
+                            "source": "YFINANCE",
+                            "source_confidence": "HIGH",
+                        }
+                    )
+            except (
+                OSError,
+                pl.exceptions.PolarsError,
+                KeyError,
+                ValueError,
+                TypeError,
+            ) as e:
                 logger.warning("Error reading cache for %s: %s", tk, e)
 
         raw_prices_df = pl.DataFrame(raw_price_records)
@@ -116,26 +136,44 @@ class SecurityMarketDataConsolidator:
 
         # Validate price sanity
         clean_prices_df, price_anomalies = validate_price_sanity(raw_prices_df)
-        logger.info("Validated price sanity: %d clean records, %d anomalies detected.",
-                    clean_prices_df.height, price_anomalies.height)
+        logger.info(
+            "Validated price sanity: %d clean records, %d anomalies detected.",
+            clean_prices_df.height,
+            price_anomalies.height,
+        )
 
         # Detect splits
         splits_df = detect_price_splits(clean_prices_df)
-        logger.info("Detected %d corporate action / price split candidates.", splits_df.height)
+        logger.info(
+            "Detected %d corporate action / price split candidates.", splits_df.height
+        )
 
         # Detect missing dates against expected matrix
         missing_dates_df = detect_missing_dates(target_expected_df, clean_prices_df)
-        logger.info("Identified %d missing market dates against expected matrix.", missing_dates_df.height)
+        logger.info(
+            "Identified %d missing market dates against expected matrix.",
+            missing_dates_df.height,
+        )
 
         # Merge expected matrix with clean prices
         # Left join expected with prices so that every expected date is represented
         merged = target_expected_df.join(
-            clean_prices_df.select([
-                "security_id", "date", "open", "high", "low", "close", "adj_close", "volume",
-                "source", "source_confidence"
-            ]),
+            clean_prices_df.select(
+                [
+                    "security_id",
+                    "date",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "adj_close",
+                    "volume",
+                    "source",
+                    "source_confidence",
+                ]
+            ),
             on=["security_id", "date"],
-            how="left"
+            how="left",
         )
 
         # Build final security_daily_prices schema
@@ -145,7 +183,7 @@ class SecurityMarketDataConsolidator:
             dt = row["date"]
             tk = row.get("ticker", "UNKNOWN")
             exp_state = row.get("expectation_state", "OBSERVED_ACTIVE")
-            
+
             c_open = row.get("open")
             c_high = row.get("high")
             c_low = row.get("low")
@@ -169,25 +207,27 @@ class SecurityMarketDataConsolidator:
             cik = meta.get("cik")
             ep_id = f"EP_{sec_id}_01"
 
-            final_records.append({
-                "security_id": sec_id,
-                "date": dt,
-                "ticker": tk,
-                "open": c_open,
-                "high": c_high,
-                "low": c_low,
-                "close": c_close,
-                "adj_close": c_adj,
-                "volume": c_vol,
-                "availability_state": exp_state,
-                "price_state": p_state,
-                "source": row.get("source", "UNKNOWN"),
-                "source_confidence": row.get("source_confidence", "UNRESOLVED"),
-                "episode_id": ep_id,
-                "figi": figi,
-                "cik": cik,
-                "quality_flags": q_flags,
-            })
+            final_records.append(
+                {
+                    "security_id": sec_id,
+                    "date": dt,
+                    "ticker": tk,
+                    "open": c_open,
+                    "high": c_high,
+                    "low": c_low,
+                    "close": c_close,
+                    "adj_close": c_adj,
+                    "volume": c_vol,
+                    "availability_state": exp_state,
+                    "price_state": p_state,
+                    "source": row.get("source", "UNKNOWN"),
+                    "source_confidence": row.get("source_confidence", "UNRESOLVED"),
+                    "episode_id": ep_id,
+                    "figi": figi,
+                    "cik": cik,
+                    "quality_flags": q_flags,
+                }
+            )
         schema = {
             "security_id": pl.Utf8,
             "date": pl.Utf8,
@@ -208,7 +248,10 @@ class SecurityMarketDataConsolidator:
             "quality_flags": pl.Utf8,
         }
         final_df = pl.DataFrame(final_records, schema=schema)
-        logger.info("Constructed final security_daily_prices table with %d records.", final_df.height)
+        logger.info(
+            "Constructed final security_daily_prices table with %d records.",
+            final_df.height,
+        )
 
         # Save deliverables
         MARKET_DIR.mkdir(parents=True, exist_ok=True)
@@ -229,46 +272,61 @@ class SecurityMarketDataConsolidator:
         logger.info("Saved missing_market_dates to %s", MISSING_MARKET_DATES_PARQUET)
 
         # 4. market_coverage
-        coverage_recs = [{
-            "total_target_securities": len(target_sec_ids),
-            "securities_with_prices": clean_prices_df["security_id"].n_unique() if clean_prices_df.height > 0 else 0,
-            "total_expected_dates": target_expected_df.height,
-            "priced_valid_dates": final_df.filter(pl.col("price_state") == "PRICED_VALID").height,
-            "missing_dates_count": final_df.filter(pl.col("price_state") == "PRICE_MISSING_HALT_OR_DELISTED").height,
-            "corrupted_dates_count": final_df.filter(pl.col("price_state") == "CORRUPTED_DATE").height,
-            "splits_detected_count": splits_df.height
-        }]
+        coverage_recs = [
+            {
+                "total_target_securities": len(target_sec_ids),
+                "securities_with_prices": clean_prices_df["security_id"].n_unique()
+                if clean_prices_df.height > 0
+                else 0,
+                "total_expected_dates": target_expected_df.height,
+                "priced_valid_dates": final_df.filter(
+                    pl.col("price_state") == "PRICED_VALID"
+                ).height,
+                "missing_dates_count": final_df.filter(
+                    pl.col("price_state") == "PRICE_MISSING_HALT_OR_DELISTED"
+                ).height,
+                "corrupted_dates_count": final_df.filter(
+                    pl.col("price_state") == "CORRUPTED_DATE"
+                ).height,
+                "splits_detected_count": splits_df.height,
+            }
+        ]
         cov_df = pl.DataFrame(coverage_recs)
         cov_df.write_parquet(MARKET_COVERAGE_PARQUET)
         cov_df.write_csv(MARKET_COVERAGE_CSV)
         logger.info("Saved market_coverage to %s", MARKET_COVERAGE_PARQUET)
 
         # 5. provider_comparison
-        prov_recs = [{
-            "provider": "YFINANCE",
-            "coverage_tier": "PRIMARY_SOURCE",
-            "active_coverage_rate": 0.85,
-            "delisted_coverage_rate": 0.25,
-            "notes": "Fast bulk coverage with split/dividend adjustment history"
-        }, {
-            "provider": "POLYGON",
-            "coverage_tier": "SECONDARY_SOURCE",
-            "active_coverage_rate": 0.95,
-            "delisted_coverage_rate": 0.70,
-            "notes": "Requires paid subscription for historical aggregates"
-        }, {
-            "provider": "ALPACA",
-            "coverage_tier": "TERTIARY_SOURCE",
-            "active_coverage_rate": 0.90,
-            "delisted_coverage_rate": 0.30,
-            "notes": "Requires API key; limited historical lookback on free tier"
-        }, {
-            "provider": "STOOQ",
-            "coverage_tier": "FALLBACK_SOURCE",
-            "active_coverage_rate": 0.60,
-            "delisted_coverage_rate": 0.15,
-            "notes": "Free daily CSVs with Cloudflare rate challenge"
-        }]
+        prov_recs = [
+            {
+                "provider": "YFINANCE",
+                "coverage_tier": "PRIMARY_SOURCE",
+                "active_coverage_rate": 0.85,
+                "delisted_coverage_rate": 0.25,
+                "notes": "Fast bulk coverage with split/dividend adjustment history",
+            },
+            {
+                "provider": "POLYGON",
+                "coverage_tier": "SECONDARY_SOURCE",
+                "active_coverage_rate": 0.95,
+                "delisted_coverage_rate": 0.70,
+                "notes": "Requires paid subscription for historical aggregates",
+            },
+            {
+                "provider": "ALPACA",
+                "coverage_tier": "TERTIARY_SOURCE",
+                "active_coverage_rate": 0.90,
+                "delisted_coverage_rate": 0.30,
+                "notes": "Requires API key; limited historical lookback on free tier",
+            },
+            {
+                "provider": "STOOQ",
+                "coverage_tier": "FALLBACK_SOURCE",
+                "active_coverage_rate": 0.60,
+                "delisted_coverage_rate": 0.15,
+                "notes": "Free daily CSVs with Cloudflare rate challenge",
+            },
+        ]
         prov_df = pl.DataFrame(prov_recs)
         prov_df.write_parquet(PROVIDER_COMPARISON_PARQUET)
         prov_df.write_csv(PROVIDER_COMPARISON_CSV)

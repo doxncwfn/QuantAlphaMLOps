@@ -18,8 +18,12 @@ class TestMergeCheckpointsIntegration(unittest.TestCase):
         self.out_file = self.test_dir / "merged.parquet"
 
         # Create 2 dummy chunks
-        df1 = pl.DataFrame({"spell_id": ["A_1", "B_1"], "ticker": ["A", "B"], "spell_seq": [1, 1]})
-        df2 = pl.DataFrame({"spell_id": ["B_1", "C_1"], "ticker": ["B", "C"], "spell_seq": [1, 1]})
+        df1 = pl.DataFrame(
+            {"spell_id": ["A_1", "B_1"], "ticker": ["A", "B"], "spell_seq": [1, 1]}
+        )
+        df2 = pl.DataFrame(
+            {"spell_id": ["B_1", "C_1"], "ticker": ["B", "C"], "spell_seq": [1, 1]}
+        )
         df1.write_parquet(self.chk_dir / "checkpoint_00000.parquet")
         df2.write_parquet(self.chk_dir / "checkpoint_00001.parquet")
 
@@ -31,8 +35,10 @@ class TestMergeCheckpointsIntegration(unittest.TestCase):
         cmd = [
             sys.executable,
             "scripts/merge_checkpoints.py",
-            "--checkpoints-dir", str(self.chk_dir),
-            "--output", str(self.out_file),
+            "--checkpoints-dir",
+            str(self.chk_dir),
+            "--output",
+            str(self.out_file),
         ]
         res = subprocess.run(cmd, capture_output=True, text=True)
         self.assertEqual(res.returncode, 0, f"Script failed: {res.stderr}")
@@ -40,7 +46,9 @@ class TestMergeCheckpointsIntegration(unittest.TestCase):
 
         df_out = pl.read_parquet(self.out_file)
         self.assertEqual(df_out.height, 3)
-        self.assertListEqual(sorted(df_out["spell_id"].to_list()), ["A_1", "B_1", "C_1"])
+        self.assertListEqual(
+            sorted(df_out["spell_id"].to_list()), ["A_1", "B_1", "C_1"]
+        )
 
 
 if __name__ == "__main__":

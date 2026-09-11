@@ -54,7 +54,6 @@ import time
 from datetime import date, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
 
 import polars as pl
 import requests
@@ -72,24 +71,25 @@ except ImportError:
     sys.exit(1)
 
 START_DATE: str = "2020-01-01"
-END_DATE:   str = "2020-02-01"
+END_DATE: str = "2020-02-01"
 
-_REPO_ROOT     = Path(__file__).resolve().parent.parent.parent
-DATA_RAW_DIR   = _REPO_ROOT / "data" / "raw" / "massive" / "active_tickers"
-DATA_PROC_DIR  = _REPO_ROOT / "data" / "processed" / "universe" / "active_tickers"
-MANIFEST_FILE  = _REPO_ROOT / "data" / "manifests" / "active_tickers_manifest.parquet"
-LOG_DIR        = _REPO_ROOT / "logs"
-LOG_FILE       = LOG_DIR / "massive_active_tickers.log"
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+DATA_RAW_DIR = _REPO_ROOT / "data" / "raw" / "massive" / "active_tickers"
+DATA_PROC_DIR = _REPO_ROOT / "data" / "processed" / "universe" / "active_tickers"
+MANIFEST_FILE = _REPO_ROOT / "data" / "manifests" / "active_tickers_manifest.parquet"
+LOG_DIR = _REPO_ROOT / "logs"
+LOG_FILE = LOG_DIR / "massive_active_tickers.log"
 
-LOG_MAX_BYTES    = 10 * 1024 * 1024
+LOG_MAX_BYTES = 10 * 1024 * 1024
 LOG_BACKUP_COUNT = 5
 
-MASSIVE_API_BASE     = "https://api.massive.com/v3/reference/tickers"
-PAGE_SIZE            = 1000
-INTER_PAGE_DELAY     = 12.0    # 5 req/min rate limit
-INITIAL_BACKOFF      = 3.0     # Backoff for HTTP 429
-MAX_BACKOFF          = 30.0
-MAX_REQUEST_RETRIES  = 10
+MASSIVE_API_BASE = "https://api.massive.com/v3/reference/tickers"
+PAGE_SIZE = 1000
+INTER_PAGE_DELAY = 12.0  # 5 req/min rate limit
+INITIAL_BACKOFF = 3.0  # Backoff for HTTP 429
+MAX_BACKOFF = 30.0
+MAX_REQUEST_RETRIES = 10
+
 
 def setup_logging() -> logging.Logger:
     """Logger: DEBUG+ to file, INFO+ to stdout."""
@@ -97,7 +97,9 @@ def setup_logging() -> logging.Logger:
     logger = logging.getLogger("massive_pipeline")
     logger.setLevel(logging.DEBUG)
 
-    fmt = logging.Formatter("%(asctime)s  %(levelname)-8s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    fmt = logging.Formatter(
+        "%(asctime)s  %(levelname)-8s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
     fh = RotatingFileHandler(
         LOG_FILE,
@@ -116,13 +118,17 @@ def setup_logging() -> logging.Logger:
     logger.addHandler(ch)
     return logger
 
-def get_valid_api_key(cli_arg_key: Optional[str] = None) -> str:
-    api_key = cli_arg_key or os.getenv("MASSIVE_API_KEY") or os.environ.get("MASSIVE_API_KEY")
+
+def get_valid_api_key(cli_arg_key: str | None = None) -> str:
+    api_key = (
+        cli_arg_key or os.getenv("MASSIVE_API_KEY") or os.environ.get("MASSIVE_API_KEY")
+    )
     if not api_key or api_key.lower().startswith("your_"):
         raise ValueError(
             "Valid Massive API Key must be supplied via argument or MASSIVE_API_KEY env/.env."
         )
     return api_key
+
 
 def get_xnys_trading_dates(start: str, end: str, logger: logging.Logger) -> list[str]:
     """Return NYSE sessions using authoritative calendar, excluding weekends/holidays/ad-hoc closures."""
@@ -130,39 +136,48 @@ def get_xnys_trading_dates(start: str, end: str, logger: logging.Logger) -> list
     calendar = xcals.get_calendar("XNYS")
     sessions = calendar.sessions_in_range(start, end)
     dates = [s.strftime("%Y-%m-%d") for s in sessions]
-    logger.info("XNYS calendar: %d trading sessions between %s and %s.", len(dates), start, end)
+    logger.info(
+        "XNYS calendar: %d trading sessions between %s and %s.", len(dates), start, end
+    )
     return dates
+
 
 def ensure_directories(logger: logging.Logger) -> None:
     for d in [DATA_RAW_DIR, DATA_PROC_DIR, MANIFEST_FILE.parent, LOG_DIR]:
         d.mkdir(parents=True, exist_ok=True)
         logger.debug("Ensured directory: %s", d)
 
+
 _MANIFEST_SCHEMA: dict = {
-    "date":          pl.Date,
-    "status":        pl.Utf8,
-    "ticker_count":  pl.Int64,
-    "processed_at":  pl.Utf8,
-    "error":         pl.Utf8,
+    "date": pl.Date,
+    "status": pl.Utf8,
+    "ticker_count": pl.Int64,
+    "processed_at": pl.Utf8,
+    "error": pl.Utf8,
 }
+
 
 def load_manifest(logger: logging.Logger) -> pl.DataFrame:
     """Load manifest, or empty DataFrame if missing. Abort if exists but unreadable."""
     if not MANIFEST_FILE.exists():
         logger.info("No existing manifest found -- starting fresh.")
-        return pl.DataFrame({k: pl.Series([], dtype=v) for k, v in _MANIFEST_SCHEMA.items()})
+        return pl.DataFrame(
+            {k: pl.Series([], dtype=v) for k, v in _MANIFEST_SCHEMA.items()}
+        )
     try:
         df = pl.read_parquet(MANIFEST_FILE)
         logger.debug("Manifest loaded: %d rows from %s", len(df), MANIFEST_FILE)
         return df
-    except Exception as exc:
+    except (OSError, pl.exceptions.PolarsError, RuntimeError, ValueError) as exc:
         logger.critical(
             "Manifest file exists at %s but cannot be read: %s\n"
             "Aborting to protect restartability. "
             "Repair or delete the manifest file manually, then retry.",
-            MANIFEST_FILE, exc,
+            MANIFEST_FILE,
+            exc,
         )
         sys.exit(1)
+
 
 def save_manifest(df: pl.DataFrame, logger: logging.Logger) -> None:
     """Atomic manifest write (parquet, temp file then replace)."""
@@ -177,30 +192,34 @@ def save_manifest(df: pl.DataFrame, logger: logging.Logger) -> None:
         tmp.unlink(missing_ok=True)
         raise
 
+
 def upsert_manifest_row(
     manifest: pl.DataFrame,
     target_date: str,
     status: str,
     ticker_count: int,
     processed_at: str,
-    error: Optional[str],
+    error: str | None,
     logger: logging.Logger,
 ) -> pl.DataFrame:
     date_val = date.fromisoformat(target_date)
     new_row = pl.DataFrame(
         {
-            "date":         [date_val],
-            "status":       [status],
+            "date": [date_val],
+            "status": [status],
             "ticker_count": [ticker_count],
             "processed_at": [processed_at],
-            "error":        [error],
+            "error": [error],
         },
         schema=_MANIFEST_SCHEMA,
     )
     updated = manifest.filter(pl.col("date") != pl.lit(date_val).cast(pl.Date))
     updated = pl.concat([updated, new_row])
-    logger.debug("Manifest upsert: date=%s status=%s count=%d", target_date, status, ticker_count)
+    logger.debug(
+        "Manifest upsert: date=%s status=%s count=%d", target_date, status, ticker_count
+    )
     return updated
+
 
 def is_date_already_successful(manifest: pl.DataFrame, target_date: str) -> bool:
     date_val = date.fromisoformat(target_date)
@@ -214,10 +233,14 @@ def is_date_already_successful(manifest: pl.DataFrame, target_date: str) -> bool
         > 0
     )
 
+
 def raw_snapshot_path(target_date: str) -> Path:
     return DATA_RAW_DIR / target_date[:4] / f"{target_date}.json"
 
-def save_raw_snapshot(target_date: str, tickers: list[str], logger: logging.Logger) -> None:
+
+def save_raw_snapshot(
+    target_date: str, tickers: list[str], logger: logging.Logger
+) -> None:
     """Atomic write of per-date raw JSON (temp file, then replace)."""
     path = raw_snapshot_path(target_date)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -236,10 +259,14 @@ def save_raw_snapshot(target_date: str, tickers: list[str], logger: logging.Logg
             pass
         raise
 
+
 def year_partition_path(year: int) -> Path:
     return DATA_PROC_DIR / f"year={year}" / "data.parquet"
 
-def update_year_partition(target_date: str, tickers: list[str], logger: logging.Logger) -> None:
+
+def update_year_partition(
+    target_date: str, tickers: list[str], logger: logging.Logger
+) -> None:
     """
     Update only the year partition containing target_date. Other partitions remain untouched.
     For this date, remove existing rows, then append and deduplicate.
@@ -275,15 +302,19 @@ def update_year_partition(target_date: str, tickers: list[str], logger: logging.
         tmp_path.replace(part_path)
         logger.info(
             "Year-%d partition updated: %s  (rows in partition: %d)",
-            year, part_path, len(combined),
+            year,
+            part_path,
+            len(combined),
         )
     except Exception as exc:
         logger.error("Failed to write year-%d partition: %s", year, exc)
         tmp_path.unlink(missing_ok=True)
         raise
 
+
 class ExtractionError(Exception):
     """Raised when the Massive API extraction for a date cannot be completed."""
+
 
 class MassiveThrottledManager:
     """
@@ -293,7 +324,7 @@ class MassiveThrottledManager:
 
     def __init__(self, api_key: str, logger: logging.Logger) -> None:
         self.api_key = api_key
-        self.logger  = logger
+        self.logger = logger
 
     def get_active_symbols_on_date(self, target_date: str) -> list[str]:
         """
@@ -306,13 +337,13 @@ class MassiveThrottledManager:
         active_symbols: list[str] = []
         seen: set[str] = set()
 
-        current_url: Optional[str] = MASSIVE_API_BASE
+        current_url: str | None = MASSIVE_API_BASE
         base_params: dict = {
-            "date":    target_date,
-            "active":  "true",
-            "market":  "stocks",
-            "limit":   PAGE_SIZE,
-            "apiKey":  self.api_key,
+            "date": target_date,
+            "active": "true",
+            "market": "stocks",
+            "limit": PAGE_SIZE,
+            "apiKey": self.api_key,
         }
         backoff_delay = INITIAL_BACKOFF
         page_num = 0
@@ -338,13 +369,18 @@ class MassiveThrottledManager:
 
             if current_url:
                 self.logger.debug(
-                    "[%s] Waiting %.1fs before page %d.", target_date, INTER_PAGE_DELAY, page_num + 1
+                    "[%s] Waiting %.1fs before page %d.",
+                    target_date,
+                    INTER_PAGE_DELAY,
+                    page_num + 1,
                 )
                 time.sleep(INTER_PAGE_DELAY)
 
         self.logger.info(
             "[%s] Complete: %d unique stock tickers across %d page(s).",
-            target_date, len(active_symbols), page_num,
+            target_date,
+            len(active_symbols),
+            page_num,
         )
 
         if not active_symbols:
@@ -365,14 +401,17 @@ class MassiveThrottledManager:
         seen: set[str],
         active_symbols: list[str],
         backoff_delay_ref: list[float],
-    ) -> tuple[int, Optional[str]]:
+    ) -> tuple[int, str | None]:
         """Fetch a single API page with retry/backoff logic."""
         retries = 0
         while True:
             try:
                 self.logger.debug(
                     "[%s] HTTP GET page %d (attempt %d/%d).",
-                    target_date, page_num, retries + 1, MAX_REQUEST_RETRIES,
+                    target_date,
+                    page_num,
+                    retries + 1,
+                    MAX_REQUEST_RETRIES,
                 )
                 response = requests.get(url, params=params, timeout=15)
 
@@ -387,8 +426,12 @@ class MassiveThrottledManager:
                     self.logger.warning(
                         "[%s] HTTP 429 on page %d (attempt %d/%d) -- "
                         "backing off %.1fs (collected %d tickers so far).",
-                        target_date, page_num, retries, MAX_REQUEST_RETRIES,
-                        delay, len(active_symbols),
+                        target_date,
+                        page_num,
+                        retries,
+                        MAX_REQUEST_RETRIES,
+                        delay,
+                        len(active_symbols),
                     )
                     time.sleep(delay)
                     backoff_delay_ref[0] = min(delay * 1.5, MAX_BACKOFF)
@@ -417,7 +460,9 @@ class MassiveThrottledManager:
                 results = payload.get("results", [])
                 if not results:
                     self.logger.debug(
-                        "[%s] Page %d: empty results -- pagination complete.", target_date, page_num
+                        "[%s] Page %d: empty results -- pagination complete.",
+                        target_date,
+                        page_num,
                     )
                     return 0, None
 
@@ -444,7 +489,10 @@ class MassiveThrottledManager:
 
                 self.logger.debug(
                     "[%s] Page %d: +%d tickers (running total: %d).",
-                    target_date, page_num, page_tickers, len(active_symbols),
+                    target_date,
+                    page_num,
+                    page_tickers,
+                    len(active_symbols),
                 )
 
                 next_url = payload.get("next_url") or None
@@ -464,7 +512,12 @@ class MassiveThrottledManager:
                 self.logger.warning(
                     "[%s] Network error on page %d (attempt %d/%d): %s. "
                     "Retrying in %.1fs.",
-                    target_date, page_num, retries, MAX_REQUEST_RETRIES, exc, wait,
+                    target_date,
+                    page_num,
+                    retries,
+                    MAX_REQUEST_RETRIES,
+                    exc,
+                    wait,
                 )
                 time.sleep(wait)
 
@@ -479,9 +532,15 @@ class MassiveThrottledManager:
                 self.logger.error(
                     "[%s] Unexpected error on page %d (attempt %d/%d): %s. "
                     "Retrying in %.1fs.",
-                    target_date, page_num, retries, MAX_REQUEST_RETRIES, exc, wait,
+                    target_date,
+                    page_num,
+                    retries,
+                    MAX_REQUEST_RETRIES,
+                    exc,
+                    wait,
                 )
                 time.sleep(wait)
+
 
 def process_date(
     target_date: str,
@@ -515,17 +574,20 @@ def process_date(
 
     except Exception as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
-        logger.error("[%s] FAILED: %s", target_date, error_msg)
+        logger.exception("[%s] FAILED: %s", target_date, error_msg)
         manifest = upsert_manifest_row(
             manifest, target_date, "failed", 0, processed_at, error_msg, logger
         )
         try:
             save_manifest(manifest, logger)
-        except Exception as save_exc:
+        except (OSError, pl.exceptions.PolarsError) as save_exc:
             logger.error(
-                "Could not save manifest after failure for %s: %s", target_date, save_exc
+                "Could not save manifest after failure for %s: %s",
+                target_date,
+                save_exc,
             )
         return manifest, False
+
 
 def run_pipeline(start_date: str, end_date: str) -> None:
     """
@@ -565,14 +627,18 @@ def run_pipeline(start_date: str, end_date: str) -> None:
     trading_dates = get_xnys_trading_dates(start_date, end_date, logger)
     logger.info("Trading dates in range: %d", len(trading_dates))
 
-    already_done = sum(1 for d in trading_dates if is_date_already_successful(manifest, d))
-    logger.info("Already completed (will skip): %d / %d", already_done, len(trading_dates))
+    already_done = sum(
+        1 for d in trading_dates if is_date_already_successful(manifest, d)
+    )
+    logger.info(
+        "Already completed (will skip): %d / %d", already_done, len(trading_dates)
+    )
 
     manager = MassiveThrottledManager(api_key=api_key, logger=logger)
 
-    n_skipped    = 0
-    n_success    = 0
-    n_failed     = 0
+    n_skipped = 0
+    n_success = 0
+    n_failed = 0
     failed_dates: list[str] = []
 
     for i, target_date in enumerate(trading_dates, start=1):
@@ -599,7 +665,7 @@ def run_pipeline(start_date: str, end_date: str) -> None:
             .collect()
             .item()
         )
-    except Exception as exc:
+    except (OSError, pl.exceptions.PolarsError, RuntimeError, ValueError) as exc:
         logger.warning("Could not count total rows in partitioned dataset: %s", exc)
 
     lines = [
@@ -620,6 +686,7 @@ def run_pipeline(start_date: str, end_date: str) -> None:
     for line in lines:
         logger.info(line)
         print(line)
+
 
 if __name__ == "__main__":
     run_pipeline(start_date=START_DATE, end_date=END_DATE)
