@@ -59,6 +59,8 @@
 
 % --- Code listings ---
 \RequirePackage{listings}
+\RequirePackage[newfloat,cache=false]{minted}
+\RequirePackage{dirtree}
 
 % --- Boxes, headers, page references, links and bibliography ---
 \RequirePackage{tcolorbox}

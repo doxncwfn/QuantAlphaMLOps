@@ -1,0 +1,101 @@
+\setcounter{page}{1}
+\startfooter{Specialized Project: HK261-DAGD1-041\\
+    Introduction
+}
+
+\part{Introduction}
+
+\section{Context and Motivation}
+Machine learning has become an increasingly important methodological tool in quantitative finance because of its ability to model nonlinear relationships and interactions among large sets of financial predictors. In a large-scale empirical study of equity returns, Gu, Kelly, and Xiu~\cite{Gu2020} show that machine learning methods can improve return forecasting relative to conventional linear approaches, with part of the predictive improvement arising from nonlinear interactions among characteristics. Their results also identify momentum, liquidity, and volatility-related variables among the dominant predictors of expected returns. This evidence motivates the use of flexible nonlinear models when the objective is to extract information from a rich set of financial signals.
+
+\medskip
+
+Sequence-based deep learning models provide one approach to capturing temporal structure in financial data. Fischer and Krauss~\cite{FischerKrauss2018} demonstrate the application of \acf{LSTM} networks to financial market prediction and report that \acs{LSTM} models can exploit patterns in sequential stock data that are difficult to capture using simpler predictive models. More generally, the Transformer architecture~\cite{Vaswani2017} provides a mechanism for modeling relationships through attention, allowing a model to selectively incorporate information from multiple elements of an input sequence. These characteristics make recurrent and attention-based architectures potentially suitable for financial problems in which relevant information may be distributed across time and across simultaneously observed securities.
+
+\medskip
+
+The present study focuses specifically on the latter dimension. The objective is not to forecast the return of an individual stock in isolation, but to generate a \emph{cross-sectional ranking} of securities at each decision point. This distinction is fundamental because the economic decision in a cross-sectional strategy is based on the relative ordering of securities rather than the numerical accuracy of an isolated return forecast. Poh et al.~\cite{Poh2021} formalize this perspective and show that ranking-oriented learning methods can improve cross-sectional systematic strategies by directly learning pairwise and listwise relationships among instruments. The ranking problem therefore requires a modeling framework that preserves information about the contemporaneous cross-section instead of treating each security as an independent forecasting task.
+
+\medskip
+
+The cross-sectional nature of equity returns is also well established in the asset-pricing literature. Fama and French~\cite{FamaFrench1992} show that firm characteristics such as size and book-to-market equity are related to systematic differences in average stock returns, while Fama and French~\cite{FamaFrench1993} demonstrate that common risk factors account for substantial shared variation in stock returns. These findings motivate a distinction between systematic variation shared across securities and residual variation that may contain additional information about relative performance. In the present study, this distinction is reflected in the construction of a forward-return target that is residualized against common risk factors before cross-sectional evaluation.
+
+\medskip
+
+% The \acf{SnP} 500 is used as the empirical market universe because it provides a large and economically coherent cross-section of large-cap U.S. equities within which this relative-ranking problem can be studied. Fortune~\cite{Fortune1998} discusses the S\&P 500 as a benchmark portfolio intended to represent a particular segment of the U.S. equity market, while Cremers, Petajisto, and Zitzewitz~\cite{Cremers2013} explicitly examine the S\&P 500 as a passive benchmark in the evaluation of portfolio performance. The S\&P 500 is therefore treated in this study not as a representation of the entire U.S. equity market, but as a defined large-cap universe in which securities share broad market exposure while retaining meaningful cross-sectional differences.
+
+% \medskip
+
+% This distinction is particularly relevant because empirical research demonstrates that S\&P 500 constituents exhibit substantial variation in their systematic risk and market behavior. Andersen, Thyrsgaard, and Todorov~\cite{Andersen2021}, for example, document significant time variation in the cross-sectional dispersion of systematic risk among S\&P 500 constituents. Similarly, Hallin et al.~\cite{Hallin2011} show that liquidity measures across S\&P 500 constituents exhibit common dynamic factors, while Hegde and McDermott~\cite{Hegde2003} document changes in liquidity associated with S\&P 500 index membership. These findings support the use of the universe as a structured cross-section in which both common and security-specific information can be examined.
+
+% \medskip
+
+The research problem is therefore not simply to determine whether a flexible model can predict future stock returns. Rather, it is to determine whether temporal information and cross-sectional relationships can be combined to improve the ranking of securities within a common market universe. The proposed architecture addresses this problem by combining an \acs{LSTM}-based temporal encoder with a cross-sectional Transformer, allowing information about the historical evolution of an individual security to be processed jointly with information from the contemporaneous cross-section.
+
+\section{Research Problem}
+The central research problem addressed in this thesis is the design and empirical validation of an end-to-end machine learning pipeline for cross-sectional equity ranking under the statistical, data, and implementation constraints inherent in financial markets.
+
+\medskip
+
+A conventional pointwise forecasting formulation assigns a prediction problem to each security separately. However, the investment decision considered in this study is inherently comparative: securities are ranked relative to their peers and subsequently incorporated into a portfolio according to their predicted relative performance. The learning objective must therefore reflect the structure of the downstream decision problem. This motivates the use of a ranking-aware learning objective in addition to the conventional regression objective, following the cross-sectional learning-to-rank perspective of Poh et al.~\cite{Poh2021}.
+
+\medskip
+
+At the same time, the predictive problem must account for common systematic variation. Because securities in the same market universe are exposed to shared market conditions, raw forward returns contain variation that may not represent security-specific information. The empirical design therefore residualizes the forward return against common factors before evaluating cross-sectional predictive performance. This approach is consistent with the role of common risk factors established in the asset-pricing literature~\cite{FamaFrench1992,FamaFrench1993}.
+
+\medskip
+
+A second dimension of the research problem concerns empirical validation. Financial observations are temporally ordered and may contain overlapping information across adjacent observations. Consequently, model evaluation must preserve chronological structure and distinguish information available at the prediction date from information that becomes available subsequently. Tashman~\cite{Tashman2000} emphasizes the importance of carefully designed out-of-sample evaluation and rolling-origin procedures in forecasting applications. In addition, extensive hyperparameter experimentation creates a multiple-testing problem: a model selected because it performs well over many trials may exhibit an inflated backtest performance even when the underlying strategy contains little genuine predictive information. Bailey and López de Prado~\cite{BaileyLopezDePrado2014} develop the Deflated Sharpe Ratio specifically to address selection bias and backtest overfitting arising from multiple testing.
+
+\medskip
+
+The research therefore treats validation as part of the model itself rather than as a separate reporting step. The proposed pipeline incorporates chronological walk-forward evaluation, purging and embargoing of observations around test periods, and explicit adjustment for multiple-testing effects. These procedures are intended to reduce the possibility that apparent predictive performance results from information leakage or repeated experimentation rather than from generalizable structure.
+
+\medskip
+
+Finally, the research considers the transition from statistical prediction to portfolio construction. A cross-sectional ranking may contain predictive information without being directly implementable as a portfolio. Portfolio decisions are affected by covariance estimation, position constraints, turnover, transaction costs, and market impact. The framework consequently evaluates the model's out-of-sample predictions within a constrained portfolio construction process. The importance of accounting for execution costs and market impact in portfolio implementation is established in the optimal-execution literature~\cite{AlmgrenChriss2000}.
+
+\section{Research Gap}
+The first research gap concerns the alignment between prediction objectives and cross-sectional portfolio decisions. Standard regression-based forecasting evaluates the accuracy of individual return predictions, whereas cross-sectional strategies ultimately depend on the relative ranking of securities. Poh et al.~\cite{Poh2021} demonstrate the importance of learning the ranking structure directly. The present study extends this perspective by investigating a hybrid learning objective that combines pointwise prediction with pairwise ranking information within a deep temporal--cross-sectional architecture.
+
+\medskip
+
+The second gap concerns the integration of temporal and cross-sectional information within a single predictive framework. LSTM-based models provide a mechanism for learning sequential dependencies~\cite{FischerKrauss2018}, while attention-based models provide a mechanism for representing interactions among elements of an input set~\cite{Vaswani2017}. Existing empirical work establishes the usefulness of both nonlinear machine learning and cross-sectional structure in equity prediction~\cite{Gu2020,Poh2021}; however, the present study focuses on an integrated architecture in which temporal representations of individual securities are subsequently processed jointly across the cross-section.
+
+\medskip
+
+The third gap concerns validation under realistic financial data constraints. Machine learning models provide substantial flexibility, but that flexibility also increases exposure to data leakage, selection bias, and backtest overfitting. Tashman~\cite{Tashman2000} establishes the importance of carefully designed out-of-sample forecasting procedures, while Bailey and López de Prado~\cite{BaileyLopezDePrado2014} show that multiple testing can materially inflate apparent strategy performance. The present research incorporates these concerns directly into the experimental design through purged walk-forward validation, embargoing, and multiple-testing diagnostics.
+
+\medskip
+
+The fourth gap concerns the connection between predictive signals and implementable portfolios. Rather than evaluating the model solely through prediction accuracy, the study carries locked out-of-sample predictions into a constrained portfolio construction stage. This allows the robustness of the predictive signal to be examined after accounting for covariance risk and explicit transaction-cost and market-impact assumptions, consistent with the principles of optimal execution~\cite{AlmgrenChriss2000}.
+
+\section{Research Questions}
+The central research question is:
+
+\begin{quote}
+    Can an end-to-end MLOps pipeline successfully engineer, validate, and constrain a hybrid temporal-attention (LSTM--Transformer) architecture for cross-sectional equity ranking, and accurately translate its out-of-sample predictions into a strictly risk-neutralized portfolio under rigid computational and data constraints?
+\end{quote}
+
+This question is investigated through two groups of research questions. The first concerns signal generation and model validation. It examines whether a hybrid loss combining Mean Squared Error (MSE) with a pairwise hinge loss improves the separation of predicted cross-sectional deciles relative to a pure pointwise objective, and whether a learned static Stock ID embedding contributes information beyond the temporal and cross-sectional market structure.
+
+\medskip
+
+The second group concerns portfolio construction and robustness. It examines the degradation of model-derived portfolio performance after the introduction of covariance risk and transaction costs, and evaluates the extent to which multiple-testing adjustment reduces the apparent performance obtained during model and hyperparameter selection.
+
+\section{Research Contributions}
+The contribution of this thesis is primarily methodological and empirical. It develops and evaluates an end-to-end framework for cross-sectional equity ranking in which predictive modeling, statistical validation, and portfolio construction are treated as interconnected components.
+
+\medskip
+
+First, the study formulates the equity prediction problem explicitly as a cross-sectional ranking task rather than as a set of independent point forecasts. Second, it combines temporal representation learning through an LSTM with cross-sectional attention through a Transformer, thereby allowing both within-security dynamics and contemporaneous inter-security relationships to be modeled. Third, it incorporates a ranking-aware training objective intended to align the optimization problem with the downstream portfolio decision. Fourth, the framework embeds chronological and leakage-aware validation procedures together with explicit control for multiple-testing bias. Finally, it evaluates the persistence of the generated signal after portfolio construction under covariance, leverage, position, turnover, and transaction-cost constraints.
+
+\medskip
+
+The study is deliberately framed as an engineering validation and empirical evaluation rather than a claim that the resulting model constitutes universally deployable trading alpha. The empirical analysis is conducted within the explicitly defined S\&P 500 research universe and its filtered analytical sample, and the methodological limitations associated with the available data are retained and discussed explicitly.
+
+\section{Thesis Organization}
+The remainder of the thesis follows the sequence of the empirical pipeline. The methodology first defines the market universe and constructs the analytical sample, including the associated survivorship and classification considerations. The data-processing stage then describes the construction and transformation of the input variables and prediction target. The predictive modeling stage presents the temporal and cross-sectional architecture, the ranking-aware learning objective, and the experimental design. The subsequent evaluation examines predictive performance, statistical significance, model stability, and sensitivity to alternative specifications. Finally, the locked out-of-sample predictions are passed to the portfolio-construction framework, where the economic consequences of risk controls and transaction costs are evaluated before the methodological limitations and conclusions are presented.
+
+\section{Overall Structure}
+To be updated

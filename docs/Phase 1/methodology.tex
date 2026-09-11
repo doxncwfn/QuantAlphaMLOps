@@ -1,0 +1,79 @@
+\startfooter{Specialized Project: HK261-DAGD1-041\\
+    Methodology
+}
+
+\part{Methodology}
+% \section{Market Universe and Sample Construction}
+
+% \subsection{S\&P 500 Universe}
+% The study defines the S\&P 500 as its intended research universe because it provides a large and economically coherent cross-section of U.S. large-cap equities suitable for the study's cross-sectional ranking objective. The universe contains substantial common exposure to broad market conditions while retaining cross-sectional heterogeneity across constituent securities. Prior research using S\&P 500 constituents has documented differences in systematic risk, liquidity, and inter-stock dependence, indicating that the universe contains both common structure and meaningful constituent-level variation~\cite{Hallin2009, Andersen2021, Araujo2019}. These characteristics are relevant to the present study because the objective is not to forecast an individual stock in isolation, but to rank securities relative to one another over a common future horizon.
+
+% \medskip
+
+% Accordingly, the S\&P 500 is treated as the economic universe within which the cross-sectional prediction problem is defined. The index is not assumed to represent the entirety of the U.S. equity market; rather, it provides the specific large-cap equity universe used to construct and evaluate the ranking task. Its established use as a U.S. equity benchmark further supports its relevance for empirical analysis and portfolio evaluation~\cite{Fortune1998, Cremers2013}.
+
+% \subsection{Sample Construction and Inclusion Criteria}
+% The effective analytical sample is obtained by filtering the stated S\&P 500 universe according to the data-availability condition specified in the study. Specifically, the analysis is restricted to equities possessing \emph{complete, continuous daily split- and dividend-adjusted \ac{OHLCV} history from 2020-01-01 onward}. This procedure results in a final sample of 413 equities~\cite{Fortune1998, Cremers2013}.
+
+% \medskip
+
+% The distinction between the intended universe and the analytical sample is important. The S\&P 500 defines the economic market universe for the study, whereas the 413 securities satisfying the stated historical-data condition define the effective sample on which the empirical analysis is conducted. The filtering step is therefore part of the sample definition rather than a subsequent modeling choice.
+
+% \subsection{Observation Period and Cross-Sectional Structure}
+% The empirical dataset is constructed as a panel of the 413 selected equities beginning on 2020-01-01 and uses daily observations. The resulting structure provides repeated observations for multiple securities over time, allowing the study to formulate the prediction problem simultaneously along temporal and cross-sectional dimensions.
+
+% \medskip
+
+% This structure is consistent with the study's modeling objective. Historical observations for each security form the temporal input required to model within-security dynamics, while the set of securities observed at each date forms the cross-section over which relative performance is evaluated. In the proposed framework, the temporal dimension is therefore associated with the evolution of individual securities through time, whereas the cross-sectional dimension provides the contemporaneous set of securities from which relative rankings can be learned. The dataset is consequently structured to support the joint investigation of temporal patterns and cross-sectional relationships rather than treating each equity as an independent forecasting problem.
+
+% \subsection{Survivorship and Universe-Definition Considerations}
+% The distinction between the intended S\&P 500 universe and the filtered analytical sample introduces important sample-construction considerations. The study does not attempt to reconstruct historical membership by including delisted or merged securities. Consequently, the resulting 413-stock sample is subject to survivorship bias. This condition is explicitly acknowledged as a limitation of the current empirical design and means that the analytical sample should not be interpreted as a survivorship-free reconstruction of the historical S\&P 500 universe.
+
+% \medskip
+
+% In addition, sector definitions are based on the current static \acf{GICS} Level 1 assignments. These classifications are therefore treated as a fixed representation of sector membership rather than a point-in-time reconstruction of historical classifications. This constitutes a further approximation in the definition of the analytical universe and is retained consistently within the study.
+
+% \medskip
+
+% The above considerations are treated as part of the empirical sample definition because both survivorship and static classification affect the composition and interpretation of the cross-sectional panel. The broader implications of these assumptions for inference and generalizability are discussed in the later limitations and evaluation sections of the thesis.
+
+\section{Problem Formulation}
+\subsection*{The Cross-Sectional Ranking Objective}
+
+The investment decision analyzed in this study is inherently comparative: the goal is to rank securities relative to each other, rather than to predict the absolute numeric accuracy of each individual return. As such, the problem is cast as a \emph{learning-to-rank} task. Denote by $N$ the number of active equities in the analytical sample at time $t$. At each prediction date, the model receives a three-dimensional input tensor of temporal features, $\mathbf{X}_t \in \mathbb{R}^{N \times T \times F}$, where $T$ is the lookback sequence length (e.g., 60 days), and $F$ is the number of engineered features extracted per security.
+
+The learning objective is to parameterize a mapping $f(\mathbf{X}_t; \Theta)$ that outputs a vector of cross-sectional scores $\mathbf{\hat{y}}_t \in \mathbb{R}^N$. These scores should monotonically align with the realized forward \emph{residualized} returns $\mathbf{y}_t \in \mathbb{R}^N$, meaning the induced orderings serve as the ranking for the cross-section at time $t$.
+
+\subsection*{Generalization and Bias Neutralization}
+A central design constraint is to prevent structural survivorship bias and regime overfitting. Since the sample is composed of continuous survivors from 2020 onward, including static identifiers (such as Stock IDs or persistent entity embeddings) would allow the model to memorize long-term “winners”, thus violating generalizability. To enforce that the model learns a generalized mapping (a pricing kernel), $f(\mathbf{X}_t; \Theta)$ is constructed to explicitly exclude such static structural identifiers. Both the temporal encoder (\acs{LSTM}) and the context layer (Cross-Sectional Transformer) must deduce the cross-sectional ranking solely from the time-varying technical and fundamental features present in $\mathbf{X}_t$, observed at each $t$.
+
+\subsection*{Hybrid Optimization Function}
+
+To align mathematical training with the requirements of downstream portfolio construction, the network is trained with a \emph{hybrid} loss. This combines classical Mean Squared Error (MSE), which helps anchor the scale of the predictions, with a pairwise hinge loss. The hinge component operates on each cross-sectional batch and explicitly penalizes situations where securities from empirically lower-performing quantiles are scored above those from higher-performing quantiles. This approach directly incentivizes the monotonic separation required for constructing a market-neutral, cross-sectional portfolio.
+
+\section{Target Construction}
+\subsection*{Systematic Risk Residualization}
+
+Securities within a broad equity universe share exposure to the same market-wide risk factors; thus, raw forward returns are dominated by common systematic variation that is not stock-specific. To ensure that the model's learning target strictly captures \emph{security-specific} signals, the forward-looking prediction target is residualized with respect to known risk factors prior to cross-sectional evaluation.
+
+\subsection*{Fama-French 3-Factor Rolling OLS}
+
+The idiosyncratic return target for each stock is constructed via the Fama-French 3-Factor model. For every security $i$, a trailing 126-day (roughly six months) rolling Ordinary Least Squares (OLS) regression is performed at date $t$:
+
+\begin{equation}
+    R_{i,t} - R_{f,t} = \alpha_{i,t} + \beta_{i,\mathrm{MKT}}\,\mathrm{MKT}_t + \beta_{i,\mathrm{SMB}}\,\mathrm{SMB}_t + \beta_{i,\mathrm{HML}}\,\mathrm{HML}_t + \epsilon_{i,t}
+\end{equation}
+
+where $R_{i,t}$ is the return for stock $i$, $R_{f,t}$ is the risk-free rate, and $\mathrm{MKT}_t$, $\mathrm{SMB}_t$, and $\mathrm{HML}_t$ denote the market, size, and value factor premia, respectively. The residual $\epsilon_{i,t}$ isolates the stock-specific, non-systematic return component at each date.
+
+\subsection*{Cross-Sectional Z-Scoring for the Forward Horizon}
+
+To produce the final set of predictive targets $\mathbf{y}_t$ for each ranking instance, the daily idiosyncratic residuals $\epsilon_{i,t}$ are aggregated for each security over a 5-day forward prediction horizon. To ensure that the resulting target is scale-invariant and purely comparative, these 5-day aggregated residuals are cross-sectionally Z-scored at each $t$. That is, for the vector of $N$ stocks on a given day, the transformed target has mean $0$ and standard deviation $1$ across the cross-section:
+
+\begin{equation}
+    \mathbf{y}_t = \frac{\boldsymbol{\epsilon}^{\,(5)}_t - \mathrm{mean}(\boldsymbol{\epsilon}^{\,(5)}_t)}{\mathrm{std}(\boldsymbol{\epsilon}^{\,(5)}_t)}
+\end{equation}
+
+This enforces that the model's predictions are evaluated exclusively by their relative ordering, consistent with the long/short, market-neutral ranking objective.
+
+\section{Project Objectives}

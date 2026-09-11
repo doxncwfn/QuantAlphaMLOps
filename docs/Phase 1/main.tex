@@ -14,41 +14,49 @@
 \begin{acronym}
     \acro{AI}{Artificial Intelligence}
     \acro{API}{Application Programming Interface}
-    \acro{CUDA}{Compute Unified Device Architecture}
-    \acro{GICS}{Global Industry Classification Standard}
+    % \acro{CUDA}{Compute Unified Device Architecture}
+    \acro{DSMA}{Distance from Simple Moving Average}
+    % \acro{GICS}{Global Industry Classification Standard}
     \acro{GPU}{Graphics Processing Unit}
     \acro{IC}{Information Coefficient}
     \acro{ICIR}{Information Coefficient Information Ratio}
     \acro{LLMs}{Large Language Models}
-    \acro{LSTMs}{Long Short-Term Memory}
+    \acro{LSTM}{Long Short-Term Memory}
     \acro{MLOps}{Machine Learning Operations}
+    \acro{NYSE}{New York Stocks Exchange}
     % \acro{SHAP}{SHapley Additive exPlanations}
     \acro{OHLCV}{Open-High-Low-Close-Volume}
-    \acro{XAI}{Explainable Artificial Intelligence}
+    \acro{PVT}{Price Volume Trend}
+    \acro{RSI}{Relative Strength Index}
+    % \acro{SnP}[S\&P]{Standard \& Poor's}
+    % \acro{XAI}{Explainable Artificial Intelligence}
 \end{acronym}
 \clearpage
 
-\input{proposal.tex}
+% \input{proposal.tex}
+% \clearpage
+
+\input{intro.tex}
 \clearpage
 
-\part{Signal Generation \& MLOps Pipeline}
+\input{methodology.tex}
+\clearpage
+p
+\input{ingestion.tex}
+\clearpage
 
-\section{Data Processing Pipeline}
-\subsection{Raw Data Acquisition}
-\subsection{Data Transformation}
-\subsection{Feature Engineering}
-\subsection{Feature Extraction}
-\subsection{Feature Selection}
+\input{data.tex}
+\clearpage
 
-\section{Model Architecture}
+\input{model.tex}
 \clearpage
 
 \input{performance.tex}
 \clearpage
 
 \part{Portfolio Construction} % Phase 2
-
 \clearpage
+
 \input{appendixes.tex}
 
 \newpage

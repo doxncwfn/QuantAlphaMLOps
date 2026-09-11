@@ -1,0 +1,285 @@
+\startfooter{Specialized Project: HK261-DAGD1-041\\
+    Data Transformation
+}
+\part{Data Transformation}
+\label{data_transformation}
+% \section{Data Sources and Preprocessing}
+% \subsection*{11.1 Raw Data Acquisition}
+
+% Daily market data for the analytical sample is acquired through programmatic \acf{API}, specifically utilizing robust financial data libraries (\texttt{yfinance}) to ensure redundancy and data validation. The extracted dataset comprises daily \acs{OHLCV} observations for the 413 S\&P 500 constituent equities that satisfy the continuous historical inclusion criteria from January 1, 2020, onward.
+
+% \medskip
+
+% To ensure the integrity of the sequential price inputs and derived technical features, all raw price series are rigorously adjusted for corporate actions, including stock splits and dividend distributions. This absolute adjustment is mandatory to prevent artificial price gaps from distorting the logarithmic return calculations and subsequent cross-sectional standardizations. The raw OHLCV panel is subsequently stored in a structured, column-oriented format (Parquet) within a persistent cloud volume (Modal) to optimize input/output (I/O) throughput during the feature engineering and deep learning phases.
+
+% \subsection*{11.2 Factor Data}
+
+% To facilitate the systematic risk residualization required for the cross-sectional prediction target, external macroeconomic factor data must be integrated into the pipeline. The daily Fama-French 3-Factor dataset is acquired programmatically via \texttt{pandas-datareader} directly from the Kenneth R. French Data Library. This dataset provides the daily market risk premium ($\mathrm{Mkt\text{-}RF}$), the size factor ($\mathrm{SMB}$), the value factor ($\mathrm{HML}$), and the risk-free rate ($\mathrm{RF}$).
+
+% \medskip
+
+% A critical MLOps engineering consideration in acquiring this factor data is chronological alignment and the management of publication lag. Because the Kenneth R. French Data Library operates with an inherent reporting delay relative to live equity markets, the overall observation period of the analytical sample is dynamically truncated to match the maximum available factor date. This strict date intersection prevents the introduction of missing observations into the trailing 126-day rolling OLS regressions and explicitly prohibits the use of forward-filling techniques, which would otherwise introduce forward-looking data leakage into the residualized alpha target.
+
+\subsection{Feature Engineering}
+\label{feature_engineering}
+\subsubsection{Logarithmic Returns}
+Let $P_{i,t}$ denote the dividend-adjusted closing price of security $i$ at time $t$. The single-period logarithmic return, $r_{i,t}$, is defined as
+
+\begin{equation}
+    r_{i,t}
+    =
+    \ln\left(\frac{P_{i,t}}{P_{i,t-1}}\right)
+    =
+    \ln(P_{i,t})-\ln(P_{i,t-1}).
+\end{equation}
+
+This transformation represents the continuously compounded return over a single period. Unlike simple returns, logarithmic returns are additive through time, such that the cumulative logarithmic return over multiple periods is equal to the sum of the corresponding single-period returns. This property provides a convenient representation for constructing rolling transformations from sequential price observations.
+
+\medskip
+
+Because the transformation is based on relative rather than absolute price changes, logarithmic returns are independent of the nominal price level of a security. This provides a comparable representation of price movements across securities with substantially different prices and avoids directly modeling the non-stationary scale of raw price levels.
+
+\medskip
+
+Within the data-processing pipeline, logarithmic returns therefore provide the baseline representation of short-horizon price dynamics. Subsequent transformations are constructed from this representation where appropriate.
+
+\subsubsection{\acf{DSMA}}
+Let $SMA_{i,t}^{(w)}$ denote the Simple Moving Average of the closing price of security $i$ over a rolling window of $w$ days:
+
+\begin{equation}
+    SMA_{i,t}^{(w)}
+    =
+    \frac{1}{w}
+    \sum_{k=0}^{w-1} P_{i,t-k},
+\end{equation}
+
+where $P_{i,t}$ denotes the dividend-adjusted closing price. The Distance from Simple Moving Average (DSMA) measures the proportional deviation of the current price from its recent moving average:
+
+\begin{equation}
+    DSMA_{i,t}^{(w)}
+    =
+    \frac{P_{i,t}-SMA_{i,t}^{(w)}}
+    {SMA_{i,t}^{(w)}}.
+\end{equation}
+
+In this study, the lookback windows are defined as
+$w\in\{10,20,60\}$ to represent short-, medium-, and long-horizon deviations from the corresponding local price baseline.
+
+\medskip
+
+DSMA represents the relative position of the current price with respect to its recent moving average. Positive values indicate that the current price is above the corresponding moving average, while negative values indicate that it is below. Expressing the deviation proportionally rather than in absolute price units makes the resulting transformation comparable across securities with different nominal price levels.
+
+\medskip
+
+As a data transformation, DSMA therefore converts the price level into a normalized measure of relative price position across multiple temporal horizons, providing information complementary to period-to-period returns.
+
+\subsubsection{\acf{RSI}}
+Let
+$\Delta P_{i,t}=P_{i,t}-P_{i,t-1}$
+denote the single-period change in the dividend-adjusted closing price of security $i$. The price changes are decomposed into positive gains, $U_{i,t}$, and absolute losses, $D_{i,t}$:
+
+\begin{equation}
+    U_{i,t}=\max(\Delta P_{i,t},0),
+    \qquad
+    D_{i,t}=\max(-\Delta P_{i,t},0).
+\end{equation}
+
+For a lookback window of $w$ periods, the Relative Strength factor is defined as the ratio of the smoothed average gain to the smoothed average loss:
+
+\begin{equation}
+    RS_{i,t}^{(w)}
+    =
+    \frac{\operatorname{AvgGain}_{i,t}^{(w)}}
+    {\operatorname{AvgLoss}_{i,t}^{(w)}}.
+\end{equation}
+
+The Relative Strength Index is then given by
+
+\begin{equation}
+    RSI_{i,t}^{(w)}
+    =
+    100-\frac{100}{1+RS_{i,t}^{(w)}}.
+\end{equation}
+
+The resulting indicator is bounded on $[0,100]$. Higher values indicate that recent gains have been larger and/or more persistent relative to recent losses, whereas lower values indicate the opposite. The ratio-based construction therefore provides a common numerical representation of recent directional momentum across securities.
+
+\medskip
+
+Within the data-processing pipeline, RSI transforms sequential price changes into a bounded representation of the relative balance between recent gains and losses. It thus provides information complementary to logarithmic returns and DSMA, which represent individual price changes and relative price position, respectively.
+
+\subsubsection{Relative Volume (RVOL)}
+Let $V_{i,t}$ denote the raw trading volume of security $i$ at time $t$. Relative Volume, $RVOL_{i,t}^{(w)}$, measures current trading activity relative to the security's recent historical volume baseline. The baseline is defined as
+
+\begin{equation}
+    SMA_{V,i,t}^{(w)}
+    =
+    \frac{1}{w}
+    \sum_{k=0}^{w-1}V_{i,t-k},
+\end{equation}
+
+and Relative Volume is given by
+
+\begin{equation}
+    RVOL_{i,t}^{(w)}
+    =
+    \frac{V_{i,t}}
+    {SMA_{V,i,t}^{(w)}}.
+\end{equation}
+
+A value near $1$ indicates that current trading volume is close to its recent average, whereas values substantially above or below $1$ indicate unusually high or low activity relative to the security's own historical baseline. By expressing volume relative to its own recent level, the transformation reduces the dependence of the representation on absolute trading volume.
+
+\medskip
+
+As a data transformation, RVOL converts raw volume into a relative measure of trading intensity. This provides a representation of changes in market activity that is more comparable across securities than absolute volume and complements price-derived transformations by incorporating information from the volume dimension of the \acs{OHLCV} data.
+\subsubsection{Ichimoku Indicator}
+
+The Ichimoku Kinko Hyo (hereafter, Ichimoku) is a multi-component technical analysis framework that represents price structure across multiple temporal horizons. It combines rolling high--low price ranges into several related reference levels, allowing the relative position and configuration of price to be represented jointly~\cite{Cahyadi2012,Deng2021}.
+
+Let $P_{i,t}^{H}$, $P_{i,t}^{L}$, and $P_{i,t}^{C}$ denote the high, low, and closing prices of security $i$ at time $t$. The framework uses three lookback parameters, $w_1$, $w_2$, and $w_3$.
+
+\paragraph{Tenkan-sen}
+
+The Tenkan-sen ($TS_{i,t}$) is the midpoint of the highest high and lowest low over the short-term window:
+
+\begin{equation}
+    TS_{i,t}
+    =
+    \frac{
+    \max_{k=0,\ldots,w_1-1}P_{i,t-k}^{H}
+    +
+    \min_{k=0,\ldots,w_1-1}P_{i,t-k}^{L}
+    }{2}.
+\end{equation}
+
+It provides a short-horizon reference level derived from the recent trading range and therefore represents local price structure over the corresponding temporal window.
+
+\paragraph{Kijun-sen}
+
+The Kijun-sen ($KS_{i,t}$) applies the same midpoint construction over the longer window $w_2$:
+
+\begin{equation}
+    KS_{i,t}
+    =
+    \frac{
+    \max_{k=0,\ldots,w_2-1}P_{i,t-k}^{H}
+    +
+    \min_{k=0,\ldots,w_2-1}P_{i,t-k}^{L}
+    }{2}.
+\end{equation}
+
+Because it is calculated over a longer horizon, the Kijun-sen provides a slower-moving reference for the prevailing price structure and complements the shorter-horizon Tenkan-sen.
+
+\paragraph{Senkou Span A}
+
+Senkou Span A ($SSA$) is defined as the midpoint of the Tenkan-sen and Kijun-sen:
+
+\begin{equation}
+    SSA_{i,t+w_2}
+    =
+    \frac{TS_{i,t}+KS_{i,t}}{2}.
+\end{equation}
+
+It combines short- and medium-horizon reference levels into a single structural representation.
+
+\paragraph{Senkou Span B}
+
+Senkou Span B ($SSB$) is the midpoint of the highest high and lowest low over the longest lookback window:
+
+\begin{equation}
+    SSB_{i,t+w_2}
+    =
+    \frac{
+    \max_{k=0,\ldots,w_3-1}P_{i,t-k}^{H}
+    +
+    \min_{k=0,\ldots,w_3-1}P_{i,t-k}^{L}
+    }{2}.
+\end{equation}
+
+It provides a slower-moving reference based on the longer historical trading range.
+
+\paragraph{Kumo}
+
+The Kumo, or cloud, is the region bounded by Senkou Span A and Senkou Span B. It therefore represents the relationship between the short/medium-horizon structure captured by $SSA$ and the longer-horizon structure captured by $SSB$~\cite{Cahyadi2012,Deng2021}.
+
+\paragraph{Chikou Span}
+
+The Chikou Span ($CS$) represents the current closing price plotted $w_2$ periods backward:
+
+\begin{equation}
+    CS_{i,t-w_2}=P_{i,t}^{C}.
+\end{equation}
+
+It provides a lagged comparison between current price and historical price levels.
+
+\paragraph{Temporal Alignment}
+
+Because Senkou spans and the Chikou Span are conventionally shifted for visualization, their use in a predictive setting requires point-in-time alignment. Features supplied to the model at time $t$ must be constructed exclusively from information available no later than $t$. A forward-shifted value that depends on observations unavailable at time $t$ would introduce look-ahead bias. The exact alignment procedure must therefore be defined according to the implemented data pipeline.
+
+Collectively, the Ichimoku components provide a multi-horizon representation of price structure that complements return-, moving-average-, momentum-, and volume-based transformations.
+
+\subsubsection{\acf{PVT}}
+
+Let $P_{i,t}$ and $V_{i,t}$ denote the dividend-adjusted closing price and trading volume, respectively, of security $i$ at time $t$. The Price Volume Trend (PVT) is a cumulative price--volume transformation defined recursively as
+
+\begin{equation}
+    PVT_{i,t}
+    =
+    PVT_{i,t-1}
+    +
+    V_{i,t}
+    \left(
+    \frac{P_{i,t}-P_{i,t-1}}{P_{i,t-1}}
+    \right).
+\end{equation}
+
+The change in PVT is therefore proportional to both the relative price movement and the contemporaneous trading volume. Positive price changes increase the cumulative value, whereas negative price changes decrease it. Unlike volume-only transformations, PVT incorporates the magnitude of the price movement into each volume contribution.
+
+\medskip
+
+As a data transformation, PVT converts the separate price and volume observations into a cumulative price--volume representation. It therefore captures information about the historical interaction between price changes and trading activity that is not represented by logarithmic returns or Relative Volume alone.
+
+\medskip
+
+Because PVT is cumulative and unbounded, its numerical scale depends on the historical path and volume scale of each security. Any subsequent normalization or transformation should therefore be documented separately from the mathematical definition of PVT.
+
+\subsubsection{Rolling Volatility}
+Let $r_{i,t}$ denote the single-period logarithmic return of security $i$ at time $t$. Rolling Volatility, $\sigma_{i,t}^{(w)}$, measures the dispersion of returns over a historical lookback window of $w$ periods. The rolling mean return is defined as
+
+\begin{equation}
+    \bar{r}_{i,t}^{(w)}
+    =
+    \frac{1}{w}
+    \sum_{k=0}^{w-1}r_{i,t-k},
+\end{equation}
+
+and rolling volatility is calculated as the sample standard deviation:
+
+\begin{equation}
+    \sigma_{i,t}^{(w)}
+    =
+    \sqrt{
+        \frac{1}{w-1}
+        \sum_{k=0}^{w-1}
+        \left(
+        r_{i,t-k}
+        -
+        \bar{r}_{i,t}^{(w)}
+        \right)^2
+    }.
+\end{equation}
+
+The resulting quantity represents the historical variability of returns around their local mean. Larger values indicate greater recent return dispersion, whereas smaller values indicate comparatively stable return behavior. Because the calculation is performed on logarithmic returns rather than absolute price levels, the resulting measure is independent of the nominal price scale of the security.
+
+\medskip
+
+As a data transformation, rolling volatility summarizes the variability of individual return observations over a defined historical horizon. It therefore complements logarithmic returns by representing the local dispersion of price movements rather than the movement of price itself.
+
+\medskip
+
+For reproducibility, the implementation must specify the lookback window, whether the volatility measure is retained as a daily standard deviation or annualized, and the degrees-of-freedom convention used in the calculation.
+
+\subsection{Feature Extraction}
+To be updated
+
+\subsection{Feature Selection}
+To be updated
