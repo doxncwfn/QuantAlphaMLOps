@@ -5,7 +5,7 @@ Implements Section 27:
 - Retains all 21 V2 invariants and incorporates 10 additional V3 invariants (INV_22 to INV_31).
 - Evaluates candidate datasets under data/identity/candidates/v3/ and data/universe/candidates/v3/.
 - Clearly distinguishes implementation/integrity invariants from historical truth validation.
-- Outputs data/quality/v3/invariant_suite_report.parquet and data/quality/v3/invariant_suite_report.md.
+- Outputs data/quality/v3/invariant_suite_report.parquet and report/validation/v3_invariant_suite_report.md.
 """
 
 from __future__ import annotations

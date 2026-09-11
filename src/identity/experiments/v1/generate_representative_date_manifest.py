@@ -246,7 +246,7 @@ def compute_statistics(df_manifest: pl.DataFrame, logger: logging.Logger) -> Dic
 # Markdown Report Synthesis
 # -----------------------------------------------------------------------------
 def generate_report(stats: Dict[str, Any], df_manifest: pl.DataFrame, logger: logging.Logger):
-    """Synthesizes data/quality/representative_date_manifest_report.md."""
+    """Synthesizes report/quality/representative_date_manifest_report.md."""
     logger.info("Synthesizing comprehensive quality report: %s...", REPORT_MD_PATH)
 
     # Format duration bucket table

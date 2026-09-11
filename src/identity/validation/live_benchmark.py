@@ -7,7 +7,7 @@ Empirically benchmarks:
 3. Live 9-key concurrent throughput (evaluating multi-worker parallelism).
 4. Reconciles latency percentiles (p50, p90, p95, p99) and corrects V2 contradictions.
 5. Formulates conservative PLANNING_ESTIMATE bounds with uncertainty margins.
-Produces: data/quality/v3/live_benchmark_report.parquet and data/quality/v3/live_benchmark_report.md
+Produces: data/quality/v3/live_benchmark_report.parquet and report/benchmark/v3_live_benchmark_report.md
 """
 
 from __future__ import annotations

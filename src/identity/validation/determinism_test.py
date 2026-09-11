@@ -5,7 +5,7 @@ Implements Section 28 & INV_31:
 - Verifies that given identical cached evidence and configuration, the V3
   candidate resolver produces 100% bit-for-bit identical outputs.
 - Computes SHA-256 hashes of all candidate outputs across Run 1 and Run 2.
-- Outputs log/v3_determinism.log and data/quality/v3/determinism_test_report.md.
+- Outputs log/v3_determinism.log and report/validation/v3_determinism_test_report.md.
 """
 
 from __future__ import annotations

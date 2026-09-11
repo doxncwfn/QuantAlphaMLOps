@@ -6,7 +6,7 @@ Verifies:
 2. Atomic cache file integrity (0 partial writes, 0 corrupted JSONs).
 3. Exact telemetry reconciliation (sum of worker total_requests == total queries).
 4. Masked worker channels (no raw API key leakage).
-Produces: log/v3_concurrency.log and data/quality/v3/concurrency_test_report.md
+Produces: log/v3_concurrency.log and report/validation/v3_concurrency_test_report.md
 """
 
 from __future__ import annotations

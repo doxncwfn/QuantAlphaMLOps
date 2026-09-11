@@ -2,14 +2,14 @@
 V3 Promotion Gate & Comprehensive Completeness Reporting.
 =========================================================
 Implements Sections 24, 25, 31, 37:
-- Generates data/quality/v3/identity_coverage_report.md:
+- Generates report/quality/identity_coverage_report.md:
     Breakdown by year, duration buckets, ticker formats, security types, and resolution tiers.
     Explicit side-by-side comparison of V2 vs V3.
 - Generates data/manifests/v3/promotion_manifest.json:
     Full artifact checksums, row counts, git status, gate decision, and manual promotion command.
-- Generates data/quality/v3/PRODUCTION_GATE_REPORT.md:
+- Generates report/quality/PRODUCTION_GATE_REPORT.md:
     Rigorous supervisor review document with PASS / CONDITIONAL / FAIL evaluation.
-- Generates log/v3_final_summary.md:
+- Generates report/quality/v3_final_summary.md:
     Complete execution summary formatted strictly according to Section 37.
 """
 
@@ -124,7 +124,7 @@ def generate_all_reports():
     inv_total = df_inv.height
 
     # -------------------------------------------------------------------------
-    # Report 1: data/quality/v3/identity_coverage_report.md
+    # Report 1: report/quality/identity_coverage_report.md
     # -------------------------------------------------------------------------
     print("Writing identity_coverage_report.md...")
     # Stratification by year
@@ -325,7 +325,7 @@ def generate_all_reports():
     print(f"Saved {PROMOTION_MANIFEST_JSON}")
 
     # -------------------------------------------------------------------------
-    # Report 3: data/quality/v3/PRODUCTION_GATE_REPORT.md
+    # Report 3: report/quality/PRODUCTION_GATE_REPORT.md
     # -------------------------------------------------------------------------
     print("Writing PRODUCTION_GATE_REPORT.md...")
     gate_md = f"""# V3 Production Promotion Gate Report
@@ -430,7 +430,7 @@ PYTHONPATH=. python3 src/identity/v3/backfill_engine.py --full-live
     print(f"Saved {GATE_REPORT_MD}")
 
     # -------------------------------------------------------------------------
-    # Report 4: log/v3_final_summary.md
+    # Report 4: report/quality/v3_final_summary.md
     # -------------------------------------------------------------------------
     print("Writing v3_final_summary.md...")
     summary_md = f"""# V3 Final Execution Summary

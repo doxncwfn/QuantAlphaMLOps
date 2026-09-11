@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def generate_availability_report():
-    """Generates comprehensive markdown report at data/quality/availability_episode_report.md."""
+    """Generates comprehensive markdown report at report/universe/availability_episode_report.md."""
     logger.info("Generating availability episode diagnostic report at %s...", REPORT_MD_PATH)
 
     df_spells = pl.read_csv(SPELLS_CSV_PATH)

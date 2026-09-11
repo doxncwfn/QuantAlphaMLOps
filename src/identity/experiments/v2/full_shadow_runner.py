@@ -8,7 +8,7 @@ Processes all 43,757 ticker spells from data/universe/spells.csv in shadow mode.
 - Assigns deterministic, isolated UNRESOLVED identifiers with is_canonical=False for offline spells.
 - Checkpoints progress every 5,000 spells to data/identity/experiments/v2/full_shadow/checkpoints/.
 - Produces complete 29-column schema in data/identity/experiments/v2/full_shadow/shadow_identity_results.parquet.
-- Generates summary report: data/identity/experiments/v2/full_shadow/shadow_summary.md.
+- Generates summary report: report/validation/v2_validation_evidence_summary.md.
 """
 
 from __future__ import annotations

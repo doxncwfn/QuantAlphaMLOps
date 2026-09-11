@@ -3,7 +3,7 @@ V3 Production Promotion Orchestrator.
 =====================================
 Safely and atomically promotes V3 candidate datasets to production.
 NOTE: This script is intended to be executed manually by the user/supervisor
-after reviewing data/quality/v3/PRODUCTION_GATE_REPORT.md.
+after reviewing report/quality/PRODUCTION_GATE_REPORT.md.
 """
 
 from __future__ import annotations

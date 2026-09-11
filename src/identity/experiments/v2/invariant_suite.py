@@ -4,8 +4,8 @@ Sections 13, 14 & 16: Comprehensive Automated Invariant Suite & Determinism Test
 Evaluates all 21 formal architectural invariants across the V2 pipeline,
 executes dual cache-only reproducibility checks, and writes:
 - data/identity/experiments/v2/invariant_suite_report.parquet
-- data/identity/experiments/v2/invariant_suite_report.md
-- data/identity/experiments/v2/determinism_test_report.md
+- report/validation/v3_invariant_suite_report.md
+- report/validation/v3_determinism_test_report.md
 """
 
 from __future__ import annotations

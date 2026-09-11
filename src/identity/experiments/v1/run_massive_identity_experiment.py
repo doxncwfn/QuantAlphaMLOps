@@ -1102,7 +1102,7 @@ def generate_experiment_report(
     logger: logging.Logger
 ):
     """
-    Writes data/quality/massive_date_aware_identity_report.md fulfilling all prompt sections A through I.
+    Writes report/quality/massive_date_aware_identity_report.md fulfilling all prompt sections A through I.
     """
     logger.info("Synthesizing comprehensive experiment report: %s...", REPORT_MD_PATH)
 

@@ -3,7 +3,7 @@ V3 Whole-Dataset Quality Suite & Advanced Integrity Audits.
 ===========================================================
 Implements Sections 12, 13, 14, 24, 25, 26, 27:
 - Ticker-Reuse Audit: Evaluates all multi-spell tickers for false merges.
-  Outputs data/quality/v3/ticker_reuse_audit.parquet and log/v3_ticker_reuse_audit.md.
+  Outputs data/quality/v3/ticker_reuse_audit.parquet and report/audit/v3_ticker_reuse_audit.md.
 - Same-CIK Multi-Security Test: Validates instrument-level separation for multi-security issuers.
   Outputs data/quality/v3/same_cik_multiple_security.parquet.
 - FIGI Collision Audit: Ensures 1:1 mapping from confirmed FIGI to canonical security_id.

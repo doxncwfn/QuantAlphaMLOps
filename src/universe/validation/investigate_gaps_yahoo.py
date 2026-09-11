@@ -593,7 +593,7 @@ def write_diagnostic_report(
     df_prob: pl.DataFrame,
     logger: logging.Logger
 ):
-    """Generates the markdown diagnostic report at data/quality/yahoo_gap_validation_report.md."""
+    """Generates the markdown diagnostic report at report/quality/yahoo_gap_validation_report.md."""
     logger.info("Generating comprehensive markdown report at %s...", REPORT_MD_PATH)
 
     # Compute key stats
