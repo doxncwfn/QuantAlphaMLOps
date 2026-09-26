@@ -4,14 +4,6 @@ version = "0.1.0"
 description = "Quantitative Alpha MLOps Platform"
 requires-python = ">=3.11"
 dependencies = [
-  # Ingestion & Market Data Clients
-  "alpaca-py>=0.30.0",
-  "databento>=0.40.0",
-  "exchange-calendars>=4.5.0",
-  "pandas-datareader>=0.10.0",
-  "requests>=2.32",
-  "yfinance>=0.2.66",
-  
   # Data Engineering & Preprocessing
   "numpy>=1.26.0,<2",
   "pandas>=2.2",
@@ -42,3 +34,39 @@ dependencies = [
 
 [tool.uv]
 default-groups = []
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "notebooks",
+    "artifacts",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade (modern type hints and idioms)
+    "C4",     # flake8-comprehensions
+    "BLE",    # flake8-blind-except
+    "SIM",    # flake8-simplify
+    "TRY",    # tryceratops
+    "G",      # flake8-logging-format
+]
+ignore = [
+    "E501",   # Line length handled by formatter
+    "E402",   # Module level import not at top of file (needed for CUDA env setup)
+    "TRY003", # Avoid specifying long messages outside exception class
+    "TRY300", # Consider moving statement to an else block
+    "TRY301", # Abstract raise to an inner function
+    "TRY400", # Use logging.exception instead of logging.error
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "tools"]

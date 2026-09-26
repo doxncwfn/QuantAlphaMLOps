@@ -1,18 +1,20 @@
 # Developer Environment
 .vscode/
 .venv/
+.DS_Store
 
 # Secret Environment Variables
 .env
 
 # Python Caches
 __pycache__/
+.ruff_cache/
 
 # Artifacts
 artifacts/
 data/
 factors/
-logs/
+log/
 metrics/
 notebooks/
 wandb/
