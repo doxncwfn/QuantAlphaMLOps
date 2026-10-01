@@ -1,0 +1,644 @@
+# Russell 1000 Historical Dataset: Data Quality & Integrity Audit Configuration
+version: "1.0.0"
+audit_name: "Russell 1000 Historical Dataset Audit"
+
+paths:
+  data_dir: "data"
+  processed_dir: "data/processed"
+  raw_dir: "data/raw"
+  wrds_dir: "data/WRDS"
+  factors_file: "data/ff.csv"
+  output_tables_dir: "report/quality/tables"
+  output_figures_dir: "report/quality/figures"
+  log_dir: "log/audit"
+  manifest_path: "report/quality/audit_input_manifest.json"
+  report_path: "report/quality/russell1000_data_quality_audit_report.md"
+  notebook_path: "notebooks/visualizations.ipynb"
+
+years:
+  start_year: 2000
+  end_year: 2026
+  missing_years: []
+
+parameters:
+  lookback_days: 40
+  coverage_threshold: 0.90
+  high_coverage_threshold: 0.95
+  missing_streak_thresholds: [5, 10, 20, 60]
+  extreme_return_thresholds: [0.10, 0.20, 0.50, 1.00]
+  random_seed: 42
+  sample_size_cross_validation: 20
+
+source_boundary:
+  wrds_cutoff_date: "2024-12-31"
+  crawled_start_date: "2025-01-02"
+  split_check_ratios: [2.0, 3.0, 4.0, 5.0, 10.0, 20.0, 25.0]
+  split_tolerance: 0.10
+  regular_return_threshold: 0.15
+  extreme_jump_threshold: 0.30
+
+# Annual Russell 1000 Constituent Snapshot Specifications (2000–2026)
+snapshots:
+  - list_year: 2000
+    source_file: "2000.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2000-06-30"
+    source_header_text: "Russell 1000 Index Membership June 30, 2000"
+    period_start: "2000-06-30"
+    period_end: "2001-06-29"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 0
+    price_start: "2000-06-30"
+    price_end: "2001-06-29"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2001
+    source_file: "2001.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2001-06-30"
+    source_header_text: "Russell 1000 Index as of June 30, 2001"
+    period_start: "2001-07-02"
+    period_end: "2002-06-28"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 0
+    price_start: "2001-07-02"
+    price_end: "2002-06-28"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2002
+    source_file: "2002.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2002-06-30"
+    source_header_text: "Russell 1000 Index as of June 30, 2002"
+    period_start: "2002-07-01"
+    period_end: "2003-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 0
+    price_start: "2002-07-01"
+    price_end: "2003-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2003
+    source_file: "2003.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2003-06-30"
+    source_header_text: "Russell 1000 Index as of June 30, 2003"
+    period_start: "2003-06-30"
+    period_end: "2004-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 0
+    price_start: "2003-06-30"
+    price_end: "2004-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Recovered official reconstitution list; completes contiguous 27-year panel."
+
+  - list_year: 2004
+    source_file: "2004.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2004-06-25"
+    source_header_text: "Russell 1000 as of June 25, 2004"
+    period_start: "2004-06-30"
+    period_end: "2005-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 5
+    price_start: "2004-06-30"
+    price_end: "2005-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF (reconstitution effective late June)."
+
+  - list_year: 2005
+    source_file: "2005.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2005-06-24"
+    source_header_text: "Russell 1000 as of June 24, 2005"
+    period_start: "2005-06-30"
+    period_end: "2006-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 6
+    price_start: "2005-06-30"
+    price_end: "2006-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2006
+    source_file: "2006.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2006-06-30"
+    source_header_text: "Russell 1000 as of June 30, 2006"
+    period_start: "2006-06-30"
+    period_end: "2007-06-29"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 0
+    price_start: "2006-06-30"
+    price_end: "2007-06-29"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2007
+    source_file: "2007.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2007-06-22"
+    source_header_text: "Russell 1000 as of June 22, 2007"
+    period_start: "2007-07-02"
+    period_end: "2008-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 10
+    price_start: "2007-07-02"
+    price_end: "2008-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell preliminary reconstitution list dated June 22."
+
+  - list_year: 2008
+    source_file: "2008.csv"
+    source_format: "CSV"
+    source_snapshot_date: "2008-06-27"
+    source_header_text: "Russell 1000 Constituent List June 2008"
+    period_start: "2008-06-30"
+    period_end: "2009-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "INFERRED_PERIOD"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 3
+    price_start: "2008-06-30"
+    price_end: "2009-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Processed constituent CSV corresponding to late-June 2008 reconstitution."
+
+  - list_year: 2009
+    source_file: "2009.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2009-06-29"
+    source_header_text: "Russell 1000 as of June 29, 2009"
+    period_start: "2009-06-30"
+    period_end: "2010-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 1
+    price_start: "2009-06-30"
+    price_end: "2010-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2010
+    source_file: "2010.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2010-06-28"
+    source_header_text: "Russell 1000 as of June 28, 2010"
+    period_start: "2010-06-30"
+    period_end: "2011-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 2
+    price_start: "2010-06-30"
+    price_end: "2011-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2011
+    source_file: "2011.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2011-06-27"
+    source_header_text: "Russell 1000 as of June 27, 2011"
+    period_start: "2011-06-30"
+    period_end: "2012-06-29"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 3
+    price_start: "2011-06-30"
+    price_end: "2012-06-29"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2012
+    source_file: "2012.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2012-06-25"
+    source_header_text: "Russell 1000 as of June 25, 2012"
+    period_start: "2012-07-02"
+    period_end: "2013-06-28"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 7
+    price_start: "2012-07-02"
+    price_end: "2013-06-28"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2013
+    source_file: "2013.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2013-06-28"
+    source_header_text: "Russell 1000 as of June 28, 2013"
+    period_start: "2013-07-01"
+    period_end: "2014-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 3
+    price_start: "2013-07-01"
+    price_end: "2014-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2014
+    source_file: "2014.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2014-06-27"
+    source_header_text: "Russell 1000 as of June 27, 2014"
+    period_start: "2014-06-30"
+    period_end: "2015-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 3
+    price_start: "2014-06-30"
+    price_end: "2015-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2015
+    source_file: "2015.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2015-06-26"
+    source_header_text: "Russell 1000 as of June 26, 2015"
+    period_start: "2015-06-30"
+    period_end: "2016-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 4
+    price_start: "2015-06-30"
+    price_end: "2016-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2016
+    source_file: "2016.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2016-06-27"
+    source_header_text: "Russell 1000 as of June 27, 2016"
+    period_start: "2016-06-30"
+    period_end: "2017-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 3
+    price_start: "2016-06-30"
+    price_end: "2017-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2017
+    source_file: "2017.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2017-06-26"
+    source_header_text: "Russell 1000 as of June 26, 2017"
+    period_start: "2017-06-30"
+    period_end: "2018-06-29"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 4
+    price_start: "2017-06-30"
+    price_end: "2018-06-29"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2018
+    source_file: "2018.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2018-06-25"
+    source_header_text: "Russell 1000 as of June 25, 2018"
+    period_start: "2018-07-02"
+    period_end: "2019-06-28"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 7
+    price_start: "2018-07-02"
+    price_end: "2019-06-28"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2019
+    source_file: "2019.json"
+    source_format: "JSON"
+    source_snapshot_date: "2019-07-31"
+    source_header_text: "iShares Russell 1000 ETF Holdings as of 2019-07-31"
+    period_start: "2019-07-01"
+    period_end: "2020-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "USED_FOR_PERIOD"
+    is_off_cycle_snapshot: true
+    hindsight_gap_days: 30
+    price_start: "2019-07-01"
+    price_end: "2020-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Off-cycle July 31 ETF snapshot; applied backwards to July 1 2019."
+
+  - list_year: 2020
+    source_file: "2020.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2020-06-29"
+    source_header_text: "Russell 1000 as of June 29, 2020"
+    period_start: "2020-06-30"
+    period_end: "2021-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 1
+    price_start: "2020-06-30"
+    price_end: "2021-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF (verified late-June list)."
+
+  - list_year: 2021
+    source_file: "2021.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2021-06-28"
+    source_header_text: "Russell 1000 as of June 28, 2021"
+    period_start: "2021-06-30"
+    period_end: "2022-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 2
+    price_start: "2021-06-30"
+    price_end: "2022-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2022
+    source_file: "2022.pdf"
+    source_format: "PDF"
+    source_snapshot_date: "2022-06-24"
+    source_header_text: "Russell 1000 as of June 24, 2022"
+    period_start: "2022-06-30"
+    period_end: "2023-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 6
+    price_start: "2022-06-30"
+    price_end: "2023-06-30"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Official FTSE Russell reconstitution PDF."
+
+  - list_year: 2023
+    source_file: "2023.json"
+    source_format: "JSON"
+    source_snapshot_date: "2023-11-15"
+    source_header_text: "iShares Russell 1000 ETF Holdings as of 2023-11-15"
+    period_start: "2023-06-30"
+    period_end: "2024-06-28"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "USED_FOR_PERIOD"
+    is_off_cycle_snapshot: true
+    hindsight_gap_days: 138
+    price_start: "2023-06-30"
+    price_end: "2024-06-28"
+    price_source: "WRDS/CRSP"
+    source_schema: "CRSP"
+    notes: "Mid-year Nov 15 snapshot used to query 2023-06-30 to 2024-06-28 (138-day hindsight mismatch)."
+
+  - list_year: 2024
+    source_file: "2024.json"
+    source_format: "JSON"
+    source_snapshot_date: "2024-07-01"
+    source_header_text: "iShares Russell 1000 ETF Holdings as of 2024-07-01"
+    period_start: "2024-06-30"
+    period_end: "2025-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "USED_FOR_PERIOD"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 1
+    price_start: "2024-07-01"
+    price_end: "2025-06-30"
+    price_source: "WRDS/CRSP + crawled"
+    source_schema: "mixed"
+    notes: "Spans WRDS (2024-07-01 to 2024-12-31) and crawled dataset (2025-01-02 to 2025-06-30)."
+
+  - list_year: 2025
+    source_file: "2025.xls"
+    source_format: "XLS"
+    source_snapshot_date: "2025-06-30"
+    source_header_text: "Fund Holdings as of Jun 30, 2025"
+    period_start: "2025-06-30"
+    period_end: "2026-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE"
+    membership_evidence_type: "OBSERVED_SNAPSHOT"
+    is_off_cycle_snapshot: false
+    hindsight_gap_days: 0
+    price_start: "2025-07-01"
+    price_end: "2026-06-30"
+    price_source: "crawled"
+    source_schema: "friend_crawled"
+    notes: "Covered by crawled dataset (2025 H2 in 2025.parquet, 2026 H1 in 2026.parquet)."
+
+  - list_year: 2026
+    source_file: "2026.xls"
+    source_format: "XLS"
+    source_snapshot_date: "2026-09-15"
+    source_header_text: "Fund Holdings as of Sep 15, 2026"
+    period_start: "2026-06-30"
+    period_end: "2027-06-30"
+    period_definition: "ANNUAL_RECONSTITUTION_CYCLE_PARTIAL"
+    membership_evidence_type: "USED_FOR_PERIOD"
+    is_off_cycle_snapshot: true
+    hindsight_gap_days: 77
+    price_start: "2026-07-01"
+    price_end: "2026-09-25"
+    price_source: "crawled"
+    source_schema: "friend_crawled"
+    notes: "In-progress evaluation cycle up to crawled observation cutoff (2026-09-25)."
+
+# Canonical Field Mapping & Schema Comparison (WRDS/CRSP vs Crawled Data)
+schema_comparison:
+  - field_category: "TEMPORAL"
+    canonical_name: "canonical_date"
+    wrds_field: "date"
+    wrds_dtype: "String (YYYY-MM-DD)"
+    wrds_definition: "Exchange trading date in ISO string format"
+    crawled_field: "Date"
+    crawled_dtype: "Datetime64[ns]"
+    crawled_definition: "Exchange trading date timestamp at midnight UTC/local"
+    semantic_equivalence: "EQUIVALENT_WITH_CAST"
+    notes: "Directly equivalent after casting String to Datetime or truncating Datetime to date string."
+
+  - field_category: "IDENTIFIER"
+    canonical_name: "canonical_ticker"
+    wrds_field: "TICKER / TSYMBOL"
+    wrds_dtype: "String"
+    wrds_definition: "CRSP exchange ticker symbol (dots stripped, e.g. BRKB, BF.B as BFB)"
+    crawled_field: "Ticker"
+    crawled_dtype: "String"
+    crawled_definition: "Crawled exchange ticker symbol (class letter appended, e.g. BRKB, HEIA)"
+    semantic_equivalence: "COMPATIBLE_WITH_SYNTAX_NORMALIZATION"
+    notes: "Both use standard ticker representations; dual classes require normalization mapping."
+
+  - field_category: "METADATA"
+    canonical_name: "canonical_name"
+    wrds_field: "COMNAM"
+    wrds_dtype: "String"
+    wrds_definition: "CRSP uppercase legal company name"
+    crawled_field: "Name"
+    crawled_dtype: "String"
+    crawled_definition: "Provider text company name"
+    semantic_equivalence: "INFORMATIONAL_ONLY"
+    notes: "Minor formatting differences (e.g. abbreviations vs full spelling)."
+
+  - field_category: "METADATA"
+    canonical_name: "canonical_sector"
+    wrds_field: "SICCD / NAICS"
+    wrds_dtype: "Int64"
+    wrds_definition: "Standard Industrial Classification 4-digit code"
+    crawled_field: "Sector"
+    crawled_dtype: "String"
+    crawled_definition: "GICS-style text sector name"
+    semantic_equivalence: "DIFFERENT_TAXONOMY"
+    notes: "Cannot be directly converted without cross-walk table."
+
+  - field_category: "PRICE"
+    canonical_name: "canonical_open"
+    wrds_field: "OPENPRC"
+    wrds_dtype: "Float64"
+    wrds_definition: "Raw unadjusted opening trade price"
+    crawled_field: "Open"
+    crawled_dtype: "Float32"
+    crawled_definition: "Opening trade price (subject to provider retroactive split adjustment)"
+    semantic_equivalence: "QUALIFIED_EQUIVALENT"
+    notes: "WRDS raw unadjusted; crawled may reflect backward split adjustments."
+
+  - field_category: "PRICE"
+    canonical_name: "canonical_high"
+    wrds_field: "ASKHI"
+    wrds_dtype: "Float64"
+    wrds_definition: "Highest trade price (or highest bid/ask quote)"
+    crawled_field: "High"
+    crawled_dtype: "Float32"
+    crawled_definition: "Intraday high trade price"
+    semantic_equivalence: "QUALIFIED_EQUIVALENT"
+    notes: "Minor quote vs trade differences on zero volume days."
+
+  - field_category: "PRICE"
+    canonical_name: "canonical_low"
+    wrds_field: "BIDLO"
+    wrds_dtype: "Float64"
+    wrds_definition: "Lowest trade price (or lowest bid/ask quote)"
+    crawled_field: "Low"
+    crawled_dtype: "Float32"
+    crawled_definition: "Intraday low trade price"
+    semantic_equivalence: "QUALIFIED_EQUIVALENT"
+    notes: "Quote vs trade differences on zero volume days."
+
+  - field_category: "PRICE"
+    canonical_name: "canonical_close"
+    wrds_field: "PRC"
+    wrds_dtype: "Float64"
+    wrds_definition: "Raw unadjusted closing price (negative denotes bid/ask midpoint quote)"
+    crawled_field: "Close"
+    crawled_dtype: "Float32"
+    crawled_definition: "Closing trade price (always positive)"
+    semantic_equivalence: "QUALIFIED_EQUIVALENT"
+    notes: "Take abs(PRC) in WRDS. High correlation (>0.999) across 960+ continuous stocks."
+
+  - field_category: "PRICE"
+    canonical_name: "canonical_adj_close"
+    wrds_field: "PRC / CFACPR"
+    wrds_dtype: "Float64 (computed)"
+    wrds_definition: "Split-adjusted closing price derived from CRSP adjustment factor CFACPR"
+    crawled_field: "Adj_Close"
+    crawled_dtype: "Float32"
+    crawled_definition: "Pre-calculated split and dividend adjusted closing price"
+    semantic_equivalence: "COMPUTABLE_EQUIVALENCE"
+    notes: "WRDS adjustment factor accounts for splits; crawled accounts for splits and dividends."
+
+  - field_category: "VOLUME"
+    canonical_name: "canonical_volume"
+    wrds_field: "VOL"
+    wrds_dtype: "Int64"
+    wrds_definition: "Daily traded share volume"
+    crawled_field: "Volume"
+    crawled_dtype: "Float64"
+    crawled_definition: "Daily traded share volume"
+    semantic_equivalence: "EQUIVALENT_WITH_CAST"
+    notes: "Directly equivalent after integer/float casting."
+
+  - field_category: "RETURN"
+    canonical_name: "canonical_return"
+    wrds_field: "RET / RETX"
+    wrds_dtype: "Float64"
+    wrds_definition: "Total daily holding return (RET with dividend, RETX without dividend)"
+    crawled_field: "None"
+    crawled_dtype: "None"
+    crawled_definition: "Must be derived dynamically from Close or Adj_Close"
+    semantic_equivalence: "DERIVED_ONLY"
+    notes: "WRDS provides official CRSP audited daily returns; crawled requires explicit calculation."
+
+  - field_category: "SECURITY_ID"
+    canonical_name: "canonical_security_id"
+    wrds_field: "PERMNO"
+    wrds_dtype: "Int64"
+    wrds_definition: "CRSP permanent numerical security identifier"
+    crawled_field: "None"
+    crawled_dtype: "None"
+    crawled_definition: "Unavailable in crawled dataset (relies on string ticker)"
+    semantic_equivalence: "UNAVAILABLE_IN_CRAWLED"
+    notes: "CRITICAL GOVERNANCE GAP: Crawled dataset cannot natively resolve ticker reuse or corporate rebrandings without linking table."
+
+  - field_category: "SURVIVORSHIP"
+    canonical_name: "delisting_status"
+    wrds_field: "DLSTCD / DLRET"
+    wrds_dtype: "Int64 / Float64"
+    wrds_definition: "Official delisting code and delisting terminal return"
+    crawled_field: "None"
+    crawled_dtype: "None"
+    crawled_definition: "Securities silently disappear when delisted"
+    semantic_equivalence: "UNAVAILABLE_IN_CRAWLED"
+    notes: "Delisting returns must be integrated from secondary corporate actions or terminal trading dates."

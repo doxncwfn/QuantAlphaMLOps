@@ -2,25 +2,56 @@ import os
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
+import sys
 import warnings
 from pathlib import Path
+
+# Ensure src/ is on sys.path for local module resolution
+src_dir = str(Path(__file__).resolve().parent)
+if src_dir not in sys.path:
+    sys.path.append(src_dir)
 
 import optuna
 import pandas as pd
 import pytorch_lightning as pl_trainer
 import torch
+import wandb
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
-import wandb
-
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from src.config import CONFIG
+import yaml
+
 from src.data.residualizer import UniversalDataProcessor, UniversalDataset
 from src.data.splitters import PurgedWalkForwardSplitter
 from src.training.trainer import AlphaEngineTrainer, seed_everything
+
+
+def load_config(config_path: Path | str | None = None) -> dict:
+    """Load configuration from config/config.yaml."""
+    if config_path is None:
+        candidates = [
+            Path(__file__).resolve().parents[1] / "config" / "config.yaml",
+            Path("config/config.yaml"),
+            Path("config.yaml"),
+        ]
+        for c in candidates:
+            if c.exists():
+                config_path = c
+                break
+    if config_path is None or not Path(config_path).exists():
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+    with open(config_path, encoding="utf-8") as f:
+        cfg = yaml.safe_load(f) or {}
+    if cfg.get("device") in (None, "auto"):
+        cfg["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+    cfg.setdefault("tickers", [])
+    return cfg
+
+
+CONFIG = load_config()
 
 
 def create_dataloaders(train_df, val_df, feature_cols, num_stocks, batch_size=32):
@@ -64,7 +95,10 @@ def objective(trial, inner_train, inner_val, feature_cols, num_stocks, input_dim
     return early_stop.best_score.item() if early_stop.best_score is not None else 0.0
 
 
-def main():
+def main(config: dict | None = None):
+    if config is not None:
+        CONFIG.update(config)
+
     seed_everything(42)
     torch.set_float32_matmul_precision("high")
 

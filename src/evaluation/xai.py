@@ -6,13 +6,42 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
+import yaml
 from captum.attr import IntegratedGradients
 from lightgbm import LGBMRegressor
 from scipy.stats import spearmanr
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from src.config import CONFIG
+
+
+def load_config(config_path: Path | str | None = None) -> dict:
+    """Load configuration from config/config.yaml."""
+    if config_path is None:
+        candidates = [
+            Path(__file__).resolve().parents[2] / "config" / "config.yaml",
+            Path("config/config.yaml"),
+            Path("config.yaml"),
+        ]
+        for c in candidates:
+            if c.exists():
+                config_path = c
+                break
+    if config_path is not None and Path(config_path).exists():
+        with open(config_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+    else:
+        cfg = {}
+    cfg.setdefault("data_dir", "data/WRDS")
+    cfg.setdefault("fama_french_dir", "data")
+    cfg.setdefault("ckpt_dir", "artifacts/checkpoints")
+    cfg.setdefault("tickers", [])
+    cfg.setdefault("seq_len", 60)
+    return cfg
+
+
+CONFIG = load_config()
+
 from src.data.residualizer import UniversalDataProcessor, UniversalDataset
 from src.training.trainer import AlphaEngineTrainer
 
@@ -38,7 +67,8 @@ class StockScorer(torch.nn.Module):
         return scores[:, self.stock_idx]
 
 
-def run_xai_diagnostics(oos_parquet_path=parquet_path):
+def run_xai_diagnostics(oos_parquet_path=parquet_path, config: dict | None = None):
+    cfg = config if config is not None else CONFIG
     print("TASK 1.4: REGIME-CONDITIONED XAI DIAGNOSTICS")
 
     oos_df = pd.read_parquet(oos_parquet_path)
@@ -46,12 +76,12 @@ def run_xai_diagnostics(oos_parquet_path=parquet_path):
 
     print("\n[1/4] Reconstructing Feature Tensors...")
     processor = UniversalDataProcessor(
-        data_dir=CONFIG["data_dir"], ff_dir=CONFIG["fama_french_dir"], tickers=CONFIG["tickers"]
+        data_dir=cfg["data_dir"], ff_dir=cfg["fama_french_dir"], tickers=cfg.get("tickers", [])
     )
     big_df = processor.load_and_process()
     feature_cols = processor.feature_cols
     num_stocks = len(processor.valid_tickers)
-    seq_len = CONFIG["seq_len"]
+    seq_len = cfg["seq_len"]
 
     print("[2/4] Segmenting Market Volatility Regimes...")
     market_vol = big_df.groupby("Date")["Vol_60"].median().reset_index()

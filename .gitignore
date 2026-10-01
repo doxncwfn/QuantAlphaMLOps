@@ -1,6 +1,8 @@
 # Developer Environment
 .vscode/
+.agents/
 .venv/
+graphify-out/
 .DS_Store
 
 # Secret Environment Variables
@@ -9,15 +11,14 @@
 # Python Caches
 __pycache__/
 .ruff_cache/
+.pytest_cache/
 
 # Artifacts
 artifacts/
 data/
-factors/
 log/
-metrics/
 notebooks/
-wandb/
+!notebooks/audit.ipynb
 
 # Project References
 refs/
@@ -54,4 +55,10 @@ refs/
 *.bmc
 *.run.xml
 *.xdy
-# End of generated LaTeX auxiliary/output files
+
+# Data
+*.parquet
+*.csv
+
+# Report
+figures/

@@ -1,0 +1,144 @@
+version: 1.0.0
+description: 'Canonical Field Mapping: WRDS/CRSP (2000-2024) vs Crawled Dataset (2025-2026)'
+transition_boundary: 2024-12-31 / 2025-01-02
+schema_comparison:
+- field_category: TEMPORAL
+  canonical_name: canonical_date
+  wrds_field: date
+  wrds_dtype: String (YYYY-MM-DD)
+  wrds_definition: Exchange trading date in ISO string format
+  crawled_field: Date
+  crawled_dtype: Datetime64[ns]
+  crawled_definition: Exchange trading date timestamp at midnight UTC/local
+  semantic_equivalence: EQUIVALENT_WITH_CAST
+  notes: Directly equivalent after casting String to Datetime or truncating Datetime
+    to date string.
+- field_category: IDENTIFIER
+  canonical_name: canonical_ticker
+  wrds_field: TICKER / TSYMBOL
+  wrds_dtype: String
+  wrds_definition: CRSP exchange ticker symbol (dots stripped, e.g. BRKB, BF.B as
+    BFB)
+  crawled_field: Ticker
+  crawled_dtype: String
+  crawled_definition: Crawled exchange ticker symbol (class letter appended, e.g.
+    BRKB, HEIA)
+  semantic_equivalence: COMPATIBLE_WITH_SYNTAX_NORMALIZATION
+  notes: Both use standard ticker representations; dual classes require normalization
+    mapping.
+- field_category: METADATA
+  canonical_name: canonical_name
+  wrds_field: COMNAM
+  wrds_dtype: String
+  wrds_definition: CRSP uppercase legal company name
+  crawled_field: Name
+  crawled_dtype: String
+  crawled_definition: Provider text company name
+  semantic_equivalence: INFORMATIONAL_ONLY
+  notes: Minor formatting differences (e.g. abbreviations vs full spelling).
+- field_category: METADATA
+  canonical_name: canonical_sector
+  wrds_field: SICCD / NAICS
+  wrds_dtype: Int64
+  wrds_definition: Standard Industrial Classification 4-digit code
+  crawled_field: Sector
+  crawled_dtype: String
+  crawled_definition: GICS-style text sector name
+  semantic_equivalence: DIFFERENT_TAXONOMY
+  notes: Cannot be directly converted without cross-walk table.
+- field_category: PRICE
+  canonical_name: canonical_open
+  wrds_field: OPENPRC
+  wrds_dtype: Float64
+  wrds_definition: Raw unadjusted opening trade price
+  crawled_field: Open
+  crawled_dtype: Float32
+  crawled_definition: Opening trade price (subject to provider retroactive split adjustment)
+  semantic_equivalence: QUALIFIED_EQUIVALENT
+  notes: WRDS raw unadjusted; crawled may reflect backward split adjustments.
+- field_category: PRICE
+  canonical_name: canonical_high
+  wrds_field: ASKHI
+  wrds_dtype: Float64
+  wrds_definition: Highest trade price (or highest bid/ask quote)
+  crawled_field: High
+  crawled_dtype: Float32
+  crawled_definition: Intraday high trade price
+  semantic_equivalence: QUALIFIED_EQUIVALENT
+  notes: Minor quote vs trade differences on zero volume days.
+- field_category: PRICE
+  canonical_name: canonical_low
+  wrds_field: BIDLO
+  wrds_dtype: Float64
+  wrds_definition: Lowest trade price (or lowest bid/ask quote)
+  crawled_field: Low
+  crawled_dtype: Float32
+  crawled_definition: Intraday low trade price
+  semantic_equivalence: QUALIFIED_EQUIVALENT
+  notes: Quote vs trade differences on zero volume days.
+- field_category: PRICE
+  canonical_name: canonical_close
+  wrds_field: PRC
+  wrds_dtype: Float64
+  wrds_definition: Raw unadjusted closing price (negative denotes bid/ask midpoint
+    quote)
+  crawled_field: Close
+  crawled_dtype: Float32
+  crawled_definition: Closing trade price (always positive)
+  semantic_equivalence: QUALIFIED_EQUIVALENT
+  notes: Take abs(PRC) in WRDS. High correlation (>0.999) across 960+ continuous stocks.
+- field_category: PRICE
+  canonical_name: canonical_adj_close
+  wrds_field: PRC / CFACPR
+  wrds_dtype: Float64 (computed)
+  wrds_definition: Split-adjusted closing price derived from CRSP adjustment factor
+    CFACPR
+  crawled_field: Adj_Close
+  crawled_dtype: Float32
+  crawled_definition: Pre-calculated split and dividend adjusted closing price
+  semantic_equivalence: COMPUTABLE_EQUIVALENCE
+  notes: WRDS adjustment factor accounts for splits; crawled accounts for splits and
+    dividends.
+- field_category: VOLUME
+  canonical_name: canonical_volume
+  wrds_field: VOL
+  wrds_dtype: Int64
+  wrds_definition: Daily traded share volume
+  crawled_field: Volume
+  crawled_dtype: Float64
+  crawled_definition: Daily traded share volume
+  semantic_equivalence: EQUIVALENT_WITH_CAST
+  notes: Directly equivalent after integer/float casting.
+- field_category: RETURN
+  canonical_name: canonical_return
+  wrds_field: RET / RETX
+  wrds_dtype: Float64
+  wrds_definition: Total daily holding return (RET with dividend, RETX without dividend)
+  crawled_field: None
+  crawled_dtype: None
+  crawled_definition: Must be derived dynamically from Close or Adj_Close
+  semantic_equivalence: DERIVED_ONLY
+  notes: WRDS provides official CRSP audited daily returns; crawled requires explicit
+    calculation.
+- field_category: SECURITY_ID
+  canonical_name: canonical_security_id
+  wrds_field: PERMNO
+  wrds_dtype: Int64
+  wrds_definition: CRSP permanent numerical security identifier
+  crawled_field: None
+  crawled_dtype: None
+  crawled_definition: Unavailable in crawled dataset (relies on string ticker)
+  semantic_equivalence: UNAVAILABLE_IN_CRAWLED
+  notes: 'CRITICAL GOVERNANCE GAP: Crawled dataset cannot natively resolve ticker
+    reuse or corporate rebrandings without linking table.'
+- field_category: SURVIVORSHIP
+  canonical_name: delisting_status
+  wrds_field: DLSTCD / DLRET
+  wrds_dtype: Int64 / Float64
+  wrds_definition: Official delisting code and delisting terminal return
+  crawled_field: None
+  crawled_dtype: None
+  crawled_definition: Securities silently disappear when delisted
+  semantic_equivalence: UNAVAILABLE_IN_CRAWLED
+  notes: Delisting returns must be integrated from secondary corporate actions or
+    terminal trading dates.

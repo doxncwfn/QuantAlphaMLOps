@@ -5,13 +5,14 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import torch
+import yaml
 from torch.utils.data import Dataset
 
 logger = logging.getLogger(__name__)
 
 CONFIG = {
-    "data_dir": "db",
-    "fama_french_dir": "factors",
+    "data_dir": "data/WRDS",
+    "fama_french_dir": "data",
     "force_start_date": "2020-01-01",
     "seq_len": 60,
     "pred_horizon": 5,
@@ -19,6 +20,25 @@ CONFIG = {
     "batch_size": 32,
     "device": "cuda" if torch.cuda.is_available() else "cpu",
 }
+
+
+def _load_yaml_config() -> dict:
+    candidates = [
+        Path(__file__).resolve().parents[2] / "config" / "config.yaml",
+        Path("config/config.yaml"),
+        Path("config.yaml"),
+    ]
+    for c in candidates:
+        if c.exists():
+            with open(c, encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+    return {}
+
+
+_loaded_cfg = _load_yaml_config()
+if _loaded_cfg:
+    CONFIG.update(_loaded_cfg)
+
 
 
 class UniversalDataProcessor:
@@ -301,13 +321,9 @@ if __name__ == "__main__":
 
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-    # Try import config, fallback to local CONFIG if not found
-    try:
-        from src.config import CONFIG as IMPORTED_CONFIG
-
-        CONFIG.update(IMPORTED_CONFIG)
-    except ImportError:
-        pass
+    cfg_override = _load_yaml_config()
+    if cfg_override:
+        CONFIG.update(cfg_override)
 
     processor = UniversalDataProcessor(
         data_dir=CONFIG["data_dir"],

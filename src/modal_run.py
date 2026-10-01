@@ -26,38 +26,61 @@ data_vol = modal.Volume.from_name("quant-data-vol")
 )
 def run_training():
     import sys
+    from pathlib import Path
+
+    import yaml
 
     sys.path.append("/root")
     sys.path.append("/root/src")
 
-    import config
+    cfg_path = Path("/root/config/config.yaml")
+    if not cfg_path.exists():
+        cfg_path = Path("config/config.yaml")
 
-    config.CONFIG["data_dir"] = "/mnt/data/db"
-    config.CONFIG["fama_french_dir"] = "/mnt/data/factors"
-    config.CONFIG["ckpt_dir"] = "/mnt/data/checkpoints"
+    cfg = {}
+    if cfg_path.exists():
+        with open(cfg_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+
+    cfg["data_dir"] = "/mnt/data/db"
+    cfg["fama_french_dir"] = "/mnt/data/factors"
+    cfg["ckpt_dir"] = "/mnt/data/checkpoints"
 
     import src.train
 
-    src.train.main()
+    src.train.main(config=cfg)
 
 
 @app.function(image=image, gpu="A100", timeout=14400, volumes={"/mnt/data": data_vol})
 def run_xai():
     import sys
+    from pathlib import Path
+
+    import yaml
 
     sys.path.append("/root")
     sys.path.append("/root/src")
 
-    import config
+    cfg_path = Path("/root/config/config.yaml")
+    if not cfg_path.exists():
+        cfg_path = Path("config/config.yaml")
 
-    config.CONFIG["data_dir"] = "/mnt/data/db"
-    config.CONFIG["fama_french_dir"] = "/mnt/data/factors"
-    config.CONFIG["ckpt_dir"] = "/mnt/data/checkpoints"  # Doxncwfn's Modal Workspace
-    # config.CONFIG['ckpt_dir'] = '/mnt/data/artifacts/checkpoints' # Ltrol's Modal Workspace
+    cfg = {}
+    if cfg_path.exists():
+        with open(cfg_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+
+    cfg["data_dir"] = "/mnt/data/db"
+    cfg["fama_french_dir"] = "/mnt/data/factors"
+    cfg["ckpt_dir"] = "/mnt/data/checkpoints"  # Doxncwfn's Modal Workspace
+    # cfg['ckpt_dir'] = '/mnt/data/artifacts/checkpoints' # Ltrol's Modal Workspace
 
     from src.evaluation.xai import run_xai_diagnostics
 
-    run_xai_diagnostics(oos_parquet_path="/mnt/data/checkpoints/oos_predictions_3.parquet")
+    run_xai_diagnostics(
+        oos_parquet_path="/mnt/data/checkpoints/oos_predictions_3.parquet",
+        config=cfg,
+    )
 
 
 @app.local_entrypoint(name="train")

@@ -11,16 +11,16 @@ by inferring schema across the full file by default and offering graceful fallba
 
 Usage Examples:
     # Convert a single file
-    python tools/csv_to_parquet.py "data/Russell 1000/WRDS/2000.csv"
+    python tools/csv_to_parquet.py "data/WRDS/2000.csv"
 
     # Convert all CSVs in a directory to Parquet using ZSTD compression
-    python tools/csv_to_parquet.py "data/Russell 1000/processed/" -c zstd
+    python tools/csv_to_parquet.py "data/processed/" -c zstd
 
     # Convert with custom output directory and 4 workers
-    python tools/csv_to_parquet.py "data/Russell 1000/processed/" -o "data/parquet/" -w 4
+    python tools/csv_to_parquet.py "data/processed/" -o "data/parquet/" -w 4
 
     # Convert with explicit null values or ignore errors
-    python tools/csv_to_parquet.py "data/Russell 1000/WRDS/2000.csv" --ignore-errors
+    python tools/csv_to_parquet.py "data/WRDS/2000.csv" --ignore-errors
 """
 
 from __future__ import annotations

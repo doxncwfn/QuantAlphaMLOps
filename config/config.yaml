@@ -1,0 +1,29 @@
+# ==============================================================================
+# Alpha Engine Model & Pipeline Configuration
+# ==============================================================================
+version: "1.0.0"
+
+# Local directories relative to repository root
+data_dir: "data/WRDS"
+fama_french_dir: "data"
+ckpt_dir: "artifacts/checkpoints"
+artifacts_dir: "artifacts"
+processed_dir: "data/processed"
+raw_dir: "data/raw"
+
+# Modal remote environment directories
+modal:
+  data_dir: "/mnt/data/db"
+  fama_french_dir: "/mnt/data/factors"
+  ckpt_dir: "/mnt/data/checkpoints"
+
+# Model hyperparameters and sequence windows
+force_start_date: "2000-07-01"
+seq_len: 60
+pred_horizon: 5
+beta_window: 126
+batch_size: 32
+device: "auto" # Resolves to 'cuda' if torch.cuda.is_available() else 'cpu'
+
+# Ticker universe (empty list defaults to all available tickers in data_dir)
+tickers: []

@@ -1,16 +1,23 @@
+#!/usr/bin/env python3
 """
-Extract line-separated tickers from Russell 1000 annual processed CSV files.
+Extract line-separated tickers from Russell 1000 annual raw and processed files.
 
-This script reads each [year].csv file in `data/Russell 1000/processed/`
-and writes a corresponding [year].txt file containing line-separated tickers,
-matching the format of reference files 2000.txt and 2001.txt.
+Supports:
+1. Extracting tickers from annual processed CSV files in data/processed/.
+2. Extracting tickers directly from raw source files (PDF, JSON, XLS) in data/raw/.
+Writes standardized [year].txt files containing LF-joined ticker symbols.
 """
+
+from __future__ import annotations
 
 import argparse
 import csv
+import json
 import logging
 import re
 from pathlib import Path
+
+import pypdfium2
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -32,22 +39,72 @@ def extract_tickers_from_csv(csv_path: Path) -> list[str]:
     return tickers
 
 
-def process_year_csv(csv_path: Path, output_dir: Path | None = None) -> tuple[Path, int]:
-    """
-    Process a single [year].csv file and write [year].txt.
+def extract_2003_pdf(pdf_path: Path) -> list[str]:
+    """Extract tickers from 2003.pdf (each row: <Ticker> <Company Name>)."""
+    pdf = pypdfium2.PdfDocument(str(pdf_path))
+    tickers = []
+    for page in pdf:
+        text = page.get_textpage().get_text_range()
+        for line in text.splitlines():
+            line = line.strip()
+            if (
+                not line
+                or "Russell 1000" in line
+                or line.startswith("Page ")
+                or line == "Ticker Name"
+            ):
+                continue
+            parts = line.split()
+            if parts and parts[0].strip():
+                tickers.append(parts[0].strip())
+    return tickers
 
-    Returns the output path and the number of tickers written.
-    """
+
+def extract_2020_pdf(pdf_path: Path) -> list[str]:
+    """Extract tickers from 2020.pdf (each row: <Company Name> <Ticker>)."""
+    pdf = pypdfium2.PdfDocument(str(pdf_path))
+    tickers = []
+    num_pages = len(pdf) - 1  # Skip final legal disclaimer page
+    for page_idx in range(num_pages):
+        page = pdf[page_idx]
+        text = page.get_textpage().get_text_range()
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line == "Company Ticker":
+                continue
+            if re.search(
+                r"(Membership list|Russell US Indexes|Russell 1000|ftserussell\.com|June \d+,\s*\d+)",
+                line,
+            ):
+                continue
+            parts = line.split()
+            if parts and parts[-1].strip():
+                tickers.append(parts[-1].strip())
+    return tickers
+
+
+def extract_2023_json(json_path: Path) -> list[str]:
+    """Extract equity tickers from iShares DataTables JSON structure."""
+    with open(json_path, encoding="utf-8") as f:
+        data = json.load(f)
+    rows = data.get("aaData", [])
+    tickers = []
+    for row in rows:
+        if len(row) > 3 and row[3] == "Equity":
+            ticker = row[0].strip()
+            if ticker and ticker != "-":
+                tickers.append(ticker)
+    return tickers
+
+
+def process_year_csv(csv_path: Path, output_dir: Path | None = None) -> tuple[Path, int]:
+    """Process a single [year].csv file and write [year].txt."""
     if output_dir is None:
         output_dir = csv_path.parent
 
     output_path = output_dir / f"{csv_path.stem}.txt"
     tickers = extract_tickers_from_csv(csv_path)
-
-    # Format matches reference files 2000.txt and 2001.txt: LF joined without trailing newline
-    content = "\n".join(tickers)
-    output_path.write_text(content, encoding="utf-8")
-
+    output_path.write_text("\n".join(tickers), encoding="utf-8")
     return output_path, len(tickers)
 
 
@@ -72,15 +129,43 @@ def process_all_years(directory: Path) -> dict[str, int]:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert Russell 1000 [year].csv files to [year].txt ticker lists."
+        description="Extract Russell 1000 constituent tickers to line-separated .txt files."
     )
     parser.add_argument(
         "--dir",
         type=Path,
-        default=Path("data/Russell 1000/processed"),
-        help="Path to the directory containing [year].csv files (default: data/Russell 1000/processed)",
+        default=Path("data/processed"),
+        help="Path to processed directory (default: data/processed)",
+    )
+    parser.add_argument(
+        "--raw-dir",
+        type=Path,
+        default=Path("data/raw"),
+        help="Path to raw source files (default: data/raw)",
+    )
+    parser.add_argument(
+        "--extract-raw",
+        action="store_true",
+        help="Extract from raw PDFs/JSONs (2003, 2020, 2023) directly to processed dir",
     )
     args = parser.parse_args()
+
+    if args.extract_raw:
+        targets = [
+            ("2003.pdf", extract_2003_pdf, "2003.txt"),
+            ("2020.pdf", extract_2020_pdf, "2020.txt"),
+            ("2023.json", extract_2023_json, "2023.txt"),
+        ]
+        for src_name, extractor, dest_name in targets:
+            src_p = args.raw_dir / src_name
+            dest_p = args.dir / dest_name
+            if src_p.exists():
+                tickers = extractor(src_p)
+                dest_p.write_text("\n".join(tickers), encoding="utf-8")
+                logger.info(
+                    "Extracted %d tickers from %s -> %s", len(tickers), src_p.name, dest_p.name
+                )
+        return
 
     processed_dir = args.dir
     if not processed_dir.is_dir():
