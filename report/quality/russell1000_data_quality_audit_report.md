@@ -1,10 +1,10 @@
 # Russell 1000 Historical Dataset: Data Quality & Integrity Audit Report
 
 > **Project**: Specialized Quantitative Finance / Alpha MLOps Platform  
-> **Generated UTC**: 2026-09-29 20:31:43 UTC  
+> **Generated UTC**: 2026-10-01 18:58:15 UTC  
 > **Audited Universe**: Russell 1000 Historical Constituents (2000–2026, 27 complete annual panels)  
 > **Total Annual Holdings Audited**: 27,130 records across 27 annual panels  
-> **Total Exceptions Logged**: 4134 findings (255 Critical, 1018 High, 789 Medium)  
+> **Total Exceptions Logged**: 4135 findings (255 Critical, 1018 High, 789 Medium)  
 
 ---
 
@@ -18,7 +18,7 @@ The objective is to determine whether the existing dataset is trustworthy enough
 2. **Correct Membership Period Semantics**: An annual Russell 1000 list does **not** represent membership for January 1 through December 31 of that calendar year. Instead, each list is a constituent snapshot defining the index universe for the subsequent reconstitution cycle ending at the next late-June boundary ($t_{June} \rightarrow t_{June+1}$).
 3. **WRDS Availability Cutoff & Crawled Dataset Continuation**: WRDS/CRSP daily market data available to our team terminates on **2024-12-31**. For 2025–2026, daily price data derives from a crawled dataset continuation. This is a data-source boundary caused by WRDS license availability, not a methodology shift in the Russell 1000 index.
 4. **The 2024/2025 Multi-Source Stitching**: The 2024 Russell list period (`2024-06-30 -> 2025-06-30`) is covered by WRDS for the first half (128 trading days, July–Dec 2024) and the crawled dataset for the second half (122 trading days, Jan–June 2025), delivering **98.90% total period coverage** across 250 available trading days.
-5. **Source Boundary Verification (2024-12-31 / 2025-01-02)**: Validation across 998 securities present on both sides confirms high price continuity (median overnight return = +0.61%). 9 securities exhibit split-ratio jumps resulting from crawled data pre-adjustments.
+5. **Source Boundary Verification (2024-12-31 / 2025-01-02)**: Validation across 998 securities present on both sides confirms high price continuity (median overnight return = +0.61%). 0 securities exhibit split-ratio jumps resulting from crawled data pre-adjustments.
 6. **Continuous 40-Day Lookback Sufficiency**: Under continuous multi-year price stitching across annual file boundaries and the WRDS-to-crawled transition, **94.85% of all historical constituent-days possess complete 40-trading-day feature windows** (with Year 2024 achieving **98.32%**, and all cohorts from 2005 onward exceeding 94.0%). This cross-boundary stitching eliminates artificial annual ramp-up deficits, recovering **1,058,070 observations (+15.92%)** that were previously falsely excluded.
 7. **Coverage & Delisting Metrics**: Overall mean membership-period coverage is **97.70%** (calendar-year baseline: 97.44%), with 30 zero-coverage instances and 1936 explicit CRSP delisting events retained.
 
@@ -76,7 +76,7 @@ They are **operationally compatible for OHLCV prices with documented caveats**:
 ### 7. Which securities can be reliably linked across the source boundary?
 - **998 securities** were successfully linked on both sides across the 2024-12-31 / 2025-01-02 boundary.
 - **960+ continuous equities** have overnight price returns $|r| \le 15\%$ and link reliably.
-- **9 securities** require split factor reconciliation due to pre-applied split adjustments (e.g. `FAST`, `COKE`, `NFLX`, `MNST`, `BKNG`, `IBKR`).
+- **0 securities** require split factor reconciliation due to pre-applied split adjustments (e.g. `FAST`, `COKE`, `NFLX`, `MNST`, `BKNG`, `IBKR`).
 - **8 dual-class tickers** (`HEI`, `LEN`, `UHAL`, `CWEN`, `WSO`, `BIO`, `MKC`, `TAP`) require class suffix alignment (`HEIA` vs `HEI.A`).
 - **24 WRDS securities** absent from Crawled represent year-end delistings or spinoffs.
 
@@ -283,7 +283,7 @@ Model Feature Eligibility Layer
 ```text
 Audit Provenance & Verification
 ------------------------------
-Git Commit Hash:          616e36a6a0341b86064d9cd36fab511e223dd9ec
+Git Commit Hash:          d025fd28c97af365c6e1c54c331808b777789930
 Python Version:           3.11.7
 Config File:              data/../config/audit.yaml
 Input Manifest:           1.0.0 (85 verified input files)

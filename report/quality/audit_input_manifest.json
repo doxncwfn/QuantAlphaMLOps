@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T20:29:36.276401+00:00",
+  "generated_at": "2026-10-01T18:55:14.226417+00:00",
   "total_files": 85,
   "manifest_version": "1.0.0",
   "inputs": [
@@ -306,7 +306,7 @@
       "category": "processed_constituents",
       "extension": ".csv",
       "size_bytes": 552645,
-      "mtime_utc": "2026-09-27T09:08:20.926578+00:00",
+      "mtime_utc": "2026-10-01T18:46:19.660306+00:00",
       "row_count": 27130,
       "columns": [
         "Year",

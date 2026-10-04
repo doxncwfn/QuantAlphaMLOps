@@ -1,0 +1,28 @@
+# Data Engineering & Preprocessing
+numpy>=1.26.0,<2
+pandas>=2.2.0
+polars>=0.20.0
+pyarrow>=17.0.0
+pypdfium2>=4.27.0
+
+# Deep Learning Engine
+torch>=2.2.0
+pytorch-lightning>=2.2.0
+
+# MLOps, Tracking, & Optimization
+optuna>=3.5.0
+wandb>=0.16.0
+
+# Explainable AI (XAI) & Baselines
+captum>=0.7.0
+lightgbm>=4.3.0
+scipy>=1.12.0
+
+# Plotting & Visualization
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# Infrastructure & Utilities
+modal==1.5.3
+python-dotenv>=1.0.1
+pyyaml>=6.0

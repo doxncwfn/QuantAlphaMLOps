@@ -1,0 +1,777 @@
+{
+  "dlstcd_counts_by_year": {
+    "2000": {
+      "231": 39,
+      "233": 25,
+      "241": 9,
+      "331": 5,
+      "574": 2,
+      "261": 1,
+      "450": 1,
+      "588": 1,
+      "580": 1,
+      "561": 1,
+      "552": 1
+    },
+    "2001": {
+      "231": 27,
+      "233": 12,
+      "241": 9,
+      "574": 3,
+      "331": 2,
+      "584": 2,
+      "570": 2,
+      "580": 1,
+      "342": 1,
+      "243": 1,
+      "552": 1
+    },
+    "2002": {
+      "231": 10,
+      "233": 6,
+      "241": 4,
+      "574": 2,
+      "331": 2,
+      "332": 1,
+      "450": 1,
+      "584": 1,
+      "570": 1
+    },
+    "2003": {
+      "231": 16,
+      "241": 5,
+      "233": 3,
+      "331": 3,
+      "552": 1,
+      "574": 1
+    },
+    "2004": {
+      "231": 13,
+      "233": 11,
+      "241": 6,
+      "331": 2,
+      "244": 1
+    },
+    "2005": {
+      "233": 22,
+      "241": 18,
+      "231": 15,
+      "520": 1,
+      "341": 1,
+      "584": 1,
+      "580": 1,
+      "574": 1,
+      "331": 1
+    },
+    "2006": {
+      "233": 29,
+      "231": 11,
+      "241": 7,
+      "552": 1,
+      "331": 1
+    },
+    "2007": {
+      "233": 35,
+      "231": 9,
+      "241": 8
+    },
+    "2008": {
+      "233": 21,
+      "231": 10,
+      "574": 3,
+      "241": 2,
+      "520": 1,
+      "261": 1,
+      "331": 1
+    },
+    "2009": {
+      "241": 10,
+      "231": 8,
+      "233": 6,
+      "331": 3,
+      "551": 1,
+      "574": 1
+    },
+    "2010": {
+      "233": 22,
+      "231": 9,
+      "241": 6,
+      "261": 1,
+      "570": 1,
+      "331": 1,
+      "244": 1
+    },
+    "2011": {
+      "233": 17,
+      "231": 7,
+      "331": 4,
+      "241": 3,
+      "332": 1,
+      "244": 1
+    },
+    "2012": {
+      "233": 15,
+      "241": 7,
+      "231": 3,
+      "560": 1
+    },
+    "2013": {
+      "233": 12,
+      "241": 6,
+      "231": 2,
+      "331": 1,
+      "244": 1
+    },
+    "2014": {
+      "241": 14,
+      "233": 14,
+      "242": 1,
+      "261": 1,
+      "231": 1
+    },
+    "2015": {
+      "233": 26,
+      "241": 17,
+      "231": 5,
+      "552": 4,
+      "574": 2
+    },
+    "2016": {
+      "233": 19,
+      "231": 10,
+      "241": 9
+    },
+    "2017": {
+      "233": 20,
+      "231": 7,
+      "241": 7
+    },
+    "2018": {
+      "233": 14,
+      "231": 11,
+      "241": 7,
+      "341": 1
+    },
+    "2019": {
+      "231": 9,
+      "233": 7,
+      "241": 3,
+      "574": 2,
+      "244": 1
+    },
+    "2020": {
+      "233": 12,
+      "231": 10,
+      "241": 6
+    },
+    "2021": {
+      "233": 14,
+      "231": 10,
+      "241": 8,
+      "331": 1,
+      "244": 1
+    },
+    "2022": {
+      "233": 16,
+      "584": 4,
+      "241": 3,
+      "231": 2,
+      "341": 1,
+      "261": 1
+    },
+    "2023": {
+      "233": 7,
+      "231": 3,
+      "261": 1,
+      "241": 1
+    },
+    "2024": {
+      "100": 1022,
+      "233": 6,
+      "231": 4,
+      "241": 1,
+      "570": 1
+    }
+  },
+  "delisting_events_sample": [
+    {
+      "year": 2000,
+      "PERMNO": 10410,
+      "ticker": "JMED",
+      "date": "2000-08-31",
+      "DLSTCD": 231,
+      "DLRET": "0.176136",
+      "DLRETX": "0.176136",
+      "DLPRC": 0.0,
+      "DLAMT": 42.04688,
+      "PRC": 35.75
+    },
+    {
+      "year": 2000,
+      "PERMNO": 10545,
+      "ticker": "THI",
+      "date": "2000-06-30",
+      "DLSTCD": 331,
+      "DLRET": "-0.005500",
+      "DLRETX": "-0.005500",
+      "DLPRC": 0.0,
+      "DLAMT": 18.64688,
+      "PRC": 18.75
+    },
+    {
+      "year": 2000,
+      "PERMNO": 10989,
+      "ticker": "BFO",
+      "date": "2000-10-04",
+      "DLSTCD": 233,
+      "DLRET": "0.000857",
+      "DLRETX": "0.000857",
+      "DLPRC": 0.0,
+      "DLAMT": 73.0,
+      "PRC": 72.9375
+    },
+    {
+      "year": 2001,
+      "PERMNO": 10564,
+      "ticker": "ADLAC",
+      "date": "2002-05-31",
+      "DLSTCD": 580,
+      "DLRET": "0.154286",
+      "DLRETX": "0.154286",
+      "DLPRC": 0.808,
+      "DLAMT": 0.808,
+      "PRC": 0.7
+    },
+    {
+      "year": 2001,
+      "PERMNO": 10594,
+      "ticker": "DME",
+      "date": "2002-01-04",
+      "DLSTCD": 231,
+      "DLRET": "0.037034",
+      "DLRETX": "0.037034",
+      "DLPRC": 0.0,
+      "DLAMT": 38.0073,
+      "PRC": 36.65
+    },
+    {
+      "year": 2001,
+      "PERMNO": 12319,
+      "ticker": "HM",
+      "date": "2001-12-14",
+      "DLSTCD": 231,
+      "DLRET": "0.020650",
+      "DLRETX": "0.020650",
+      "DLPRC": 0.0,
+      "DLAMT": 8.798,
+      "PRC": 8.62
+    },
+    {
+      "year": 2002,
+      "PERMNO": 11042,
+      "ticker": "WCOME",
+      "date": "2002-07-29",
+      "DLSTCD": 574,
+      "DLRET": "-0.44898",
+      "DLRETX": "-0.44898",
+      "DLPRC": 0.135,
+      "DLAMT": 0.135,
+      "PRC": 0.245
+    },
+    {
+      "year": 2002,
+      "PERMNO": 11997,
+      "ticker": "CMCSK",
+      "date": "2002-11-18",
+      "DLSTCD": 231,
+      "DLRET": "0.007977",
+      "DLRETX": "0.007977",
+      "DLPRC": 0.0,
+      "DLAMT": 24.01,
+      "PRC": 23.82
+    },
+    {
+      "year": 2002,
+      "PERMNO": 12749,
+      "ticker": "KM",
+      "date": "2002-12-18",
+      "DLSTCD": 574,
+      "DLRET": "-0.171429",
+      "DLRETX": "-0.171429",
+      "DLPRC": 0.29,
+      "DLAMT": 0.29,
+      "PRC": 0.35
+    },
+    {
+      "year": 2003,
+      "PERMNO": 11983,
+      "ticker": "BGEN",
+      "date": "2003-11-12",
+      "DLSTCD": 231,
+      "DLRET": "0.051011",
+      "DLRETX": "0.051011",
+      "DLPRC": 0.0,
+      "DLAMT": 40.5375,
+      "PRC": 38.57
+    },
+    {
+      "year": 2003,
+      "PERMNO": 26332,
+      "ticker": "CE",
+      "date": "2004-02-26",
+      "DLSTCD": 231,
+      "DLRET": "0.002527",
+      "DLRETX": "0.002527",
+      "DLPRC": 0.0,
+      "DLAMT": 14.9577,
+      "PRC": 14.92
+    },
+    {
+      "year": 2003,
+      "PERMNO": 47159,
+      "ticker": "FBF",
+      "date": "2004-03-31",
+      "DLSTCD": 231,
+      "DLRET": "0.007579",
+      "DLRETX": "0.007579",
+      "DLPRC": 0.0,
+      "DLAMT": 45.24029,
+      "PRC": 44.9
+    },
+    {
+      "year": 2004,
+      "PERMNO": 10725,
+      "ticker": "CF",
+      "date": "2004-08-31",
+      "DLSTCD": 233,
+      "DLRET": "0.000675",
+      "DLRETX": "0.000675",
+      "DLPRC": 0.0,
+      "DLAMT": 44.5,
+      "PRC": 44.47
+    },
+    {
+      "year": 2004,
+      "PERMNO": 10906,
+      "ticker": "BNK",
+      "date": "2005-03-01",
+      "DLSTCD": 241,
+      "DLRET": "0.023118",
+      "DLRETX": "0.023118",
+      "DLPRC": 0.0,
+      "DLAMT": 36.63787,
+      "PRC": 35.81
+    },
+    {
+      "year": 2004,
+      "PERMNO": 14322,
+      "ticker": "S",
+      "date": "2005-03-24",
+      "DLSTCD": 241,
+      "DLRET": "0.194944",
+      "DLRETX": "0.194944",
+      "DLPRC": 0.0,
+      "DLAMT": 59.795,
+      "PRC": 50.04
+    },
+    {
+      "year": 2005,
+      "PERMNO": 10108,
+      "ticker": "SDS",
+      "date": "2005-08-11",
+      "DLSTCD": 233,
+      "DLRET": "0.000278",
+      "DLRETX": "0.000278",
+      "DLPRC": 0.0,
+      "DLAMT": 36.0,
+      "PRC": 35.99
+    },
+    {
+      "year": 2005,
+      "PERMNO": 10211,
+      "ticker": "WES",
+      "date": "2006-02-28",
+      "DLSTCD": 231,
+      "DLRET": "-0.005276",
+      "DLRETX": "-0.005276",
+      "DLPRC": 0.0,
+      "DLAMT": 71.47089,
+      "PRC": 71.85
+    },
+    {
+      "year": 2005,
+      "PERMNO": 10342,
+      "ticker": "IMDC",
+      "date": "2006-03-22",
+      "DLSTCD": 231,
+      "DLRET": "0.053479",
+      "DLRETX": "0.053479",
+      "DLPRC": 0.0,
+      "DLAMT": 97.51,
+      "PRC": 92.56
+    },
+    {
+      "year": 2006,
+      "PERMNO": 11970,
+      "ticker": "APCC",
+      "date": "2007-02-14",
+      "DLSTCD": 233,
+      "DLRET": "0.000646",
+      "DLRETX": "0.000646",
+      "DLPRC": 0.0,
+      "DLAMT": 31.0,
+      "PRC": 30.98
+    },
+    {
+      "year": 2006,
+      "PERMNO": 17806,
+      "ticker": "PD",
+      "date": "2007-03-19",
+      "DLSTCD": 241,
+      "DLRET": "0.002394",
+      "DLRETX": "0.002394",
+      "DLPRC": 0.0,
+      "DLAMT": 129.78,
+      "PRC": 129.47
+    },
+    {
+      "year": 2006,
+      "PERMNO": 25769,
+      "ticker": "KMG",
+      "date": "2006-08-10",
+      "DLSTCD": 233,
+      "DLRET": "0.000426",
+      "DLRETX": "0.000426",
+      "DLPRC": 0.0,
+      "DLAMT": 70.5,
+      "PRC": 70.47
+    },
+    {
+      "year": 2007,
+      "PERMNO": 11927,
+      "ticker": "RESP",
+      "date": "2008-03-14",
+      "DLSTCD": 233,
+      "DLRET": "0.000606",
+      "DLRETX": "0.000606",
+      "DLPRC": 0.0,
+      "DLAMT": 66.0,
+      "PRC": 65.96
+    },
+    {
+      "year": 2007,
+      "PERMNO": 18092,
+      "ticker": "BMET",
+      "date": "2007-09-25",
+      "DLSTCD": 233,
+      "DLRET": "0.000217",
+      "DLRETX": "0.000217",
+      "DLPRC": 0.0,
+      "DLAMT": 46.0,
+      "PRC": 45.99
+    },
+    {
+      "year": 2007,
+      "PERMNO": 22032,
+      "ticker": "CBSS",
+      "date": "2007-09-06",
+      "DLSTCD": 231,
+      "DLRET": "-0.025482",
+      "DLRETX": "-0.025482",
+      "DLPRC": 0.0,
+      "DLAMT": 62.72,
+      "PRC": 64.36
+    },
+    {
+      "year": 2008,
+      "PERMNO": 10562,
+      "ticker": "SOV",
+      "date": "2009-01-29",
+      "DLSTCD": 231,
+      "DLRET": "0.017611",
+      "DLRETX": "0.017611",
+      "DLPRC": 0.0,
+      "DLAMT": 2.5135,
+      "PRC": 2.47
+    },
+    {
+      "year": 2008,
+      "PERMNO": 11415,
+      "ticker": "BRL",
+      "date": "2008-12-22",
+      "DLSTCD": 241,
+      "DLRET": "0.006626",
+      "DLRETX": "0.006626",
+      "DLPRC": 0.0,
+      "DLAMT": 66.236,
+      "PRC": 65.8
+    },
+    {
+      "year": 2008,
+      "PERMNO": 12079,
+      "ticker": "GM",
+      "date": "2009-06-01",
+      "DLSTCD": 574,
+      "DLRET": "-0.186667",
+      "DLRETX": "-0.186667",
+      "DLPRC": 0.61,
+      "DLAMT": 0.61,
+      "PRC": 0.75
+    },
+    {
+      "year": 2009,
+      "PERMNO": 10078,
+      "ticker": "JAVA",
+      "date": "2010-01-26",
+      "DLSTCD": 233,
+      "DLRET": "0.001054",
+      "DLRETX": "0.001054",
+      "DLPRC": 0.0,
+      "DLAMT": 9.5,
+      "PRC": 9.49
+    },
+    {
+      "year": 2009,
+      "PERMNO": 10143,
+      "ticker": "OSIP",
+      "date": "2010-06-08",
+      "DLSTCD": 233,
+      "DLRET": "0.000174",
+      "DLRETX": "0.000174",
+      "DLPRC": 0.0,
+      "DLAMT": 57.5,
+      "PRC": 57.49
+    },
+    {
+      "year": 2009,
+      "PERMNO": 15667,
+      "ticker": "WYE",
+      "date": "2009-10-15",
+      "DLSTCD": 241,
+      "DLRET": "0.002183",
+      "DLRETX": "0.002183",
+      "DLPRC": 0.0,
+      "DLAMT": 50.5,
+      "PRC": 50.39
+    }
+  ],
+  "dlret_summary": {
+    "available": 905,
+    "missing": 1031,
+    "total": 1936
+  },
+  "ticker_disappearance": {
+    "total_permnos": 2834,
+    "disappear_before_2024": 1800,
+    "multi_ticker_permnos": 324,
+    "nwperm_rows": 184
+  },
+  "yahoo_ticker_disappearance": [
+    {
+      "year": 2025,
+      "ticker": "AAP",
+      "last_date": "2025-06-27",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "AMED",
+      "last_date": "2025-08-14",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "ANSS",
+      "last_date": "2025-07-16",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "AZEK",
+      "last_date": "2025-06-30",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "AZPN",
+      "last_date": "2025-03-11",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "AZTA",
+      "last_date": "2025-06-27",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "BERY",
+      "last_date": "2025-04-29",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "CC",
+      "last_date": "2025-06-27",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "CCCS",
+      "last_date": "2025-10-30",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2025,
+      "ticker": "CHK",
+      "last_date": "2025-06-27",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "ACHC",
+      "last_date": "2026-06-26",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "AL",
+      "last_date": "2026-04-07",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "APLS",
+      "last_date": "2026-05-13",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "ASH",
+      "last_date": "2026-06-26",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "AVB",
+      "last_date": "2026-06-26",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "BK",
+      "last_date": "2026-05-20",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "BLD",
+      "last_date": "2026-06-26",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "BRBR",
+      "last_date": "2026-06-26",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "CERT",
+      "last_date": "2026-06-26",
+      "source": "Yahoo"
+    },
+    {
+      "year": 2026,
+      "ticker": "CFLT",
+      "last_date": "2026-03-16",
+      "source": "Yahoo"
+    }
+  ],
+  "fallback_examples": [],
+  "target_feasibility": [
+    {
+      "year": 2005,
+      "total_obs": 258830,
+      "has_t5": 253244,
+      "missing_t5": 5586,
+      "expected_missing_tail": 5278,
+      "unexpected_missing": 308,
+      "pct_has_t5": 97.84182668160568,
+      "cal_gap_median": 7.0,
+      "cal_gap_mean": 7.241772890767969,
+      "cal_gap_min": 7.0,
+      "cal_gap_max": 11.0
+    },
+    {
+      "year": 2010,
+      "total_obs": 256518,
+      "has_t5": 250754,
+      "missing_t5": 5764,
+      "expected_missing_tail": 5138,
+      "unexpected_missing": 626,
+      "pct_has_t5": 97.75298419604083,
+      "cal_gap_median": 7.0,
+      "cal_gap_mean": 7.216759487628292,
+      "cal_gap_min": 7.0,
+      "cal_gap_max": 10.0
+    },
+    {
+      "year": 2015,
+      "total_obs": 266002,
+      "has_t5": 260288,
+      "missing_t5": 5714,
+      "expected_missing_tail": 5365,
+      "unexpected_missing": 349,
+      "pct_has_t5": 97.85189585040715,
+      "cal_gap_median": 7.0,
+      "cal_gap_mean": 7.236796770988002,
+      "cal_gap_min": 7.0,
+      "cal_gap_max": 11.0
+    },
+    {
+      "year": 2020,
+      "total_obs": 259028,
+      "has_t5": 253567,
+      "missing_t5": 5461,
+      "expected_missing_tail": 5185,
+      "unexpected_missing": 276,
+      "pct_has_t5": 97.89173371218556,
+      "cal_gap_median": 7.0,
+      "cal_gap_mean": 7.237666589190956,
+      "cal_gap_min": 7.0,
+      "cal_gap_max": 11.0
+    },
+    {
+      "year": 2024,
+      "total_obs": 131758,
+      "has_t5": 126578,
+      "missing_t5": 5180,
+      "expected_missing_tail": 5170,
+      "unexpected_missing": 10,
+      "pct_has_t5": 96.06854991727258,
+      "cal_gap_median": 7.0,
+      "cal_gap_mean": 7.186684361866844,
+      "cal_gap_min": 7.0,
+      "cal_gap_max": 10.0
+    },
+    {
+      "year": 2025,
+      "total_obs": 249773,
+      "has_t5": 244518,
+      "missing_t5": 5255,
+      "expected_missing_tail": 5255,
+      "unexpected_missing": 0,
+      "pct_has_t5": 97.89608964940166,
+      "cal_gap_median": 7.0,
+      "cal_gap_mean": 7.28079323403594,
+      "cal_gap_min": 7.0,
+      "cal_gap_max": 10.0
+    }
+  ],
+  "trading_calendar": {
+    "n_trading_days_2020": 253,
+    "stocks_per_date_min": 1010,
+    "stocks_per_date_max": 1036
+  }
+}

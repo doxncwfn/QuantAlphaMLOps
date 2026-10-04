@@ -1,0 +1,296 @@
+{
+  "factor_descriptive_stats": {
+    "mktrf": {
+      "count": 6684,
+      "null": 0,
+      "min": -0.1201,
+      "max": 0.1136,
+      "mean": 0.0003235338120885697,
+      "std": 0.012321718896571078,
+      "q50": 0.0007
+    },
+    "smb": {
+      "count": 6684,
+      "null": 0,
+      "min": -0.0458,
+      "max": 0.0571,
+      "mean": 7.836624775583485e-05,
+      "std": 0.006452077183277131,
+      "q50": 0.0001
+    },
+    "hml": {
+      "count": 6684,
+      "null": 0,
+      "min": -0.0503,
+      "max": 0.0673,
+      "mean": 0.00011781867145421901,
+      "std": 0.007795445861385919,
+      "q50": -0.0001
+    },
+    "rmw": {
+      "count": 6684,
+      "null": 0,
+      "min": -0.0296,
+      "max": 0.0457,
+      "mean": 0.0001777977259126272,
+      "std": 0.005614121284828725,
+      "q50": 0.0001
+    },
+    "cma": {
+      "count": 6684,
+      "null": 0,
+      "min": -0.053,
+      "max": 0.0247,
+      "mean": 0.00010330640335128663,
+      "std": 0.004550169846004164,
+      "q50": 0.0
+    },
+    "umd": {
+      "count": 6684,
+      "null": 0,
+      "min": -0.1439,
+      "max": 0.0712,
+      "mean": 0.0001410383004189108,
+      "std": 0.010764210969528969,
+      "q50": 0.0007
+    },
+    "rf": {
+      "count": 6684,
+      "null": 0,
+      "min": 0.0,
+      "max": 0.0003,
+      "mean": 7.657091561938961e-05,
+      "std": 8.526920462054716e-05,
+      "q50": 0.0001
+    }
+  },
+  "factor_correlation": {
+    "mktrf": {
+      "mktrf": 1.0,
+      "smb": 0.1553,
+      "hml": 0.0062,
+      "rmw": -0.3634,
+      "cma": -0.2646,
+      "umd": -0.2334,
+      "rf": -0.018
+    },
+    "smb": {
+      "mktrf": 0.1553,
+      "smb": 1.0,
+      "hml": 0.1716,
+      "rmw": -0.2821,
+      "cma": 0.0517,
+      "umd": -0.0941,
+      "rf": -0.0134
+    },
+    "hml": {
+      "mktrf": 0.0062,
+      "smb": 0.1716,
+      "hml": 1.0,
+      "rmw": 0.1823,
+      "cma": 0.4879,
+      "umd": -0.3131,
+      "rf": 0.0107
+    },
+    "rmw": {
+      "mktrf": -0.3634,
+      "smb": -0.2821,
+      "hml": 0.1823,
+      "rmw": 1.0,
+      "cma": 0.2861,
+      "umd": 0.0596,
+      "rf": 0.0113
+    },
+    "cma": {
+      "mktrf": -0.2646,
+      "smb": 0.0517,
+      "hml": 0.4879,
+      "rmw": 0.2861,
+      "cma": 1.0,
+      "umd": 0.0672,
+      "rf": 0.0048
+    },
+    "umd": {
+      "mktrf": -0.2334,
+      "smb": -0.0941,
+      "hml": -0.3131,
+      "rmw": 0.0596,
+      "cma": 0.0672,
+      "umd": 1.0,
+      "rf": 0.0181
+    },
+    "rf": {
+      "mktrf": -0.018,
+      "smb": -0.0134,
+      "hml": 0.0107,
+      "rmw": 0.0113,
+      "cma": 0.0048,
+      "umd": 0.0181,
+      "rf": 1.0
+    }
+  },
+  "date_alignment": {
+    "2000": {
+      "crsp_trading_days": 252,
+      "common_days": 252,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 125
+    },
+    "2001": {
+      "crsp_trading_days": 247,
+      "common_days": 247,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 125
+    },
+    "2002": {
+      "crsp_trading_days": 252,
+      "common_days": 252,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2003": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2004": {
+      "crsp_trading_days": 254,
+      "common_days": 254,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2005": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2006": {
+      "crsp_trading_days": 251,
+      "common_days": 251,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2007": {
+      "crsp_trading_days": 252,
+      "common_days": 252,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2008": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2009": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2010": {
+      "crsp_trading_days": 254,
+      "common_days": 254,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2011": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2012": {
+      "crsp_trading_days": 249,
+      "common_days": 249,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 125
+    },
+    "2013": {
+      "crsp_trading_days": 252,
+      "common_days": 252,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2014": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2015": {
+      "crsp_trading_days": 254,
+      "common_days": 254,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2016": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2017": {
+      "crsp_trading_days": 252,
+      "common_days": 252,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2018": {
+      "crsp_trading_days": 250,
+      "common_days": 250,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 125
+    },
+    "2019": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2020": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2021": {
+      "crsp_trading_days": 253,
+      "common_days": 253,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2022": {
+      "crsp_trading_days": 252,
+      "common_days": 252,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2023": {
+      "crsp_trading_days": 251,
+      "common_days": 251,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 123
+    },
+    "2024": {
+      "crsp_trading_days": 128,
+      "common_days": 128,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 124
+    },
+    "2025": {
+      "crsp_trading_days": 250,
+      "common_days": 250,
+      "crsp_missing_in_ff": 0,
+      "ff_missing_in_crsp": 0
+    },
+    "2026": {
+      "crsp_trading_days": 188,
+      "common_days": 145,
+      "crsp_missing_in_ff": 43,
+      "ff_missing_in_crsp": 0
+    }
+  }
+}

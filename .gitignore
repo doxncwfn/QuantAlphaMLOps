@@ -1,43 +1,109 @@
-# Developer Environment
-.vscode/
-.agents/
-.venv/
-graphify-out/
+# ==========================================
+# Git Ignore Configuration
+# Quantitative Alpha MLOps Platform
+# ==========================================
+
+# Operating System & Filesystem Artifacts
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+Icon*
+ehthumbs.db
+Thumbs.db
 
-# Secret Environment Variables
-.env
-
-# Python Caches
-__pycache__/
-.ruff_cache/
-.pytest_cache/
-
-# Artifacts
-artifacts/
-data/
-log/
-notebooks/
-!notebooks/audit.ipynb
-
-# Project References
+# IDEs & Developer Environment
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.venv/
+env/
+venv/
+ENV/
+.agents/
+graphify-out/
 refs/
 
-# LaTeX 
-*.aux
-*.out
+# Secrets, Credentials, & Private Environment Variables
+.env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.secret
+
+# Python Bytecode & Runtime Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Jupyter Notebook Caches & Scratch Notebooks
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+notebooks/*
+!notebooks/README.md
+!notebooks/audit.ipynb
+
+# Datasets & Large Binary Panels
+# Exclude raw archives, extracted text lists, large Parquet/CSV panels, and local symlinks
+data/raw/
+data/WRDS/
+data/Russell1000/
+data/US_history.parquet
+data/*.parquet
+data/*.csv
+data/processed/*.parquet
+data/processed/*.csv
+data/processed/*.txt
+
+# Preserve essential data documentation within data/
+!data/README.md
+!data/dictionary.md
+!data/processed/
+!data/processed/panel_validation_report.md
+
+# ML Artifacts, Checkpoints, & Experiment Tracking
+artifacts/checkpoints/
+artifacts/*.parquet
+checkpoints/
+wandb/
+
+# Runtime, Profiling, & Debug Logs
+log/
+logs/
 *.log
+
+# Generated Audit Tables, High-Resolution Figures, & Parquet Master
+report/quality/tables/
+report/quality/figures/
+report/quality/*.parquet
+report/quality/*.csv
+figures/
+
+# LaTeX Compilation Artifacts (keep source .tex, .bib, .cls, and target .pdf)
+*.aux
 *.bbl
 *.blg
 *.brf
 *.fdb_latexmk
 *.fls
-*.lol
 *.lof
+*.log
 *.lot
-*.lox
-*.nav
-*.snm
+*.out
 *.synctex.gz
 *.toc
 *.acn
@@ -55,10 +121,7 @@ refs/
 *.bmc
 *.run.xml
 *.xdy
-
-# Data
-*.parquet
-*.csv
-
-# Report
-figures/
+*.nav
+*.snm
+*.lol
+*.lox

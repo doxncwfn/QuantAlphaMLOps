@@ -28,7 +28,7 @@ correctly identifies historical securities and **reliably avoids false identity 
 ## 1. Frozen Input Specification
 
 We strictly use the previously generated and verified query manifest:
-* **Path**: [`data/identity/experiments/representative_date_manifest.parquet`](file:///Users/macbook/Downloads/HCMUT/Specialized%20Project/data/identity/experiments/representative_date_manifest.parquet)
+* **Path**: `data/identity/experiments/representative_date_manifest.parquet`
 * **Fields preserved**:
   * `ticker`: Clean uppercase ticker symbol
   * `spell_seq`: Observation sequence number (1, 2, ...)

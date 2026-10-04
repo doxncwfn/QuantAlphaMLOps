@@ -11,6 +11,7 @@ Verifies:
 from __future__ import annotations
 
 from pathlib import Path
+
 import polars as pl
 import pytest
 
@@ -23,16 +24,16 @@ from src.audit.semantics import audit_model_eligibility
 def audit_tables():
     config = load_audit_config("config/audit.yaml")
     out_dir = Path(config["paths"]["output_tables_dir"])
-    
+
     # If tables do not exist yet, run audit_model_eligibility
     diag_path = out_dir / "model_eligibility_diagnostics.parquet"
     summary_path = out_dir / "model_eligibility_summary.parquet"
     comp_path = out_dir / "model_boundary_exclusion_comparison.parquet"
-    
+
     if not (diag_path.exists() and summary_path.exists() and comp_path.exists()):
         registry = ExceptionRegistry()
         audit_model_eligibility(config, registry)
-        
+
     return {
         "diagnostics": pl.read_parquet(diag_path),
         "summary": pl.read_parquet(summary_path),
@@ -56,7 +57,7 @@ def test_cross_boundary_continuity(audit_tables):
     )
     assert len(aapl_2020) == 1, "AAPL record on 2020-07-01 must exist."
     row = aapl_2020.to_dicts()[0]
-    
+
     assert row["source_file_start"] == "2019.parquet", "Lookback window start must come from 2019.parquet."
     assert row["source_file_end"] == "2020.parquet", "Lookback window end must be in 2020.parquet."
     assert row["valid_history_count"] == 40, f"Expected 40 valid sessions, got {row['valid_history_count']}."
@@ -82,7 +83,7 @@ def test_new_entrant_with_prior_history(audit_tables):
     )
     assert len(aaxn_entry) == 1, "AAXN record on entry date 2020-06-30 must exist."
     row = aaxn_entry.to_dicts()[0]
-    
+
     assert row["membership_state"] == "CONFIRMED_MEMBER", "Must be confirmed member on entry date."
     assert row["valid_history_count"] == 40, f"Expected 40 valid sessions from prior history, got {row['valid_history_count']}."
     assert row["lookback_eligible"] is True, "New entrant with prior history must be lookback eligible."
@@ -105,7 +106,7 @@ def test_new_listing_ipo_insufficient_history(audit_tables):
         .collect()
     )
     assert len(abnb_sub) == 4, f"ABNB should have exactly 4 trading days by 2020-12-15, got {len(abnb_sub)}."
-    
+
     # Check that any security with fewer than 40 trading days fails lookback eligibility
     df_diag = audit_tables["diagnostics"]
     ineligible_h = df_diag.filter(pl.col("valid_history_count") < 40)
@@ -160,7 +161,7 @@ def test_boundary_exclusion_quantification(audit_tables):
     assert len(df_comp) == 27, "Must have comparison records for all 27 snapshots."
     total_recovered = df_comp["falsely_excluded_by_boundaries"].sum()
     assert total_recovered > 1_000_000, f"Expected >1M observations recovered, got {total_recovered:,}."
-    
+
     # Verify Year 2024 has high eligibility (>95%)
     df_summary = audit_tables["summary"]
     row_2024 = df_summary.filter(pl.col("list_year") == 2024).to_dicts()[0]

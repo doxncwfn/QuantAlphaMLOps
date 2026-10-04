@@ -26,7 +26,6 @@ Ensures:
 from __future__ import annotations
 
 import logging
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -168,11 +167,6 @@ def main() -> None:
         .collect()
     )
     logger.info("Loaded %d candidate rows from US history.", len(df_us_master))
-
-    # Map insertions by year: year -> list of (spec, raw_sub_df)
-    insertions_by_year: dict[int, list[tuple[dict[str, Any], pl.DataFrame]]] = {
-        y: [] for y in range(2000, 2025)
-    }
 
     # Group B updates by year: year -> list of update dicts
     updates_by_year: dict[int, list[dict[str, Any]]] = {

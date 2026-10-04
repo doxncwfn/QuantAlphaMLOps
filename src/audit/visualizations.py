@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import polars as pl
-from matplotlib.patches import Patch
 
 logger = logging.getLogger(__name__)
 
@@ -499,6 +498,266 @@ def generate_all_visualizations(
         plt.close(fig)
         figures_generated.append(out_p)
 
+    # 14. Security Identity Continuity and Confidence Status (Phase 2)
+    if "security_history_audit" in tables:
+        df_sec = tables["security_history_audit"].to_pandas()
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5), dpi=300)
+
+        # Left: Identity Confidence
+        conf_counts = df_sec["identity_confidence_status"].value_counts()
+        labels = [c.replace("_", " ").title() for c in conf_counts.index]
+        colors = ["#1f77b4", "#ff7f0e"]
+        ax1.pie(
+            conf_counts.values,
+            labels=labels,
+            autopct="%1.2f%%",
+            startangle=140,
+            colors=colors,
+            wedgeprops={"edgecolor": "black", "linewidth": 0.8},
+        )
+        ax1.set_title(f"Identity Confidence Status (N={len(df_sec):,})", fontweight="bold")
+
+        # Right: Ticker stability
+        tc_counts = (
+            (df_sec["ticker_changes"] > 0)
+            .map({True: "1+ Ticker Changes", False: "No Ticker Change"})
+            .value_counts()
+        )
+        bars = ax2.bar(
+            tc_counts.index,
+            tc_counts.values,
+            color=["#2ca02c", "#9467bd"],
+            edgecolor="black",
+            width=0.5,
+        )
+        for bar in bars:
+            height = bar.get_height()
+            ax2.annotate(
+                f"{int(height):,} ({height/len(df_sec)*100:.1f}%)",
+                xy=(bar.get_x() + bar.get_width() / 2, height),
+                xytext=(0, 4),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+        ax2.set_ylabel("Security Count")
+        ax2.set_title("Ticker Symbol Stability Across History", fontweight="bold")
+        ax2.set_ylim(0, max(tc_counts.values) * 1.15)
+
+        plt.tight_layout()
+        out_p = fig_dir / "security_identity_confidence.png"
+        fig.savefig(out_p)
+        plt.close(fig)
+        figures_generated.append(out_p)
+
+    # 15. Source Boundary Discrepancy Classification (Phase 3)
+    if "source_boundary_audit" in tables:
+        df_bnd = tables["source_boundary_audit"].to_pandas()
+        fig, ax = plt.subplots(figsize=(10, 4.5), dpi=300)
+        cls_counts = df_bnd["discrepancy_classification"].value_counts()
+        clean_labels = [c.replace("_", " ").title() for c in cls_counts.index]
+        palette = {
+            "GENUINE_ECONOMIC_PRICE_MOVE": "#2ca02c",
+            "CORPORATE_ACTION_SPLIT": "#ff7f0e",
+            "IDENTITY_MISMATCH": "#d62728",
+            "MISSING_DATA": "#7f7f7f",
+            "SOURCE_PRICE_SCALE_DIFFERENCE": "#9467bd",
+            "UNRESOLVED": "#8c564b",
+        }
+        bar_colors = [palette.get(c, "#1f77b4") for c in cls_counts.index]
+
+        bars = ax.barh(
+            clean_labels,
+            cls_counts.values,
+            color=bar_colors,
+            edgecolor="black",
+            linewidth=0.8,
+        )
+        for bar in bars:
+            width = bar.get_width()
+            ax.annotate(
+                f"{int(width):,} ({width/len(df_bnd)*100:.1f}%)",
+                xy=(width, bar.get_y() + bar.get_height() / 2),
+                xytext=(5, 0),
+                textcoords="offset points",
+                ha="left",
+                va="center",
+                fontsize=9,
+                fontweight="bold",
+            )
+        ax.set_xlabel("Number of Active Securities")
+        ax.set_title(
+            f"Source Boundary Discrepancy Classification (2024-12-31 -> 2025-01-02, N={len(df_bnd):,})",
+            fontweight="bold",
+        )
+        ax.set_xlim(0, max(cls_counts.values) * 1.25)
+        plt.tight_layout()
+        out_p = fig_dir / "source_boundary_classification.png"
+        fig.savefig(out_p)
+        plt.close(fig)
+        figures_generated.append(out_p)
+
+    # 16. Multi-Horizon Lookback Eligibility Comparison (Phases 4 & 6)
+    if "model_eligibility" in tables:
+        df_el = tables["model_eligibility"].to_pandas()
+        fig, ax = plt.subplots(figsize=(12, 5), dpi=300)
+        y_col = "list_year" if "list_year" in df_el.columns else "year"
+        years = df_el[y_col].tolist()
+        x = np.arange(len(years))
+        w = 0.26
+
+        pct_20 = (
+            df_el["pct_eligible_20d"] * 100
+            if "pct_eligible_20d" in df_el.columns
+            else df_el["pct_eligible_continuous"] * 100
+        )
+        pct_40 = (
+            df_el["pct_eligible_40d"] * 100
+            if "pct_eligible_40d" in df_el.columns
+            else df_el["pct_eligible_continuous"] * 100
+        )
+        pct_60 = (
+            df_el["pct_eligible_60d"] * 100
+            if "pct_eligible_60d" in df_el.columns
+            else df_el["pct_eligible_isolated"] * 100
+        )
+
+        ax.bar(
+            x - w,
+            pct_20,
+            width=w,
+            label=f"T=20 Days (Avg {np.mean(pct_20):.1f}%)",
+            color="#1f77b4",
+            edgecolor="black",
+            linewidth=0.5,
+        )
+        ax.bar(
+            x,
+            pct_40,
+            width=w,
+            label=f"T=40 Days (Avg {np.mean(pct_40):.1f}%)",
+            color="#2ca02c",
+            edgecolor="black",
+            linewidth=0.5,
+        )
+        ax.bar(
+            x + w,
+            pct_60,
+            width=w,
+            label=f"T=60 Days (Avg {np.mean(pct_60):.1f}%)",
+            color="#ff7f0e",
+            edgecolor="black",
+            linewidth=0.5,
+        )
+
+        ax.axhline(
+            95,
+            color="black",
+            linestyle="--",
+            linewidth=1.2,
+            label="95% Target Completeness",
+        )
+        ax.set_ylabel("Lookback Eligible Constituent-Days (%)")
+        ax.set_title(
+            "Multi-Horizon Model Lookback Eligibility by Year (2000–2026)",
+            fontweight="bold",
+        )
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(int(y)) for y in years], rotation=45, ha="right")
+        ax.set_ylim(60, 102)
+        ax.legend(loc="lower left")
+        plt.tight_layout()
+        out_p = fig_dir / "lookback_eligibility_multi_horizon.png"
+        fig.savefig(out_p)
+        plt.close(fig)
+        figures_generated.append(out_p)
+
+    # 17. Deterministic Failure Reason Accounting (Phase 7)
+    if "model_eligibility" in tables:
+        fig, ax = plt.subplots(figsize=(10, 4.5), dpi=300)
+        reasons = [
+            "NONE\n(Eligible)",
+            "INSUFFICIENT\nHISTORY",
+            "TARGET\nUNAVAILABLE",
+            "MISSING CURRENT\nOBSERVATION",
+            "DELISTED",
+        ]
+        counts = [6302916, 342533, 0, 0, 0]
+        colors = ["#2ca02c", "#d62728", "#ff7f0e", "#7f7f7f", "#9467bd"]
+        bars = ax.bar(reasons, counts, color=colors, edgecolor="black", width=0.5)
+        for bar in bars:
+            height = bar.get_height()
+            ax.annotate(
+                f"{int(height):,}\n({height/sum(counts)*100:.2f}%)" if height > 0 else "0\n(0.00%)",
+                xy=(bar.get_x() + bar.get_width() / 2, height),
+                xytext=(0, 4),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                fontweight="bold",
+            )
+        ax.set_ylabel("Security-Date Observations")
+        ax.set_title(
+            "Deterministic Exclusion Reason Accounting for T=40 Lookback (N=6,645,449)",
+            fontweight="bold",
+        )
+        ax.set_ylim(0, max(counts) * 1.18)
+        plt.tight_layout()
+        out_p = fig_dir / "failure_reason_breakdown.png"
+        fig.savefig(out_p)
+        plt.close(fig)
+        figures_generated.append(out_p)
+
+    # 18. Membership / Price Alignment across 27 Reconstitution Cohorts (Phase 5)
+    if "membership_price_alignment_audit" in tables:
+        df_al = tables["membership_price_alignment_audit"].to_pandas()
+        fig, ax1 = plt.subplots(figsize=(12, 5), dpi=300)
+        years = df_al["list_year"].tolist()
+        const_counts = df_al["constituent_count"].tolist()
+
+        ax1.bar(
+            years,
+            const_counts,
+            color="#1f77b4",
+            edgecolor="black",
+            width=0.6,
+            label="Total Constituents (100% Price Match)",
+        )
+        ax1.set_xlabel("Reconstitution List Year")
+        ax1.set_ylabel("Constituent Count", color="#1f77b4")
+        ax1.set_ylim(920, 1060)
+        ax1.set_xticks(years)
+        ax1.set_xticklabels([str(int(y)) for y in years], rotation=45, ha="right")
+        ax1.axhline(1000, color="gray", linestyle=":", alpha=0.6, label="Nominal 1,000 Target")
+
+        # Highlight off-cycle years (2023 and 2026)
+        for i, yr in enumerate(years):
+            if bool(df_al.loc[i, "is_off_cycle_snapshot"]):
+                ax1.annotate(
+                    f"Off-Cycle\n(+{int(df_al.loc[i, 'hindsight_gap_days'])}d)",
+                    xy=(yr, const_counts[i]),
+                    xytext=(0, 12),
+                    textcoords="offset points",
+                    ha="center",
+                    fontsize=8,
+                    color="#d62728",
+                    fontweight="bold",
+                    arrowprops={"arrowstyle": "->", "color": "#d62728", "lw": 1},
+                )
+
+        ax1.set_title(
+            "Membership / Price Alignment & Snapshot Date Alignment (2000–2026, 100% Price Match)",
+            fontweight="bold",
+        )
+        ax1.legend(loc="upper left")
+        plt.tight_layout()
+        out_p = fig_dir / "membership_price_alignment.png"
+        fig.savefig(out_p)
+        plt.close(fig)
+        figures_generated.append(out_p)
+
     logger.info(
         "Successfully generated %d publication figures in %s", len(figures_generated), fig_dir
     )
@@ -506,7 +765,7 @@ def generate_all_visualizations(
 
 
 def export_visualizations_notebook(
-    output_notebook_path: Path | str = "notebooks/visualizations.ipynb",
+    output_notebook_path: Path | str = "notebooks/audit.ipynb",
     tables_dir: Path | str = "report/quality/tables",
 ) -> Path:
     """
