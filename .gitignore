@@ -53,3 +53,16 @@ refs/
 *.run.xml
 *.xdy
 # End of generated LaTeX auxiliary/output files
+# Platform outputs (never commit data: CRSP/WRDS is licensed). The data/ folders are kept
+# (README + .gitkeep) so the layout exists after a clone; their contents are ignored.
+data/*
+!data/README.md
+!data/warehouse/
+data/warehouse/*
+!data/warehouse/.gitkeep
+runs/
+*.parquet
+*.duckdb
+*.duckdb.wal
+.pytest_cache/
+*.egg-info/

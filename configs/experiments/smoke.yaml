@@ -1,0 +1,130 @@
+# Smoke test: baseline_hybrid on a small slice (2 years, 50 stocks, 1 epoch, 2 folds) to check
+# that the whole pipeline runs. Not a result. Differs from baseline_hybrid only in name,
+# data_spec.period, filter_spec.kwargs.k, split_spec.kwargs.n_folds and train_spec.max_epochs.
+# Paths: configs/env/<env>.yaml
+name: smoke
+seed: 42
+
+# ------------------------------------------------------------------ data
+data_spec:
+  dataset_name: r1000_topk            # dataset file: <data_root>/datasets/r1000_topk.duckdb
+  source:
+    func: warehouse_duckdb
+  period:
+    start: 2018-01-01
+    end: 2019-12-31
+  warmup_days: 400                    # calendar days loaded before start for feature warm-up
+
+feature_spec:                         # stock time series, stored raw (context/06_features.md)
+  - func: log_ret
+    kwargs:
+      clip: [-0.2231, 0.1823]         # [ln 0.8, ln 1.2]
+  - func: vol
+    kwargs:
+      n: 60
+  - func: dist_sma
+    kwargs:
+      n: 20
+  - func: dist_sma
+    kwargs:
+      n: 60
+  - func: log_dollar_volume
+    kwargs:
+      n: 20
+
+filter_spec:                          # context/03_filter.md; values are placeholders (open question 2)
+  func: topk_dollar_volume
+  kwargs:
+    k: 50
+    buffer_ratio: 0.1
+    x: 20
+    y: 30
+    ttl: 21
+    agg: sum
+    on_delist: keep
+
+indicator_spec: []                    # economic indicators (open question 10)
+
+label_spec:
+  func: forward_return
+  kwargs:
+    h: 5
+    offset: 0                         # 0 = legacy timing (open question 7)
+
+window_spec:                          # what load_window(t) gives the model
+  lookback: 60
+  max_missing: 2
+  fill: zero
+  transforms:                         # per date, across the k selected stocks
+    - func: cs_zscore
+    - func: clip
+      kwargs:
+        lo: -3
+        hi: 3
+
+# ------------------------------------------------------------------ model
+model_spec:
+  func: hybrid_lstm_tfm
+  kwargs:
+    hidden_dim: 64
+    lstm_layers: 2
+    tfm_layers: 2
+    heads: 4
+    ff_dim: 128
+    dropout: 0.2
+
+loss_spec:
+  func: hybrid_hinge
+  kwargs:
+    margin: 0.1
+    decile: 0.1
+    lambda_mse: 1.0
+    target: zscore
+
+# ------------------------------------------------------------------ training
+split_spec:
+  func: purged_walk_forward
+  kwargs:
+    n_folds: 2
+    purge: 5
+    embargo: 20
+    val_frac: 0.15
+
+train_spec:
+  max_epochs: 1
+  batch_dates: 32
+  lr: 1.0e-4
+  weight_decay: 1.0e-5
+  lr_patience: 3
+  lr_factor: 0.5
+  monitor: val_ic
+  early_stopping_patience: null
+  min_valid_slots: 20
+  accelerator: auto
+  num_workers: 0
+  deterministic: true
+
+# ------------------------------------------------------------------ evaluation
+evaluation_spec:
+  metrics:
+    - func: mean_ic
+    - func: icir
+      kwargs:
+        periods_per_year: 50.4        # 252 / h for non-overlapping 5-day labels
+    - func: ic_hit_rate
+    - func: decile_spread
+      kwargs:
+        n: 10
+        cost_bps: 10
+    - func: decile_monotonicity
+      kwargs:
+        n: 10
+
+backtest_spec:
+  func: placeholder
+
+tracking_spec:
+  wandb:
+    enabled: false
+    project: HCMUT-Specialized-Project
+    mode: online
