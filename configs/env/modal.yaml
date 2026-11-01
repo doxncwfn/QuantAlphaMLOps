@@ -1,0 +1,5 @@
+# Paths inside the Modal container (volume mounted at /mnt/data). See modal_app.py.
+paths:
+  warehouse: /mnt/data/warehouse/russell1000.duckdb
+  data_root: /mnt/data/qam
+  runs_root: /mnt/data/qam/runs

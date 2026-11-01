@@ -1,0 +1,5 @@
+# Paths for running on this machine. Relative paths resolve against the repository root.
+paths:
+  warehouse: data/warehouse/russell1000.duckdb  # download: data/README.md
+  data_root: data
+  runs_root: runs

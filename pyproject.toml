@@ -1,0 +1,34 @@
+[project]
+name = "qam"
+version = "0.1.0"
+description = "QuantAlphaMLOps: config-driven platform for cross-sectional equity ranking"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "polars>=1.21",  # rolling_*(min_samples=...)
+    "pyarrow>=14",
+    "duckdb>=1.1",
+    "pydantic>=2.6",
+    "pyyaml>=6",
+    "torch>=2.2",
+    "pytorch-lightning>=2.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "scipy>=1.12"]  # scipy: legacy parity tests
+tracking = ["wandb>=0.16"]
+modal = ["modal==1.5.3"]
+
+[project.scripts]
+qam = "qam.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qam"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
