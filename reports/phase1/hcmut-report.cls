@@ -39,8 +39,11 @@
 \RequirePackage[english]{babel} % Change to '[vietnamese]' to use Vietnamese labels
 
 % --- Mathematics and colour ---
-\RequirePackage{amsmath,amssymb}
+\RequirePackage{amsmath,amsthm,amssymb}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
 \RequirePackage{xcolor}
+\RequirePackage{algorithm, algpseudocode}
 
 % --- Page layout and spacing ---
 \RequirePackage{geometry}
@@ -59,13 +62,17 @@
 
 % --- Code listings ---
 \RequirePackage{listings}
+\RequirePackage[newfloat,cache=false]{minted}
+\RequirePackage{dirtree}
 
 % --- Boxes, headers, page references, links and bibliography ---
 \RequirePackage{tcolorbox}
 \RequirePackage{fancyhdr,lastpage}
-\RequirePackage{hyperref}
 \RequirePackage[super,square,sort]{natbib}
 \RequirePackage{acronym}
+\RequirePackage[title,toc,page]{appendix}
+\RequirePackage{hyperref}
+\RequirePackage{etoolbox}
 
 %---------------------------------------------------------------------
 % 3. Colour definitions
@@ -118,6 +125,17 @@
     \counterwithin{figure}{section}%
     \counterwithin{lstlisting}{section}%
 }
+
+% Tighten math spacing inside list environments
+\newcommand{\tightenmathspacing}{%
+  \setlength{\abovedisplayskip}{3pt}%
+  \setlength{\belowdisplayskip}{3pt}%
+  \setlength{\abovedisplayshortskip}{3pt}%
+  \setlength{\belowdisplayshortskip}{3pt}%
+}
+\AtBeginEnvironment{equation}{\tightenmathspacing}
+\AtBeginEnvironment{align}{\tightenmathspacing}
+% \AtBeginEnvironment{description}{\tightenmathspacing}
 
 %---------------------------------------------------------------------
 % 6. Date helper commands

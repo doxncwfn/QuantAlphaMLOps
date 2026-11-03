@@ -1,0 +1,45 @@
+\startfooter{Specialized Project: HK261-DAGD1-041\\
+	Methodology
+}
+
+\part{Methodology} \label{part:methodology}
+\section{Problem Formulation} \label{sec:problem-formulation}
+\subsection*{The Cross-Sectional Ranking Objective}
+
+The investment decision analyzed in this study is inherently comparative: the goal is to rank securities relative to each other, rather than to predict the absolute numeric accuracy of each individual return. As such, the problem is cast as a \emph{learning-to-rank} task. Denote by $N$ the number of active equities in the analytical sample at time $t$. At each prediction date, the model receives a three-dimensional input tensor of temporal features, $\mathbf{X}_t \in \mathbb{R}^{N \times T \times F}$, where $T$ is the lookback sequence length (e.g., 60 days), and $F$ is the number of engineered features extracted per security.
+
+The learning objective is to parameterize a mapping $f(\mathbf{X}_t; \Theta)$ that outputs a vector of cross-sectional scores $\mathbf{\hat{y}}_t \in \mathbb{R}^N$. These scores should monotonically align with the realized forward \emph{residualized} returns $\mathbf{y}_t \in \mathbb{R}^N$, meaning the induced orderings serve as the ranking for the cross-section at time $t$.
+
+\subsection*{Generalization and Bias Neutralization}
+A central design constraint is to prevent structural survivorship bias and regime overfitting. Since the sample is composed of continuous survivors from 2020 onward, including static identifiers (such as Stock IDs or persistent entity embeddings) would allow the model to memorize long-term “winners”, thus violating generalizability. To enforce that the model learns a generalized mapping (a pricing kernel), $f(\mathbf{X}_t; \Theta)$ is constructed to explicitly exclude such static structural identifiers. Both the temporal encoder (\acs{LSTM}) and the context layer (Cross-Sectional Transformer) must deduce the cross-sectional ranking solely from the time-varying technical and fundamental features present in $\mathbf{X}_t$, observed at each $t$.
+
+\subsection*{Hybrid Optimization Function}
+
+To align mathematical training with the requirements of downstream portfolio construction, the network is trained with a \emph{hybrid} loss. This combines classical Mean Squared Error (MSE), which helps anchor the scale of the predictions, with a pairwise hinge loss. The hinge component operates on each cross-sectional batch and explicitly penalizes situations where securities from empirically lower-performing quantiles are scored above those from higher-performing quantiles. This approach directly incentivizes the monotonic separation required for constructing a market-neutral, cross-sectional portfolio.
+
+\section{Target Construction} \label{sec:target-construction}
+\subsection*{Systematic Risk Residualization}
+
+Securities within a broad equity universe share exposure to the same market-wide risk factors; thus, raw forward returns are dominated by common systematic variation that is not stock-specific. To ensure that the model's learning target strictly captures \emph{security-specific} signals, the forward-looking prediction target is residualized with respect to known risk factors prior to cross-sectional evaluation.
+
+\subsection*{Fama-French 3-Factor Rolling OLS}
+
+The idiosyncratic return target for each stock is constructed via the Fama-French 3-Factor model. For every security $i$, a trailing 126-day (roughly six months) rolling Ordinary Least Squares (OLS) regression is performed at date $t$:
+
+\begin{equation}
+	R_{i,t} - R_{f,t} = \alpha_{i,t} + \beta_{i,\mathrm{MKT}}\,\mathrm{MKT}_t + \beta_{i,\mathrm{SMB}}\,\mathrm{SMB}_t + \beta_{i,\mathrm{HML}}\,\mathrm{HML}_t + \epsilon_{i,t}
+\end{equation}
+
+where $R_{i,t}$ is the return for stock $i$, $R_{f,t}$ is the risk-free rate, and $\mathrm{MKT}_t$, $\mathrm{SMB}_t$, and $\mathrm{HML}_t$ denote the market, size, and value factor premia, respectively. The residual $\epsilon_{i,t}$ isolates the stock-specific, non-systematic return component at each date.
+
+\subsection*{Cross-Sectional Z-Scoring for the Forward Horizon}
+
+To produce the final set of predictive targets $\mathbf{y}_t$ for each ranking instance, the daily idiosyncratic residuals $\epsilon_{i,t}$ are aggregated for each security over a 5-day forward prediction horizon. To ensure that the resulting target is scale-invariant and purely comparative, these 5-day aggregated residuals are cross-sectionally Z-scored at each $t$. That is, for the vector of $N$ stocks on a given day, the transformed target has mean $0$ and standard deviation $1$ across the cross-section:
+\begin{equation}
+	\mathbf{y}_t = \frac{\boldsymbol{\epsilon}^{\,(5)}_t - \mathrm{mean}(\boldsymbol{\epsilon}^{\,(5)}_t)}{\mathrm{std}(\boldsymbol{\epsilon}^{\,(5)}_t)}
+\end{equation}
+
+This enforces that the model's predictions are evaluated exclusively by their relative ordering, consistent with the long/short, market-neutral ranking objective.
+
+\section{Project Objectives} \label{sec:project-objectives}
+To be updated

@@ -1,6 +1,12 @@
-\part{Appendixes}
-\section*{A. Evaluation Metrics Definitions}
-\label{appendix_A}
-\subsection*{1 \acf{IC}}
-\subsubsection*{1.1 \acf{ICIR}}
-\subsection*{2 Ledoit-Wolf Shrinkage}
+\startfooter{Specialized Project: HK261-DAGD1-041\\
+	Nested Walk-Forward Cross-Validation}
+
+\renewcommand{\addappheadtotoc}{%
+	\phantomsection
+	\addcontentsline{toc}{part}{\appendixtocname}%
+}
+
+\begin{appendices}
+	\input{appendixes/NWFCV}
+	\input{appendixes/metrics}
+\end{appendices}

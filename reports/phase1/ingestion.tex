@@ -1,0 +1,98 @@
+\startfooter{Specialized Project: HK261-DAGD1-041\\
+	Market Reconstruction
+}
+\part{Market Reconstruction} \label{part:market-reconstruction}
+Survivorship bias is a well-established problem in empirical financial research: restricting historical analysis to securities that survive until the end of the sample can produce distorted estimates and misleading evidence of return predictability. Brown et al.~\cite{Brown1992} demonstrate that survivorship-truncated samples can materially affect empirical conclusions.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics*[width=0.6\textwidth]{images/survivorship_bias.png}
+	\caption{Abraham Wald's Survivorship Bias Plane}
+\end{figure}
+
+For this study, avoiding survivorship bias is complicated by the limited access provided by free-tier market-data services. No single freely accessible source is assumed to provide both a sufficiently long historical security universe and the complete security-level price data required by the study. Consequently, the dataset must be reconstructed by combining complementary sources rather than directly downloaded as a finished historical panel.
+
+\medskip
+
+The pipeline therefore uses the \acf{NYSE} trading calendar as its temporal backbone, retrieves daily historical active-ticker snapshots from \href{https://wrds-www.wharton.upenn.edu/}{Wharton Research Data Services \inlinelogo{images/wrds-logo.png}}, aggregates these observations with Polars to derive ticker availability intervals, and uses those intervals to obtain daily \acs{OHLCV} data from Yahoo Finance. This produces a persistent raw market dataset that preserves historical security availability while remaining feasible under the constraints of the available free-tier \acs{API}s. The resulting data then serve as the foundation for the subsequent integrity checks, point-in-time universe construction, data-quality procedures, and machine-learning pipeline.
+
+\section{U.S. Equity Market Proxy Selection} \label{sec:market-selection}
+To construct a representative, investable, and unconfounded U.S. equity universe, this study selects the FTSE Russell 1000 Index as the primary market proxy. Comprising the 1,000 largest U.S.-domiciled securities ranked by total market capitalization within the Russell 3000E universe, the Russell 1000 captures approximately 90\% to 95\% of total investable U.S. equity capitalization while maintaining strict rules-based transparency \cite{ftserussell2026}. At any time $t$, constituents are weighted in proportion to their free-float-adjusted market capitalization $M_{i,t}^{\mathrm{float}} = P_{i,t}(S_{i,t}^{\mathrm{total}} - S_{i,t}^{\mathrm{restricted}})$, yielding the index weight and effective diversification metric:
+\begin{equation}
+	w_{i,t} = \dfrac{M_{i,t}^{\mathrm{float}}}{\displaystyle\sum_{j=1}^{1000} M_{j,t}^{\mathrm{float}}},
+	\qquad
+	N_{\mathrm{eff},t} = \dfrac{1}{\displaystyle\sum_{i=1}^{1000} w_{i,t}^2}.
+	\label{eq:weights_neff}
+\end{equation}
+
+While the top 200 mega-cap constituents account for roughly 78\% of index capitalization (compressing $N_{\mathrm{eff},t}$ and driving the primary market mode), the remaining 800 mid-cap constituents (representing $\approx 22\%$ of index weight, with a median capitalization of \$16.7 billion against a weighted average of \$1.56 trillion as of Q3 2026) provide substantial cross-sectional breadth \cite{ftserussell2026}. For cross-sectional ranking models, expanding the universe from 500 to 1,000 names increases the number of unique pairwise comparisons $\displaystyle\binom{N}{2} = \dfrac{N(N-1)}{2}$ fourfold, from $124{,}750$ to $499{,}500$ per period.
+
+\medskip
+
+The empirical asset-pricing and market-microstructure literature provides three primary justifications for preferring the Russell 1000 over alternative benchmarks such as the S\&P 500 or Russell 3000:
+
+\subsubsection*{Elimination of Committee-Selection Bias}
+Unlike the S\&P 500 -- which relies on discretionary committee selection and enforces positive GAAP earnings screens -- Russell 1000 membership is determined mechanically by market-capitalization rank on the prescribed rank day \cite{chang2015, bendavid2019}. As emphasized by \cite{chang2015}, discretionary S\&P 500 additions correlate endogenously with firm profitability, visibility, and expected future performance, confounding cross-sectional return inferences. By contrast, the deterministic Russell 1000/2000 threshold at rank $1{,}000$ creates exogenous variation in benchmark weights. Exploiting this cutoff in a fuzzy regression-discontinuity design (RDD), \cite{chang2015} document that stocks migrating just above rank $1{,}000$ into the top of the value-weighted Russell 2000 experience an approximate $7.3\%$ jump in passive institutional demand and a $5.0\%$ abnormal June return ($t = 2.65$) relative to near-identical stocks remaining at the bottom of the Russell 1000.
+
+\subsubsection*{Well-Documented Reconstitution and Ownership Dynamics}
+Because Russell reconstitution follows a predictable schedule -- historically annual in June, and transitioning to a semiannual June/December cycle in 2026 \cite{ftserussell2026} -- its liquidity and ownership shocks are thoroughly parameterized in the literature. Early event studies by \cite{madhavan2003}, \cite{biktimirov2004}, \cite{chen2006}, and \cite{cai2008} show that index rebalancing induces both temporary order-imbalance price pressure (e.g., a $10.78\%$ June addition-minus-deletion spread followed by a $-6.04\%$ July reversal in \cite{madhavan2003}) and permanent shifts in bid-ask spreads and institutional monitoring. Furthermore, \cite{petajisto2011} quantifies the hidden rebalancing drag borne by passive funds during crowded index revisions, while \cite{cremers2009} establish Russell indexes as foundational benchmarks for evaluating active management via Active Share ($\mathrm{AS}_t = \dfrac{1}{2}\displaystyle\sum_i |w_{i,t}^{\mathrm{fund}} - w_{i,t}|$). More recently, researchers have used Russell's mechanical assignment to identify how passive and ETF ownership improve corporate governance \cite{appel2016}, propagate return comovement \cite{chen2016, da2018}, and elevate daily volatility and short-horizon negative autocorrelation -- yielding a risk premium of up to 56 basis points per month for high-ETF-ownership stocks \cite{bendavid2018}.
+
+\subsubsection*{Institutional Liquidity and Arbitrage Efficiency vs.\ the Russell 3000}
+While the broader Russell 3000 captures roughly 98\% of the U.S. market by adding the 2,000 small-cap constituents of the Russell 2000 \cite{ftserussell2026}, the bottom 2,000 names contribute only 3\% to 8\% of market capitalization while imposing severe implementation friction. Using Russell reconstitution as an instrument, \cite{patatoukas2022} demonstrate that large- and mid-cap Russell 1000 securities exhibit low arbitrage constraints and unimpaired price discovery, whereas small- and micro-cap stocks suffer from binding short-sale and liquidity frictions. Under a standard square-root market-impact cost function for trade size $|Q_{i,t}|$ relative to average daily dollar volume $\mathrm{ADV}_{i,t}$ and volatility $\sigma_{i,t}$:
+\begin{equation}
+	MI_{i,t} = \eta_i \sigma_{i,t} \left( \dfrac{|Q_{i,t}|}{\mathrm{ADV}_{i,t}} \right)^{1/2},
+	\label{eq:market_impact}
+\end{equation}
+truncating the universe at rank $1{,}000$ avoids the steep market-impact decay, wide spreads, and elevated delisting bias of the small-cap tail while preserving the economically dominant core of the U.S. equity market.
+
+\section{Data Acquisition and Processing Pipeline} \label{sec:data-acquisition}
+To construct a survivorship-bias-free dataset, we implement a three-stage data acquisition and normalization pipeline. Because standard financial databases frequently overwrite historical index memberships with current constituents, reconstructing point-in-time constituent lists is essential for empirical validity. Our workflow systematically captures annual snapshots of the Russell 1000 Index following its late-June reconstitution and links these constituents to fundamental and market records.
+
+\subsection{Historical Index Constituent Extraction}
+The Russell 1000 Index undergoes an annual reconstitution on the final Friday of June, establishing the definitive constituent list for the subsequent twelve months. To capture true point-in-time index membership across our 2000--2026 sample period, we retrieve archival constituent snapshots directly from the \href{web.archive.org}{Internet Archive's Wayback Machine} immediately following each June reconstitution phase.
+
+\medskip
+
+Because institutional data hosting and corporate ownership have migrated across platforms over the past two decades, we query multiple archival domains to ensure complete longitudinal coverage:
+\begin{itemize}
+	\item \textbf{Official Index Providers:} Primary constituent lists and reconstitution reports published across current and legacy provider portals, including \href{https://lseg.com/}{London Stock Exchange Group}, \href{https://ftserussell.com/}{FTSE Russell}, \href{https://russellinvestments.com/}{Russell Investments} and \href{https://russell.com/}{russell.com}, and the defunct early-2000s \href{https://www.russellmellon.com/}{Russell/Mellon} analytical services domain.
+	\item \textbf{Institutional ETF Holdings:} Post-reconstitution holdings disclosures from \href{https://ishares.com/}{BlackRock} for the iShares Russell 1000 ETF (IWB), which serve as a high-fidelity proxy and cross-validation source when direct provider tables are unavailable.
+\end{itemize}
+Due to changes in web standards over the 2000--2026 sample horizon, the 27 extracted raw files span heterogeneous file architectures, including unstructured Portable Document Format (\texttt{.pdf}) fact sheets, Microsoft Excel (\texttt{.xls}) and comma-separated values (\texttt{.csv}) spreadsheets, and JavaScript Object Notation (\texttt{.json}) API payloads (summarized in Table~\ref{tab:russell_raw_sources}). We implement a custom parsing pipeline to strip document metadata, headers, and footnotes, standardizing each annual extraction into a clean, line-separated plain-text file containing company names and primary ticker symbols for each reconstitution year $t$.
+\begin{table}[H]
+	\small
+	\centering
+	\caption{Raw Russell 1000 Constituent Snapshots}
+	\label{tab:russell_raw_sources}
+	\begin{tabular}{lcll}
+		\toprule
+		\textbf{File Format} & \textbf{Count} & \textbf{Reconstitution Cohort Years} & \textbf{Primary Source Structure}    \\
+		\midrule
+		PDF Document         & 21             & 2000--2007, 2009--2018, 2020--2022   & Multi-page provider fact sheets      \\
+		JSON Payload         & 3              & 2019, 2023, 2024                     & Structured web API responses         \\
+		Excel Workbook       & 2              & 2025, 2026                           & Tabular holdings spreadsheets        \\
+		CSV File             & 1              & 2008                                 & Delimited constituent table          \\
+		\midrule
+		\textbf{Total}       & \textbf{27}    & \textbf{2000--2026 (Complete Panel)} & \textbf{Normalized to \texttt{.txt}} \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection{WRDS Query Execution and Historical Data Retrieval} \label{subsec:wrds-query}
+With the standardized annual constituent lists established, the second phase of the pipeline extracts longitudinal stock records via the \href{https://wrds-www.wharton.upenn.edu/}{Wharton Research Data Services \inlinelogo{images/wrds-logo.png}} web query interface, specifically targeting the Center for Research in Security Prices (CRSP) Stock Database (\texttt{crsp\_a\_stock}). To preserve the annual reconstitution structure and prevent look-ahead or survivorship bias, we execute separate cohort-specific queries for each reconstitution cycle rather than pooling tickers across the entire sample period.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics*[width=0.9\textwidth]{images/wrds-flow.png}
+	\caption{Historical Constituent Data Pipeline.}
+\end{figure}
+
+For each reconstitution year $t$, the WRDS web query execution follows a standardized four-step protocol:
+\begin{enumerate}[topsep=0pt, parsep=0pt]
+	\item[Step 1] \textbf{Date Range:} Select the 12-month active cycle following reconstitution, from late June of year $t$ to late June of year $t+1$ (e.g., \texttt{2023-06-30} to \texttt{2024-06-30}).
+	\item[Step 2] \textbf{Code Upload:} Set the format to ticker symbols and upload the standardized plain-text file (\texttt{.txt}, one ticker per line) using the WRDS interface.
+	\item[Step 3] \textbf{Variables:} Select 61 Identifying and Time Series variables to capture market data and security-level metadata.
+	\item[Step 4] \textbf{Output:} Export the query results as comma-delimited text (\texttt{.csv}) in a compressed \texttt{.zip} archive using \texttt{YYYY-MM-DD} dates, then download directly from the WRDS portal.
+\end{enumerate}
+
+\section{Data Integrity}

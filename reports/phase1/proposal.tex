@@ -9,7 +9,7 @@
 
 \subsection*{Context and Motivation}
 
-Deep learning architectures show immense theoretical promise in equity forecasting. Models such as \ac{LSTMs} and Transformers can effectively capture nonlinear structures and complex dependencies embedded in financial time series, increasingly outperforming shallow machine learning models in asset return prediction~\cite{Ellery2025}. However, transitioning these highly parameterized models from theoretical environments to deployable pipelines requires robust \ac{MLOps} frameworks, ranking-aware objectives, and strict validation protocols.
+Deep learning architectures show immense theoretical promise in equity forecasting. Models such as \ac{LSTM} and Transformers can effectively capture nonlinear structures and complex dependencies embedded in financial time series, increasingly outperforming shallow machine learning models in asset return prediction~\cite{Ellery2025}. However, transitioning these highly parameterized models from theoretical environments to deployable pipelines requires robust \ac{MLOps} frameworks, ranking-aware objectives, and strict validation protocols.
 
 \medskip
 
@@ -46,17 +46,17 @@ Can an end-to-end \acs{MLOps} pipeline successfully engineer, validate, and cons
 \subsection*{Scope and Limitations}
 
 \begin{itemize}
-    \item \textbf{Data Universe Constraints:} The analysis is strictly constrained to the intersection of 413 S\&P 500 equities possessing complete, continuous daily split- and dividend-adjusted \ac{OHLCV} history from 2020-01-01 onward.
+    \item \textbf{Data Universe Constraints:} The analysis is strictly constrained to the intersection of 413 \ac{SnP} 500 equities possessing complete, continuous daily split- and dividend-adjusted \ac{OHLCV} history from 2020-01-01 onward.
     \item \textbf{Structural Bias Acknowledgment:} No attempt is made to reconstruct delisted or merged names; therefore, a structural survivorship bias is present and explicitly acknowledged. Additionally, sector definitions rely on static, current \ac{GICS} Level 1 assignments, acting as an acknowledged approximation.
     \item \textbf{Leakage Prevention:} Intra-series missing bars or trading suspensions are strictly forward-filled to prevent look-ahead bias.
     \item \textbf{Nature of Results:} All financial metrics serve solely to validate mechanical pipeline health and must not be interpreted as deployable alpha.
-    \item \textbf{System Validation vs. Inferential Claims:} The pipeline will be deployed to a brokerage API for engineering validation (paper trading); however, these paper trading results are entirely excluded from financial conclusions, acting solely as validation of order routing and system orchestration.
+    \item \textbf{System Validation vs. Inferential Claims:} The pipeline will be deployed to a brokerage \ac{API} for engineering validation (paper trading); however, these paper trading results are entirely excluded from financial conclusions, acting solely as validation of order routing and system orchestration.
     \item \textbf{Decoupled Architecture:} The data layer is intentionally decoupled; this design ensures that a survivorship-free point-in-time database can be substituted in the future without altering the core pipeline code.
 \end{itemize}
 
 \section{Specialized Project}
 \subsection*{Decription:}
-Phase 1 builds the core predictive layer of the entire system: an end-to-end MLOps pipeline that transforms raw OHLCV time series and factor data into strictly validated cross-sectional equity rankings. The architectural principle throughout is to enforce rigorous chronological integrity; the data layer is completely decoupled, ensuring strict forward-filling of intra-series missing bars to prevent look-ahead bias. The pipeline is organized into five functional layers:
+Phase 1 builds the core predictive layer of the entire system: an end-to-end \acs{MLOps} pipeline that transforms raw \acs{OHLCV} time series and factor data into strictly validated cross-sectional equity rankings. The architectural principle throughout is to enforce rigorous chronological integrity; the data layer is completely decoupled, ensuring strict forward-filling of intra-series missing bars to prevent look-ahead bias. The pipeline is organized into five functional layers:
 \begin{enumerate}
     \item \textbf{Target Residualization \& Cross-Sectional Z-Scoring:} Extracts a 5-day forward excess return residualized against a multi-factor risk model (Fama-French Market, SMB, HML, and Volatility factors) to isolate asset-specific price-volume dynamics. According to Fama and French~\cite{FamaFrench1993}, extracting common risk factor exposures is necessary to isolate true idiosyncratic returns (alpha) from systematic market betas.
     \item \textbf{Tensor Construction:} Formulates structured temporal-cross-sectional input tensors of shape $[\text{Batch\_Dates}, 413, 60, 15]$.
@@ -69,7 +69,7 @@ The most important data product of Phase 1 is the locked sequence of out-of-samp
 
 \subsection*{Tasks}
 \begin{itemize}
-    \item \textbf{Task 1.1 -- Point-in-Time Data Gateway and Target Residualization.} Survey and filter the S\&P 500 universe to the 413 equities possessing complete, continuous OHLCV history from 2020-01-01. Construct the 5-day forward target return:
+    \item \textbf{Task 1.1 -- Point-in-Time Data Gateway and Target Residualization.} Survey and filter the S\&P 500 universe to the 413 equities possessing complete, continuous \acs{OHLCV} history from 2020-01-01. Construct the 5-day forward target return:
           \[
               y_{i,t} = r_{i,t+5} - \sum_{k}\hat{\beta}_{i,k,t}f_{k,t+5}
           \]
@@ -77,13 +77,13 @@ The most important data product of Phase 1 is the locked sequence of out-of-samp
 
     \item \textbf{Task 1.2 -- Architecture Implementation and Hybrid AlphaLoss.} Implement the hybrid LSTM-Transformer network. Configure the 2-layer LSTM (treating the stock dimension as part of the batch), inject the 32-dimensional Stock ID embedding, and construct the 2-layer, 4-head cross-sectional Transformer (feedforward dimension 128). Implement the custom hybrid loss function:
           \[
-              L_{\text{total},t} = L_{\text{rank},t} + \lambda L_{\text{MSE},t}
+              \mathcal{L}_{\text{total},t} = \mathcal{L}_{\text{rank},t} + \lambda \mathcal{L}_{\text{MSE},t}
           \]
-          where $L_{\text{rank},t}$ calculates the pairwise hinge loss between the top ($P_t$) and bottom ($Q_t$) deciles with margin $\alpha \in \{0.1, 0.25\}$. Ensure deciles are never pooled across dates during loss computation.
+          where $\mathcal{L}_{\text{rank},t}$ calculates the pairwise hinge loss between the top ($P_t$) and bottom ($Q_t$) deciles with margin $\alpha \in \{0.1, 0.25\}$. Ensure deciles are never pooled across dates during loss computation.
 
     \item \textbf{Task 1.3 -- Purged Walk-Forward Validation and Capacity Ablation.} Construct the expanding 5-fold Purged Walk-Forward validation framework (approx. 12-month test windows). Implement a 5-day purge and a 20-day embargo between train and test sets. As mathematically proven by López de Prado~\cite{LopezdePrado2018}, standard k-fold cross-validation fails in finance due to serial correlation; purging and embargoing are strictly required to prevent leakage. Execute the capacity ablation loop over hidden sizes $\{64, 128, 256\}$ and dropout $[0.1, 0.5]$ exclusively on inner training folds using Optuna. Evaluate against strict baseline models (Naive Momentum, ElasticNet, LightGBM, Pure MLP, Pure LSTM, Pure Transformer) on exact matching folds.
 
-    \item \textbf{Task 1.4 -- Regime-Conditioned Explainable AI (XAI) Diagnostics.} Segment the validation data into High/Low volatility regimes based on the trailing 60-day median of market-wide realized volatility. Apply PyTorch Integrated Gradients -- an attribution method established by Sundararajan et al.~\cite{Sundararajan2017} that guarantees sensitivity and implementation invariance -- on a 5000-sample subset to characterize model logic shifts. Evaluate LightGBM surrogate fidelity via Spearman rank correlation between neural network and surrogate outputs.
+    \item \textbf{Task 1.4 -- Regime-Conditioned \acs{XAI} Diagnostics.} Segment the validation data into High/Low volatility regimes based on the trailing 60-day median of market-wide realized volatility. Apply PyTorch Integrated Gradients -- an attribution method established by Sundararajan et al.~\cite{Sundararajan2017} that guarantees sensitivity and implementation invariance -- on a 5000-sample subset to characterize model logic shifts. Evaluate LightGBM surrogate fidelity via Spearman rank correlation between neural network and surrogate outputs.
 \end{itemize}
 
 \subsection*{Deliverables Phase 1}
@@ -96,7 +96,7 @@ The most important data product of Phase 1 is the locked sequence of out-of-samp
 
 \section{Graduation Project}
 \subsection*{Description}
-Phase 2 transitions the engineering focus from raw signal generation to execution mechanics, translating out-of-sample predictions from the final, locked walk-forward test folds (produced in Phase 1) into a simulated, risk-neutral portfolio. The core challenge lies in the mathematically rigorous reconciliation of competing objectives: maximizing exposure to the deep learning alpha signal, strictly penalizing transaction costs, and maintaining robust risk controls via convex optimization. The process combines a core convex optimization engine with an external \ac{API} orchestration layer. A single convex objective function is constructed to balance expected alpha returns against covariance risk and non-linear market impact. Crucially, this phase is designed to demonstrate that machine learning predictions retain robustness even after being subjected to realistic market frictions, which are modeled explicitly rather than assumed negligible.
+Phase 2 transitions the engineering focus from raw signal generation to execution mechanics, translating out-of-sample predictions from the final, locked walk-forward test folds (produced in Phase 1) into a simulated, risk-neutral portfolio. The core challenge lies in the mathematically rigorous reconciliation of competing objectives: maximizing exposure to the deep learning alpha signal, strictly penalizing transaction costs, and maintaining robust risk controls via convex optimization. The process combines a core convex optimization engine with an external \acs{API} orchestration layer. A single convex objective function is constructed to balance expected alpha returns against covariance risk and non-linear market impact. Crucially, this phase is designed to demonstrate that machine learning predictions retain robustness even after being subjected to realistic market frictions, which are modeled explicitly rather than assumed negligible.
 
 \subsection*{Tasks}
 \begin{itemize}
@@ -108,7 +108,7 @@ Phase 2 transitions the engineering focus from raw signal generation to executio
 
     \item \textbf{Task 2.2 -- Non-Linear Transaction Cost (TCA) Modeling.} To model realistic execution friction, define transaction costs as
           \[
-              TC(w, w_{\text{prev}}) = \displaystyle\sum_{i} \left[ c_{\text{spread},i}|\Delta w_i| + c_{\text{impact},i} \left( \frac{\Delta w_i}{ADV_i} \right)^2 \right]
+              TC(w, w_{\text{prev}}) = \displaystyle\sum_{i} \left[ c_{\text{spread},i}|\Delta w_i| + c_{\text{impact},i} \left( \dfrac{\Delta w_i}{ADV_i} \right)^2 \right]
           \]
           with $\Delta w_i = w_i - w_{\text{prev},i}$ and $ADV_i$ the average daily dollar volume. As shown by Almgren and Chriss~\cite{AlmgrenChriss2000}, quadratic (or convex) impact penalizes excessive instantaneous liquidity demand. Explicitly impose turnover constraints: $||w - w_{\text{prev}}||_1 \le \tau$.
 
@@ -121,12 +121,12 @@ Phase 2 transitions the engineering focus from raw signal generation to executio
               \item \textit{Sector constraints:} Use static \acs{GICS} Level 1 dummy variables.
           \end{itemize}
 
-    \item \textbf{Task 2.4 -- Engineering Validation (Paper Trading).} Deploy the pipeline to a brokerage API for live, forward-testing. Implement logic for real-time fill and latency tracking, order routing diagnostics, and robust state management. Paper trading results are strictly excluded from inferential conclusions, serving only to validate system orchestration and API reliability.
+    \item \textbf{Task 2.4 -- Engineering Validation (Paper Trading).} Deploy the pipeline to a brokerage \acs{API} for live, forward-testing. Implement logic for real-time fill and latency tracking, order routing diagnostics, and robust state management. Paper trading results are strictly excluded from inferential conclusions, serving only to validate system orchestration and \acs{API} reliability.
 \end{itemize}
 
 \subsection*{Deliverables Phase 2}
 \begin{enumerate}
-    \item Source code for the convex optimization engine, the custom transaction cost modules, and the full brokerage API orchestration logic.
+    \item Source code for the convex optimization engine, the custom transaction cost modules, and the full brokerage \acs{API} orchestration logic.
     \item Quantitative report evaluating signal performance degradation through the transaction cost simulator (comparing pre-cost versus post-cost metrics).
 \end{enumerate}
 
@@ -143,8 +143,8 @@ To ensure the pipeline achieves production-grade standards and avoids statistica
 
 \subsection*{Statistical Diagnostics}
 \begin{itemize}
-    \item \textbf{Signal Power:} Out-of-sample Purged Mean \ac{IC} and \ac{ICIR}. By Grinold's Fundamental Law of Active Management~\cite{Grinold1989}, the IC -- the cross-sectional correlation between predictions and realized returns -- is the key mathematical driver of conditional strategy performance.
-    \item \textbf{Consistency:} Percentage of positive IC periods.
+    \item \textbf{Signal Power:} Out-of-sample Purged Mean \ac{IC} and \ac{ICIR}. By Grinold's Fundamental Law of Active Management~\cite{Grinold1989}, the \acs{IC} -- the cross-sectional correlation between predictions and realized returns -- is the key mathematical driver of conditional strategy performance.
+    \item \textbf{Consistency:} Percentage of positive \acs{IC} periods.
     \item \textbf{Significance:} Newey-West adjusted t-statistics~\cite{NeweyWest1987} to correct for heteroskedasticity and autocorrelation. Conventional t-tests are not used as they inflate significance under time series dependence.
     \item \textbf{Overfitting Control:} Report a Deflated Sharpe Ratio or Probability of Backtest Overfitting, rigorously controlling for multiple testing bias during hyperparameter search.
 \end{itemize}
@@ -161,7 +161,7 @@ To ensure the pipeline achieves production-grade standards and avoids statistica
 
 \section{Risk and Mitigation}
 
-The transition of deep learning architectures from static datasets to time-series cross-sectional panels introduces severe inferential and infrastructural vulnerabilities. This section outlines the primary failure vectors inherent in financial MLOps pipelines and establishes strict engineering and statistical mitigations to ensure the integrity of the ablation studies and out-of-sample metrics.
+The transition of deep learning architectures from static datasets to time-series cross-sectional panels introduces severe inferential and infrastructural vulnerabilities. This section outlines the primary failure vectors inherent in financial \acs{MLOps} pipelines and establishes strict engineering and statistical mitigations to ensure the integrity of the ablation studies and out-of-sample metrics.
 
 \subsection*{Statistical and Inferential Risks}
 
