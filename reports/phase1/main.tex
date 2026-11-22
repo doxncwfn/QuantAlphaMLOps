@@ -547,7 +547,7 @@ Mỗi ngày quyết định $t$ là một mẫu. Với mã ở vị trí $i$ c�
         0, & \text{ngược lại,}
     \end{cases}
 \end{equation}
-và nhãn chỉ được dùng khi $m_{t,i}=1$ và $y_{t,i}$ tồn tại. Một batch gồm $B=16$ ngày. Khi huấn luyện, mỗi batch chỉ lấy ngẫu nhiên $640$ trên $1000$ vị trí. Kỹ thuật này vừa giảm bộ nhớ, vừa đóng vai trò \textit{data augmentation}: Transformer được huấn luyện để xếp hạng trên nhiều ``cross-section con'' khác nhau, thay vì phụ thuộc vào một tập mã cố định. Khi suy luận, mô hình dùng đủ 1000 vị trí.
+và nhãn chỉ được dùng khi $m_{t,i}=1$ và $y_{t,i}$ tồn tại. Một batch gồm $B=16$ ngày. Trong cấu hình chính (\texttt{noshuffle} và \texttt{shuffle}), mô hình sử dụng toàn bộ $K=1000$ vị trí mỗi ngày cả khi huấn luyện lẫn suy luận (ở phiên bản baseline \texttt{No-Gate} trước đó, mỗi ngày huấn luyện lấy mẫu con $640$ vị trí).
 
 \subsection{Kiến trúc mô hình}
 Hình~\ref{fig:arch} minh họa mô hình lai LSTM--Transformer tổng quát kết hợp bộ mã hóa time series với cơ chế self-attention, và Bảng~\ref{tab:shapes} mô tả kích thước tensor qua từng khối của kiến trúc \texttt{HybridLstmTfm}. Trong thiết kế của đề tài, phần temporal encoder (Market Gate + LSTM + temporal attention pooling) xử lý lịch sử của từng mã riêng lẻ và nén thành một vector 64 chiều, sau đó khối Transformer thực hiện self-attention theo chiều \textit{cross-section} giữa $K$ mã trong cùng ngày để head xuất ra ranking score.
@@ -648,8 +648,8 @@ và $s_{t,i}=0$ với mã có $m_{t,i}=0$. \textit{Skip connection} này giúp h
 Universe $K$ / TTL / buffer & 1000 / 60 / 10\% & Optimizer & AdamW\\
 Lookback $L$ / $F$ & 60 / 20 & lr / weight decay & $3\!\times\!10^{-4}$ / $10^{-4}$\\
 Market state / $T_g$ & 28 / 5 & Batch & 16 ngày\\
-Hidden $d$ & 64 & Mã/ngày khi train & 640\\
-LSTM & 2 lớp & Epoch tối đa & 20 / 8 (warm)\\
+Hidden $d$ & 64 & Mã/ngày khi train & 1000 (640 ở No-Gate)\\
+LSTM & 2 lớp & Epoch tối đa & 20 (cold-start)\\
 Transformer & 2 lớp, 4 heads & Early stopping & patience 4\\
 FFN / dropout & 128 / 0,2 & LR scheduler & $\times0{,}5$, patience 2\\
 Soft-rank $\tau$ & 0,1 & Gradient clipping & norm 1,0\\
@@ -678,7 +678,7 @@ Median và MAD (nhân hệ số $1{,}4826$ để tương đương độ lệch c
     \hat r_i=\sum_{j\in\mathcal{V}_b}\sigma\!\Big(\frac{z_i-z_j}{\tau}\Big)-\tfrac12,\qquad
     \mathcal{L}_{S}^{(b)}=1-\Corr_{\mathcal{V}_b}\big(\hat{\mathbf{r}},\ \rk(\mathbf{y}_b)\big),\qquad \tau=0{,}1.
 \end{equation}
-Nhãn dùng hạng thật $\rk(\mathbf{y})$ vì phía nhãn không cần đạo hàm. Phép tính cần ma trận sai phân cặp $K\times K$ mỗi ngày; với 640 mã khi huấn luyện, chi phí này vẫn ở mức chấp nhận được trên GPU.
+Nhãn dùng hạng thật $\rk(\mathbf{y})$ vì phía nhãn không cần đạo hàm. Phép tính cần ma trận sai phân cặp $K\times K$ mỗi ngày; với $K=1000$ mã khi huấn luyện, chi phí này vẫn ở mức chấp nhận được trên GPU.
 
 \subsection{Quy trình huấn luyện walk-forward}
 \paragraph{Chia fold.} Gọi dãy các ngày quyết định là $d_0,d_1,\dots$. Giai đoạn test 2010--2024 được chia đều thành 14 đoạn liên tiếp. Với fold $k$ có ngày test đầu tiên ở vị trí $t^{\mathrm{test}}_{k}$:
@@ -713,9 +713,9 @@ với $P=2$, $E=5$, $V=400$ phiên. Vì nhãn chỉ dài 1 phiên, khoảng purg
 \end{equation}
 với $t_{\mathrm{last}}$ là ngày train cuối cùng của fold. Ví dụ, dữ liệu cách 6 năm có trọng số $0{,}5$, cách 12 năm có trọng số $0{,}25$. Dữ liệu cũ vẫn được sử dụng nhưng đóng góp ít hơn.
 
-\paragraph{Warm-start.} Fold đầu tiên được huấn luyện từ đầu, tối đa 20 epoch. Mỗi fold $k\ge2$ khởi tạo từ trọng số tốt nhất của fold $k-1$, với learning rate giảm một nửa ($1{,}5\times10^{-4}$) và tối đa 8 epoch. Về bản chất, đây là \emph{fine-tuning} trên dữ liệu mở rộng: mô hình giữ lại tri thức đã học và cập nhật thêm theo phần dữ liệu mới, giúp giảm chi phí tính toán và tăng tính liên tục giữa các fold.
+\paragraph{Cold-start theo từng fold.} Trong cấu hình v5 chính thức (\texttt{noshuffle} và \texttt{shuffle}), mỗi fold được khởi tạo và huấn luyện độc lập từ đầu (\texttt{init\_state = None}) với tối đa 20 epoch và learning rate khởi điểm $3\times10^{-4}$, thay vì dùng warm-start giới hạn 8 epoch. Cách làm này cho phép mỗi fold hội tụ đầy đủ trên tập dữ liệu mở rộng mà không bị ràng buộc bởi trọng số của các chế độ thị trường cũ.
 
-\paragraph{Tối ưu hóa và early stopping.} Các ngày trong training set được xáo trộn ở mỗi epoch. Mô hình dùng AdamW, gradient clipping theo norm $1{,}0$ và mixed precision; batch có loss không hữu hạn được bỏ qua. Sau mỗi epoch, mô hình được đánh giá bằng Rank IC trung bình trên validation set. Scheduler \texttt{ReduceLROnPlateau} giảm learning rate một nửa nếu val Rank IC không cải thiện sau 2 epoch (tối thiểu $10^{-5}$), và huấn luyện dừng sau 4 epoch không cải thiện. Trọng số tại epoch có val Rank IC cao nhất được dùng để dự báo trên test set.
+\paragraph{Thứ tự batch và tối ưu hóa.} Đề tài khảo sát hai chế độ duyệt dữ liệu trong mỗi epoch: \textbf{No-Shuffle} (\texttt{shuffle=False}, giữ nguyên thứ tự thời gian từ quá khứ đến hiện tại, giúp mỗi epoch kết thúc trên giai đoạn gần nhất) và \textbf{Shuffle} (\texttt{shuffle=True}, xáo trộn ngẫu nhiên các ngày). Mô hình dùng AdamW, gradient clipping theo norm $1{,}0$ và mixed precision; batch có loss không hữu hạn được bỏ qua. Sau mỗi epoch, mô hình được đánh giá bằng Rank IC trung bình trên validation set. Scheduler \texttt{ReduceLROnPlateau} giảm learning rate một nửa nếu val Rank IC không cải thiện sau 2 epoch (tối thiểu $10^{-5}$), và early stopping dừng sau 4 epoch không cải thiện. Trọng số tại epoch có val Rank IC cao nhất được dùng để dự báo trên test set.
 
 \subsection{Suy luận và đánh giá tín hiệu}
 Score trên test set được chuẩn hóa z-score theo từng ngày trên các mã hợp lệ, $\mathbf{s}_t\leftarrow(\mathbf{s}_t-\mu_t)/\sigma_t$. Vì loss tương quan không ràng buộc thang đo của điểm, bước này đưa điểm của các fold về cùng một thang trước khi nối 14 đoạn test thành một chuỗi OOS liên tục. Các chỉ số được báo cáo gồm:
@@ -732,131 +732,142 @@ Score trên test set được chuẩn hóa z-score theo từng ngày trên các 
 % =====================================================================
 
 \subsection{Thiết lập}
-Hai thí nghiệm chính được chạy với cùng kiến trúc, dữ liệu và quy trình, chỉ khác hàm mất mát: \texttt{pearson} (nhãn z-clip) và \texttt{spearman} (nhãn hạng). Mỗi thí nghiệm dùng một seed. Toàn bộ quy trình chạy trên một GPU của Kaggle; bước dựng dữ liệu mất khoảng 4,5 phút và mỗi fold huấn luyện mất khoảng 1,5--4,5 phút. Giai đoạn OOS gồm khoảng 3.774 phiên giao dịch (04/01/2010 -- 31/12/2024).
+Các thí nghiệm được thực hiện trên một GPU của Kaggle với cùng dữ liệu point-in-time ($2.931$ mã, $6.440$ ngày giao dịch, khoảng $3.774$ phiên OOS từ 04/01/2010 đến 31/12/2024 qua 14 fold). Mỗi cấu hình chạy cả hai hàm loss \texttt{pearson} (nhãn z-clip) và \texttt{spearman} (nhãn hạng) với $\mathrm{SEED}=42$:
+\begin{itemize}
+    \item \textbf{Gate + No-Shuffle (cấu hình chính, v5):} đầy đủ Market Gate, $K=1000$ mã khi train, cold-start tối đa 20 epoch mỗi fold, duyệt ngày theo đúng thứ tự thời gian (\texttt{shuffle=False}).
+    \item \textbf{Gate + Shuffle (v5):} giống cấu hình chính nhưng xáo trộn ngẫu nhiên các ngày train ở mỗi epoch (\texttt{shuffle=True}).
+    \item \textbf{No-Gate Baseline (v4):} bỏ khối Market Gate, lấy mẫu con $640$ mã khi train, warm-start tối đa 8 epoch từ fold 2 và \texttt{shuffle=True}.
+\end{itemize}
+Bước dựng và cache dữ liệu mất khoảng 4 phút; mỗi fold của cấu hình chính mất khoảng 6--15 phút huấn luyện tùy số epoch trước khi early stopping.
 
-\subsection{Kết quả theo fold}
-Bảng~\ref{tab:fold} trình bày epoch được chọn, Val IC tại epoch đó và Test IC của từng fold; Hình~\ref{fig:foldic} biểu diễn Test IC theo fold.
+\subsection{Kết quả theo fold (Gate + No-Shuffle)}
+Bảng~\ref{tab:fold} trình bày epoch được chọn, Val IC tại epoch đó và Test IC của từng fold cho cấu hình chính; Hình~\ref{fig:foldic} biểu diễn Test Rank IC theo fold, còn Hình~\ref{fig:train_curves} minh họa diễn biến \textit{train loss} và \textit{Val Rank IC} qua các epoch.
 
 \begin{table}[H]\centering\small
-\caption[Kết quả theo fold]{Kết quả theo fold. Val IC là Rank IC validation tại epoch tốt nhất (Ep); Test IC là Rank IC trung bình theo ngày trên đoạn test.}
+\caption[Kết quả theo fold (Gate + No-Shuffle)]{Kết quả theo fold của cấu hình chính (\texttt{noshuffle}). Val IC là Rank IC validation tại epoch tốt nhất (Ep); Test IC là Rank IC trung bình theo ngày trên đoạn test.}
 \label{tab:fold}
 \renewcommand{\arraystretch}{1.12}
 \begin{tabular}{@{}cl|ccc|ccc@{}}
 \toprule
 & & \multicolumn{3}{c|}{\textbf{Pearson (z-clip)}} & \multicolumn{3}{c}{\textbf{Spearman (soft-rank)}}\\
 \textbf{Fold} & \textbf{Giai đoạn test} & Ep & Val IC & Test IC & Ep & Val IC & Test IC\\\midrule
-01 & 01/2010 -- 01/2011 & 3 & 0,0316 & 0,0151 & 14 & 0,0376 & 0,0256\\
-02 & 01/2011 -- 02/2012 & 7 & 0,0188 & 0,0217 & 8 & 0,0263 & 0,0294\\
-03 & 02/2012 -- 03/2013 & 6 & 0,0275 & 0,0348 & 6 & 0,0285 & \textbf{0,0437}\\
-04 & 03/2013 -- 04/2014 & 3 & 0,0362 & 0,0246 & 7 & 0,0462 & 0,0234\\
-05 & 04/2014 -- 05/2015 & 6 & 0,0293 & 0,0353 & 6 & 0,0289 & 0,0369\\
-06 & 05/2015 -- 06/2016 & 6 & 0,0360 & \textbf{0,0420} & 1 & 0,0357 & 0,0338\\
-07 & 06/2016 -- 07/2017 & 3 & 0,0431 & 0,0200 & 2 & 0,0399 & 0,0180\\
-08 & 07/2017 -- 08/2018 & 6 & 0,0277 & 0,0097 & 5 & 0,0244 & 0,0076\\
-09 & 08/2018 -- 08/2019 & 2 & 0,0177 & 0,0186 & 7 & 0,0210 & 0,0259\\
-10 & 08/2019 -- 09/2020 & 8 & 0,0229 & 0,0121 & 5 & 0,0339 & 0,0399\\
-11 & 09/2020 -- 10/2021 & 5 & 0,0199 & 0,0196 & 2 & 0,0411 & 0,0159\\
-12 & 10/2021 -- 11/2022 & 1 & 0,0253 & $-$0,0002 & 2 & 0,0288 & 0,0260\\
-13 & 11/2022 -- 12/2023 & 4 & 0,0340 & 0,0308 & 3 & 0,0276 & 0,0172\\
-14 & 12/2023 -- 12/2024 & 3 & 0,0335 & 0,0156 & 3 & 0,0256 & 0,0181\\\midrule
-\multicolumn{2}{l|}{\textbf{Trung bình}} & 4,5 & 0,0288 & 0,0214 & 5,1 & 0,0318 & 0,0258\\
+01 & 01/2010 -- 01/2011 & 20 & 0,0330 & \textbf{0,0333} & 14 & 0,0345 & 0,0282\\
+02 & 01/2011 -- 02/2012 & 17 & 0,0203 & 0,0259 & 20 & 0,0240 & 0,0309\\
+03 & 02/2012 -- 03/2013 & 13 & 0,0304 & 0,0315 & 19 & 0,0329 & \textbf{0,0405}\\
+04 & 03/2013 -- 04/2014 & 16 & 0,0329 & 0,0234 & 20 & 0,0373 & 0,0285\\
+05 & 04/2014 -- 05/2015 & 20 & 0,0345 & 0,0280 & 19 & 0,0308 & 0,0300\\
+06 & 05/2015 -- 06/2016 & 20 & 0,0347 & 0,0331 & 19 & 0,0361 & 0,0373\\
+07 & 06/2016 -- 07/2017 & 18 & 0,0363 & 0,0161 & 18 & 0,0389 & 0,0193\\
+08 & 07/2017 -- 08/2018 & 14 & 0,0214 & 0,0057 & 14 & 0,0224 & 0,0064\\
+09 & 08/2018 -- 08/2019 & 7 & 0,0133 & 0,0133 & 7 & 0,0145 & 0,0183\\
+10 & 08/2019 -- 09/2020 & 8 & 0,0134 & 0,0189 & 7 & 0,0171 & 0,0187\\
+11 & 09/2020 -- 10/2021 & 9 & 0,0196 & 0,0219 & 17 & 0,0242 & 0,0204\\
+12 & 10/2021 -- 11/2022 & 5 & 0,0267 & 0,0325 & 15 & 0,0259 & 0,0344\\
+13 & 11/2022 -- 12/2023 & 8 & 0,0254 & 0,0197 & 8 & 0,0283 & 0,0201\\
+14 & 12/2023 -- 12/2024 & 7 & 0,0248 & 0,0254 & 12 & 0,0272 & 0,0226\\\midrule
+\multicolumn{2}{l|}{\textbf{Trung bình (OOS)}} & 13,0 & 0,0262 & 0,0235 & 14,9 & 0,0282 & 0,0254\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[H]\centering
 \begin{tikzpicture}
-\begin{axis}[ybar,bar width=4.2pt,width=\textwidth,height=5.6cm,
-  xmin=0.4,xmax=14.6,xtick={1,...,14},ymin=-0.003,ymax=0.048,
+\begin{axis}[ybar,bar width=4.2pt,width=\textwidth,height=5.4cm,
+  xmin=0.4,xmax=14.6,xtick={1,...,14},ymin=0,ymax=0.045,
   ylabel={Test Rank IC},xlabel={fold},tick label style={font=\scriptsize},label style={font=\small},
   legend style={font=\scriptsize,at={(0.5,-0.22)},anchor=north,legend columns=2},
   yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=2,/pgf/number format/use comma},
   scaled y ticks=false,grid=major,grid style={gray!15}]
-\addplot[fill=blue!55,draw=blue!70!black] coordinates {(1,0.0151) (2,0.0217) (3,0.0348) (4,0.0246) (5,0.0353) (6,0.0420) (7,0.0200) (8,0.0097) (9,0.0186) (10,0.0121) (11,0.0196) (12,-0.0002) (13,0.0308) (14,0.0156)};
-\addplot[fill=orange!70,draw=orange!80!black] coordinates {(1,0.0256) (2,0.0294) (3,0.0437) (4,0.0234) (5,0.0369) (6,0.0338) (7,0.0180) (8,0.0076) (9,0.0259) (10,0.0399) (11,0.0159) (12,0.0260) (13,0.0172) (14,0.0181)};
-\draw[dashed,blue!70!black] (axis cs:0.4,0.0214) -- (axis cs:14.6,0.0214);
-\draw[dashed,orange!80!black] (axis cs:0.4,0.0258) -- (axis cs:14.6,0.0258);
+\addplot[fill=blue!55,draw=blue!70!black] coordinates {(1,0.0333) (2,0.0259) (3,0.0315) (4,0.0234) (5,0.0280) (6,0.0331) (7,0.0161) (8,0.0057) (9,0.0133) (10,0.0189) (11,0.0219) (12,0.0325) (13,0.0197) (14,0.0254)};
+\addplot[fill=orange!70,draw=orange!80!black] coordinates {(1,0.0282) (2,0.0309) (3,0.0405) (4,0.0285) (5,0.0300) (6,0.0373) (7,0.0193) (8,0.0064) (9,0.0183) (10,0.0187) (11,0.0204) (12,0.0344) (13,0.0201) (14,0.0226)};
+\draw[dashed,blue!70!black] (axis cs:0.4,0.0235) -- (axis cs:14.6,0.0235);
+\draw[dashed,orange!80!black] (axis cs:0.4,0.0254) -- (axis cs:14.6,0.0254);
 \legend{Pearson,Spearman}
 \end{axis}
 \end{tikzpicture}
-\caption[Test Rank IC theo fold]{Test Rank IC theo fold (đường nét đứt: trung bình toàn chuỗi OOS của từng loss).}
+\caption[Test Rank IC theo fold]{Test Rank IC theo fold của cấu hình chính (\texttt{noshuffle}); đường nét đứt là Mean Rank IC toàn chuỗi OOS ($0{,}0235$ với Pearson và $0{,}0254$ với Spearman).}
 \label{fig:foldic}
+\end{figure}
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.96\textwidth]{images/pearson_training_curves.png}\\[6pt]
+\includegraphics[width=0.96\textwidth]{images/spearman_training_curves.png}
+\caption[Đường cong huấn luyện qua 14 fold]{Diễn biến huấn luyện và kiểm định qua 14 fold của \texttt{noshuffle}: trên là \texttt{pearson}, dưới là \texttt{spearman} (train loss, Val Rank IC theo epoch, đối chiếu Val IC -- Test IC và số epoch trước khi early stopping).}
+\label{fig:train_curves}
 \end{figure}
 
 \subsection{Kết quả tổng hợp trên chuỗi OOS}
 \begin{table}[H]\centering\small
-\caption{Chất lượng tín hiệu trên toàn chuỗi OOS 2010--2024.}
+\caption{Chất lượng tín hiệu trên toàn chuỗi OOS 2010--2024 (\texttt{Gate + No-Shuffle}).}
 \label{tab:agg}
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}lcc@{}}
 \toprule
 \textbf{Chỉ số} & \textbf{Pearson} & \textbf{Spearman}\\\midrule
-Mean Rank IC & 0,0214 & \textbf{0,0258}\\
-ICIR (quy năm) & 2,21 & \textbf{2,30}\\
-Độ lệch chuẩn Rank IC ngày & 0,154 & 0,178\\
-Thống kê $t$ (xấp xỉ, $T\approx3.774$) & 8,6 & 8,9\\
-Số fold có Test IC $>0$ & 13/14 & \textbf{14/14}\\
-Độ lệch chuẩn Test IC giữa các fold & 0,0113 & 0,0102\\
-Test IC thấp nhất / cao nhất & $-0{,}0002$ / $0{,}0420$ & $0{,}0076$ / $0{,}0437$\\
-Mean Val IC & 0,0288 & 0,0318\\
-Tỷ lệ Test IC / Val IC & 0,74 & 0,81\\
-Tương quan Val IC -- Test IC (qua 14 fold) & 0,30 & $-0{,}03$\\
+Mean Rank IC & 0,0235 & \textbf{0,0254}\\
+ICIR (quy năm) & \textbf{2,90} & 2,82\\
+Độ lệch chuẩn Rank IC ngày & \textbf{0,129} & 0,143\\
+Thống kê $t$ (xấp xỉ, $T\approx3.774$) & \textbf{11,2} & 10,9\\
+Số fold có Test IC $>0$ & \textbf{14/14} & \textbf{14/14}\\
+Độ lệch chuẩn Test IC giữa các fold & \textbf{0,0082} & 0,0091\\
+Test IC thấp nhất / cao nhất & $0{,}0057$ / $0{,}0333$ & $0{,}0064$ / $0{,}0405$\\
+Mean Val IC & 0,0262 & 0,0282\\
+Tỷ lệ Test IC / Val IC & \textbf{0,90} & \textbf{0,90}\\
+Tương quan Val IC -- Test IC (qua 14 fold) & \textbf{0,51} & 0,48\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Ảnh hưởng của Market Gate}
-Để đánh giá đóng góp của gate, cùng quy trình được chạy lại với phiên bản \textbf{No-Gate} (bỏ khối (1), giữ nguyên các thành phần và siêu tham số còn lại).
+\subsection{Nghiên cứu cắt bỏ: Market Gate và thứ tự batch}
+Bảng~\ref{tab:gate} tổng hợp kết quả từ ba notebook thực nghiệm: bản \texttt{No-Gate} (v4, $640$ mã/ngày, warm-start 8 epoch, \texttt{shuffle=True}), bản \texttt{Gate + Shuffle} (v5, $1000$ mã/ngày, cold-start 20 epoch, \texttt{shuffle=True}) và bản \texttt{Gate + No-Shuffle} (v5, \texttt{shuffle=False}).
 
 \begin{table}[H]\centering\small
-\caption{So sánh mô hình có và không có Market Gate trên chuỗi OOS 2010--2024.}
+\caption{So sánh các cấu hình trên toàn chuỗi OOS 2010--2024 (14/14 fold đều đạt Test IC dương).}
 \label{tab:gate}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}l|cc|cc@{}}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{@{}l|ccc|ccc@{}}
 \toprule
-& \multicolumn{2}{c|}{\textbf{Pearson}} & \multicolumn{2}{c}{\textbf{Spearman}}\\
-& No-Gate & Gate & No-Gate & Gate\\\midrule
-Mean Rank IC & 0,0193 & \textbf{0,0214} & 0,0209 & \textbf{0,0258}\\
-ICIR (quy năm) & 1,96 & \textbf{2,21} & 1,91 & \textbf{2,30}\\
-Thay đổi Mean Rank IC & \multicolumn{2}{c|}{$+11\%$} & \multicolumn{2}{c}{$+23\%$}\\
+& \multicolumn{3}{c|}{\textbf{Pearson (z-clip)}} & \multicolumn{3}{c}{\textbf{Spearman (soft-rank)}}\\
+\textbf{Cấu hình} & Mean IC & ICIR & Test/Val & Mean IC & ICIR & Test/Val\\\midrule
+No-Gate (v4, $640$, warm) & 0,0193 & 1,96 & 0,71 & 0,0209 & 1,91 & 0,76\\
+Gate + Shuffle (v5, $1000$, cold) & 0,0213 & 2,41 & 0,80 & 0,0249 & \textbf{2,86} & 0,85\\
+Gate + No-Shuffle (v5, $1000$, cold) & \textbf{0,0235} & \textbf{2,90} & \textbf{0,90} & \textbf{0,0254} & 2,82 & \textbf{0,90}\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Phân tích}
-\paragraph{Tín hiệu dương và tương đối bền vững theo thời gian.} Cả hai cấu hình đạt Mean Rank IC dương trên 15 năm OOS với ICIR trên $2{,}2$. Thống kê $t$ xấp xỉ $8{,}6$--$8{,}9$ cho thấy khả năng kết quả chỉ do ngẫu nhiên là thấp, trong phạm vi giả định các ngày gần độc lập. Tín hiệu cũng không tập trung vào một giai đoạn đơn lẻ: Spearman có Test IC dương ở cả 14 fold, Pearson ở 13/14 fold (fold âm duy nhất có giá trị xấp xỉ $0$). Kết quả này phù hợp với Fundamental Law: lợi thế trên từng mã nhỏ ($\mathrm{IC}\approx0{,}02$) nhưng được lặp lại tương đối nhất quán trên khoảng 1000 mã mỗi ngày.
+\paragraph{Tín hiệu mạnh và ổn định qua cả 14 fold.} Cả hai hàm loss ở cấu hình chính đều đạt Test IC dương ở toàn bộ \textbf{14/14 fold} trong suốt 15 năm OOS (2010--2024), với Mean Rank IC đạt $0{,}0235$ (Pearson) và $0{,}0254$ (Spearman), ICIR quy năm đạt $2{,}82$--$2{,}90$ và thống kê $t \approx 10{,}9$--$11{,}2$. Kết quả này phù hợp với Fundamental Law: lợi thế xếp hạng trên từng mã nhỏ ($\mathrm{IC}\approx 0{,}024$--$0{,}025$) nhưng lặp lại ổn định trên $K=1000$ mã mỗi ngày.
 
-\paragraph{Spearman nhỉnh hơn Pearson.} Spearman soft-rank cho Mean Rank IC cao hơn khoảng $21\%$, ICIR cao hơn và tốt hơn ở 8/14 fold. Điều này phù hợp với lập luận rằng Spearman loss tối ưu gần hơn với đại lượng được đánh giá (tương quan hạng), trong khi Pearson loss vẫn chịu ảnh hưởng của độ lớn nhãn dù đã giới hạn. Tuy nhiên, độ lệch chuẩn Rank IC ngày của Spearman cũng lớn hơn ($0{,}178$ so với $0{,}154$), và kiểm định $t$ ghép cặp trên 14 fold chỉ cho $t\approx1{,}4$; với một seed, chênh lệch này chưa đủ cơ sở để kết luận là có ý nghĩa thống kê.
+\paragraph{So sánh Pearson và Spearman.} Spearman soft-rank cho Mean Rank IC cao hơn Pearson khoảng $8\%$ ($0{,}0254$ so với $0{,}0235$) và tốt hơn ở 11/14 fold trong cấu hình \texttt{noshuffle}, phù hợp với nhận định rằng tối ưu hóa trực tiếp tương quan hạng gần với thước đo đánh giá hơn. Ngược lại, Pearson đạt độ lệch chuẩn Rank IC ngày thấp hơn ($0{,}129$ so với $0{,}143$), nên cho ICIR nhỉnh hơn nhẹ trong bản \texttt{noshuffle} ($2{,}90$ so với $2{,}82$), còn ở bản \texttt{shuffle} thì Spearman vượt trội rõ rệt ($2{,}86$ so với $2{,}41$).
 
-\paragraph{Market Gate cải thiện chất lượng tín hiệu.} Thêm gate làm Mean Rank IC tăng khoảng $11\%$ với Pearson và $23\%$ với Spearman, đồng thời ICIR tăng từ khoảng $1{,}9$--$2{,}0$ lên $2{,}2$--$2{,}3$. Kết quả này ủng hộ giả thuyết của MASTER rằng giá trị dự báo của features thay đổi theo chế độ thị trường. Một cách giải thích bổ sung là RankGauss đã loại bỏ thông tin về mặt bằng chung của thị trường khỏi features của từng mã, và gate cung cấp lại một phần thông tin này dưới dạng có kiểm soát. Do gate chỉ thêm $580$ tham số (khoảng $0{,}4\%$ mô hình), mức cải thiện khó được giải thích chủ yếu bằng việc tăng dung lượng mô hình. Dù vậy, đây là so sánh trên một seed, nên cần thêm thí nghiệm nhiều seed để đánh giá độ ổn định của mức cải thiện.
-
-\paragraph{Khoảng cách validation--test và giới hạn của early stopping.} Test IC chỉ bằng khoảng $74\%$--$81\%$ Val IC, và tương quan giữa Val IC và Test IC qua các fold yếu ($0{,}30$ với Pearson, xấp xỉ $0$ với Spearman), như thể hiện ở Hình~\ref{fig:valtest}. Nói cách khác, một fold có validation tốt chưa chắc có test tốt: fold 07 có Val IC cao nhất của Pearson ($0{,}0431$) nhưng Test IC chỉ $0{,}0200$. Có thể có hai nguyên nhân. Thứ nhất, việc chọn epoch có Val IC cao nhất là một dạng chọn lọc, nên Val IC tại epoch đó có xu hướng bị đánh giá cao hơn thực tế (\textit{winner's curse}). Thứ hai, cửa sổ validation 400 phiên và đoạn test kế tiếp có thể thuộc các chế độ thị trường khác nhau. Việc phần lớn fold dừng ở epoch 1--7 cũng gợi ý rằng, với SNR thấp, mô hình bắt đầu overfit khá sớm.
+\paragraph{Tác động của thứ tự batch (No-Shuffle vs.\ Shuffle) và cold-start.} Giữ nguyên thứ tự thời gian của các ngày train (\texttt{shuffle=False}) giúp tăng Mean Rank IC ở cả hai loss ($0{,}0235$ vs.\ $0{,}0213$ với Pearson; $0{,}0254$ vs.\ $0{,}0249$ với Spearman) và nâng tỷ lệ Test/Val lên $0{,}90$. Nguyên nhân hợp lý là khi kết hợp với time-decay weighting, việc duyệt tuần tự đến hết ngày train cuối cùng tạo ra một \textit{implicit recency curriculum}, giúp trạng thái cuối của mỗi epoch bám sát chế độ thị trường cận kề đoạn validation/test. Đồng thời, huấn luyện cold-start 20 epoch với đủ $1000$ mã giúp các fold đầu hội tụ sâu hơn (Ep trung bình $13{,}0$--$14{,}9$), cải thiện rõ rệt khả năng tổng quát hóa: tỷ lệ Test/Val tăng từ $0{,}71$--$0{,}76$ lên $0{,}90$ và tương quan Val--Test đạt $0{,}48$--$0{,}51$ (Hình~\ref{fig:valtest}).
 
 \begin{figure}[H]\centering
 \begin{tikzpicture}
-\begin{axis}[width=0.62\textwidth,height=5.6cm,xmin=0.015,xmax=0.048,ymin=-0.003,ymax=0.047,
+\begin{axis}[width=0.62\textwidth,height=5.4cm,xmin=0.011,xmax=0.042,ymin=0.003,ymax=0.043,
   xlabel={Val IC (epoch tốt nhất)},ylabel={Test IC},tick label style={font=\scriptsize},label style={font=\small},
   legend style={font=\scriptsize,at={(0.02,0.98)},anchor=north west},grid=major,grid style={gray!15},
   scaled ticks=false,
   xticklabel style={/pgf/number format/fixed,/pgf/number format/precision=2,/pgf/number format/use comma},
   yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=2,/pgf/number format/use comma}]
-\addplot[only marks,mark=*,blue!70!black] coordinates {(0.0316,0.0151) (0.0188,0.0217) (0.0275,0.0348) (0.0362,0.0246) (0.0293,0.0353) (0.0360,0.0420) (0.0431,0.0200) (0.0277,0.0097) (0.0177,0.0186) (0.0229,0.0121) (0.0199,0.0196) (0.0253,-0.0002) (0.0340,0.0308) (0.0335,0.0156)};
-\addplot[only marks,mark=triangle*,mark size=2.6pt,orange!85!black] coordinates {(0.0376,0.0256) (0.0263,0.0294) (0.0285,0.0437) (0.0462,0.0234) (0.0289,0.0369) (0.0357,0.0338) (0.0399,0.0180) (0.0244,0.0076) (0.0210,0.0259) (0.0339,0.0399) (0.0411,0.0159) (0.0288,0.0260) (0.0276,0.0172) (0.0256,0.0181)};
-\addplot[dashed,gray,domain=0.015:0.047] {x};
+\addplot[only marks,mark=*,blue!70!black] coordinates {(0.0330,0.0333) (0.0203,0.0259) (0.0304,0.0315) (0.0329,0.0234) (0.0345,0.0280) (0.0347,0.0331) (0.0363,0.0161) (0.0214,0.0057) (0.0133,0.0133) (0.0134,0.0189) (0.0196,0.0219) (0.0267,0.0325) (0.0254,0.0197) (0.0248,0.0254)};
+\addplot[only marks,mark=triangle*,mark size=2.6pt,orange!85!black] coordinates {(0.0345,0.0282) (0.0240,0.0309) (0.0329,0.0405) (0.0373,0.0285) (0.0308,0.0300) (0.0361,0.0373) (0.0389,0.0193) (0.0224,0.0064) (0.0145,0.0183) (0.0171,0.0187) (0.0242,0.0204) (0.0259,0.0344) (0.0283,0.0201) (0.0272,0.0226)};
+\addplot[dashed,gray,domain=0.011:0.041] {x};
 \legend{Pearson,Spearman,Test $=$ Val}
 \end{axis}
 \end{tikzpicture}
-\caption[Quan hệ giữa Val IC và Test IC]{Val IC và Test IC theo fold. Phần lớn điểm nằm dưới đường chéo (test thấp hơn validation) và gần như không có xu hướng tuyến tính rõ ràng.}
+\caption[Quan hệ giữa Val IC và Test IC]{Val IC và Test IC theo fold của \texttt{noshuffle}: tương quan đạt $0{,}51$ (Pearson) và $0{,}48$ (Spearman), tỷ lệ Test/Val đạt $0{,}90$.}
 \label{fig:valtest}
 \end{figure}
 
-\paragraph{Các giai đoạn yếu.} Fold 08 (07/2017 -- 08/2018) là giai đoạn yếu nhất ở cả hai loss (Test IC $<0{,}01$); giai đoạn này có thời kỳ biến động thấp kéo dài và đợt tăng biến động đột ngột đầu năm 2018. Ở fold 12 (10/2021 -- 11/2022), Pearson gần như không có tín hiệu trong khi Spearman vẫn đạt $0{,}026$; giai đoạn này trùng với chu kỳ tăng lãi suất và sự điều chỉnh mạnh của nhóm cổ phiếu tăng trưởng. Các nhận định về bối cảnh thị trường ở đây mang tính mô tả, chưa phải kết luận nhân quả. Tương quan giữa Test IC của hai loss qua các fold là $0{,}42$: hai mô hình cùng gặp khó khăn ở một số giai đoạn nhưng không hoàn toàn trùng nhau, gợi ý tiềm năng của việc kết hợp (ensemble).
+\paragraph{Đóng góp của Market Gate và các giai đoạn thị trường.} So với baseline \texttt{No-Gate} (v4), cấu hình đầy đủ cải thiện Mean Rank IC $+22\%$ và ICIR $+48\%$ (từ $1{,}91$--$1{,}96$ lên $2{,}82$--$2{,}90$). Tuy lưu ý rằng bước nhảy này gộp cả đóng góp của Market Gate ($580$ tham số) lẫn nâng cấp huấn luyện (đủ $1000$ mã và cold-start 20 epoch). Qua các chu kỳ, fold 08 (07/2017 -- 08/2018) là giai đoạn yếu nhất ở cả hai loss (Test IC $\approx 0{,}006$), còn fold 12 (10/2021 -- 11/2022, chu kỳ tăng lãi suất) vẫn giữ được tín hiệu cao ($0{,}0325$--$0{,}0344$).
 
 \subsection{Hạn chế}
 Nghiên cứu hiện tại còn bốn hạn chế chính cần được khắc phục trong giai đoạn tiếp theo:
 \begin{enumerate}
-    \item \textbf{Single-seed evaluation.} Mỗi cấu hình được huấn luyện với một \textit{random seed} cố định ($\mathrm{SEED}=42$). Vì mức chênh lệch giữa một số biến thể (chẳng hạn Spearman so với Pearson, $t \approx 1{,}4$ qua 14 fold) còn khiêm tốn, cần chạy lặp trên nhiều seed để lượng hóa phương sai do khởi tạo trọng số và thứ tự lấy mẫu.
-    \item \textbf{Thiếu đối chiếu với các baseline.} Báo cáo mới thực hiện \textit{ablation} cho khối Market Gate (No-Gate vs.\ Gate), chưa so sánh trực tiếp trên cùng dữ liệu point-in-time với các mô hình tuyến tính chuẩn hóa (Ridge/Lasso), mô hình cây tăng cường gradient (LightGBM), hay các kiến trúc đơn lẻ (LSTM thuần, Transformer thuần).
+    \item \textbf{Single-seed evaluation.} Mỗi cấu hình được huấn luyện với một \textit{random seed} cố định ($\mathrm{SEED}=42$). Cần chạy lặp trên nhiều seed để lượng hóa phương sai do khởi tạo trọng số.
+    \item \textbf{Chưa cô lập hoàn toàn từng biến thể trong ablation No-Gate.} Bản \texttt{No-Gate} chạy ở thiết lập v4 ($640$ mã, warm-start 8 epoch), khác với thiết lập v5 ($1000$ mã, cold-start 20 epoch) của hai bản có Gate; đồng thời chưa đối chiếu với các baseline phi tuyến/tuyến tính khác (Ridge, LightGBM, LSTM thuần, Transformer thuần).
     \item \textbf{Feature space thuần túy giá--khối lượng.} 20 features hiện tại chỉ khai thác dữ liệu OHLCV; chưa tích hợp các nhân tố cơ bản từ báo cáo tài chính, nhóm ngành (GICS) hay tín hiệu vĩ mô bổ sung.
     \item \textbf{Chưa đánh giá khâu portfolio construction.} Giai đoạn 1 dừng ở việc kiểm định chất lượng tín hiệu xếp hạng (Rank IC, ICIR); khả năng sinh lời ròng khi chuyển $\mathbf{s}_t$ thành trọng số danh mục long--short còn phụ thuộc vào \textit{turnover}, chi phí giao dịch, \textit{slippage} và các ràng buộc trung hòa rủi ro nhân tố/ngành.
 \end{enumerate}
@@ -871,7 +882,7 @@ Nghiên cứu hiện tại còn bốn hạn chế chính cần được khắc p
     \item Xây dựng quy trình dữ liệu point-in-time cho universe Russell 1000 giai đoạn 2000--2024, tích hợp delisting return và bộ lọc thanh khoản có vùng đệm, chọn $K=1000$ mã qua 103 chu kỳ tái cơ cấu.
     \item Thiết kế hệ 20 features giá--khối lượng đa khung thời gian, chuẩn hóa RankGauss theo ngày, cùng vector trạng thái thị trường 28 chiều chỉ dùng thông tin quá khứ.
     \item Đề xuất kiến trúc Market Gate $\to$ LSTM $\to$ Cross-Sectional Transformer có tính permutation-equivariant, không dùng positional hay ID embedding.
-    \item Trên 15 năm OOS walk-forward, mô hình đạt Mean Rank IC $0{,}0258$ và ICIR $2{,}30$ (Spearman), với Test IC dương ở cả 14 fold; Market Gate giúp Mean Rank IC tăng khoảng $11\%$--$23\%$ so với phiên bản không gate trong thí nghiệm một seed.
+    \item Trên 15 năm OOS walk-forward, cấu hình chính (\texttt{Gate + No-Shuffle}) đạt Test IC dương ở cả \textbf{14/14 fold}, với Mean Rank IC $0{,}0254$ / ICIR $2{,}82$ (Spearman) và Mean Rank IC $0{,}0235$ / ICIR $2{,}90$ (Pearson).
 \end{enumerate}
 
 \subsection{Định hướng phát triển}
