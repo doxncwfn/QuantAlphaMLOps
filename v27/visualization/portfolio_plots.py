@@ -13,7 +13,7 @@ import pandas as pd
 
 from v27.config import PortfolioBacktestConfig
 from v27.data.bundle import V7DataBundle
-from v27.visualization.style import save_fig
+from v27.visualization.style import save_fig, shade_crisis_eras
 
 
 def plot_portfolio_evaluation_suite(
@@ -77,8 +77,10 @@ def plot_portfolio_evaluation_suite(
     ax1.set_title("v27 Ensemble vs Best Individual & Benchmark (Strict OOS 2011-2024)")
     ax1.legend(loc="upper left", fontsize=8, ncol=2)
     ax1.grid(alpha=0.25)
+    shade_crisis_eras(ax1, add_labels=True)
     ax2.set_ylabel("Drawdown (%)")
     ax2.grid(alpha=0.25)
+    shade_crisis_eras(ax2)
     save_fig(fig, fig_dir / "fig08_01_cum_nav_and_dd.png")
 
     # Fig 08_02: Rolling 252d Sharpe & Rolling 63d Vol
@@ -104,8 +106,10 @@ def plot_portfolio_evaluation_suite(
     )
     ax1.legend(loc="upper left", fontsize=8, ncol=2)
     ax1.grid(alpha=0.25)
+    shade_crisis_eras(ax1, add_labels=True)
     ax2.set_ylabel("Rolling 63d Ann. Vol (%)")
     ax2.grid(alpha=0.25)
+    shade_crisis_eras(ax2)
     save_fig(fig, fig_dir / "fig08_02_rolling_sharpe_and_vol.png")
 
     # Fig 08_03: Frontier & Transaction Cost Decay
@@ -195,6 +199,7 @@ def plot_portfolio_evaluation_suite(
             f"Walk-Forward Allocation History ({best_hier if all_entries[best_hier]['schedule'] is not None else best_dyn})"
         )
         ax.legend(loc="upper left", fontsize=7.5, ncol=3)
+        shade_crisis_eras(ax, add_labels=True)
     save_fig(fig, fig_dir / "fig08_04_allocation_weights.png")
 
     # Fig 08_05: Fold Stability & FF6 Exposures

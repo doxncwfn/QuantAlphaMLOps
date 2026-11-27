@@ -12,7 +12,7 @@ import pandas as pd
 from v27.backtest.simulator import backtest_weights_daily
 from v27.config import PortfolioBacktestConfig
 from v27.data.bundle import V7DataBundle
-from v27.visualization.style import save_fig
+from v27.visualization.style import save_fig, shade_crisis_eras
 
 
 def _comp_pnl_m(r: pd.Series, book_m: float) -> pd.Series:
@@ -96,6 +96,7 @@ def plot_pnl_dollar_suite(
     ax1.set_ylabel("Compounded PnL ($M)")
     ax1.legend(loc="upper left", fontsize=8.5)
     ax1.grid(alpha=0.25)
+    shade_crisis_eras(ax1, add_labels=True)
 
     bt_sc = bts["G_ScoreBest_G1 (VolTgt9%)"]
     for k, lbl, col, ls in [
@@ -118,6 +119,7 @@ def plot_pnl_dollar_suite(
     ax2.set_ylabel("Compounded PnL ($M)")
     ax2.legend(loc="upper left", fontsize=8.5)
     ax2.grid(alpha=0.25)
+    shade_crisis_eras(ax2, add_labels=True)
 
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b", "#7f7f7f"]
     for (nm, btd), col in zip(bts.items(), colors):
@@ -146,6 +148,7 @@ def plot_pnl_dollar_suite(
     ax3.set_ylabel("Compounded Net PnL ($M)")
     ax3.legend(loc="upper left", fontsize=8)
     ax3.grid(alpha=0.25)
+    shade_crisis_eras(ax3, add_labels=True)
 
     ann_df = (
         pd.DataFrame(
@@ -231,6 +234,8 @@ def plot_pnl_dollar_suite(
     bx2.legend(loc="upper left", fontsize=8)
     bx1.grid(alpha=0.25)
     bx2.grid(alpha=0.25)
+    shade_crisis_eras(bx1, add_labels=True)
+    shade_crisis_eras(bx2, add_labels=True)
 
     bt_b5 = bts["B5_ScoreEW_Rank_All3"]
     bt_fl5, bt_b5_5 = bts_5["G_HierBest_G5 (Flagship)"], bts_5["B5_ScoreEW_Rank_All3"]
@@ -274,4 +279,6 @@ def plot_pnl_dollar_suite(
     bx4.legend(loc="upper left", fontsize=8.5)
     bx3.grid(alpha=0.25)
     bx4.grid(alpha=0.25)
+    shade_crisis_eras(bx3, add_labels=True)
+    shade_crisis_eras(bx4, add_labels=True)
     save_fig(fig, fig_dir / "fig08_07_pnl_compounded_vs_fixed20m.png")

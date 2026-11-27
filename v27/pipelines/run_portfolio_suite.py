@@ -41,6 +41,7 @@ from v27.optimization.method_d_opt import build_method_d_risk_and_opt
 from v27.portfolio.constructors import select_orthogonal_subset
 from v27.risk.method_g_overlay import build_method_g_risk_overlays
 from v27.signal_analysis.alpha_decay import compute_alpha_decay
+from v27.signal_analysis.decile_monotonicity import audit_decile_monotonicity_all
 from v27.signal_analysis.horizon_audit import (
     audit_risk_t5_horizon_accounting,
     audit_signal_1d_vs_5d,
@@ -52,6 +53,8 @@ from v27.signal_analysis.score_persistence import (
 from v27.visualization.explainability_plots import (
     plot_alpha_decay,
     plot_corr_overlap_clusters,
+    plot_decile_monotonicity,
+    plot_ic_and_decay_profile,
     plot_master_gate_clusters,
     plot_regime_heatmap,
     plot_risk_and_beta_alpha,
@@ -91,6 +94,17 @@ def main() -> None:
             f"      Parity max |Delta_NetSh@2bps| vs grand_summary_v7 = {max_d_sh:.4f}"
         )
     audit_signal_1d_vs_5d(bundle, paths.tables_dir, ann_days=bt_cfg.ann_days)
+    audit_decile_monotonicity_all(bundle, paths.tables_dir, ann_days=bt_cfg.ann_days)
+    plot_ic_and_decay_profile(
+        bundle,
+        paths.figures_dir / "fig03_ic_and_decay_profile.png",
+        ann_days=bt_cfg.ann_days,
+    )
+    plot_decile_monotonicity(
+        bundle,
+        paths.figures_dir / "fig03_decile_monotonicity.png",
+        ann_days=bt_cfg.ann_days,
+    )
     audit_risk_t5_horizon_accounting(bundle, paths.tables_dir, bt_cfg)
     for exp in EXPERIMENTS_V7:
         df_dec, ic_lag = compute_alpha_decay(

@@ -9,9 +9,17 @@ import numpy as np
 import pandas as pd
 from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
 from scipy.spatial.distance import squareform
+from scipy.stats import kendalltau, spearmanr
 
-from v27.config import CANDIDATES_24
-from v27.visualization.style import CLUSTER_COLORS, EXP_COLORS, save_fig
+from v27.config import CANDIDATES_24, EXPERIMENTS_V7
+from v27.data.bundle import V7DataBundle
+from v27.signal_analysis.decile_monotonicity import compute_decile_monotonicity
+from v27.visualization.style import (
+    CLUSTER_COLORS,
+    EXP_COLORS,
+    save_fig,
+    shade_crisis_eras,
+)
 
 
 def plot_master_gate_clusters(
@@ -29,6 +37,7 @@ def plot_master_gate_clusters(
     ax1.set_ylabel("Mean Multiplier (Neutral = 1.0)")
     ax1.legend(fontsize=8.5)
     ax1.grid(alpha=0.25)
+    shade_crisis_eras(ax1, add_labels=True)
 
     means = cluster_df.mean(axis=0)
     cols_b = [CLUSTER_COLORS.get(c, "#1f77b4") for c in means.index]
@@ -171,6 +180,7 @@ def plot_rolling_correlations(net_df: pd.DataFrame, out_path: Path) -> Path:
         ax.set_ylim(-0.6, 1.05)
         ax.grid(alpha=0.25)
         ax.legend(fontsize=7.5)
+        shade_crisis_eras(ax)
     fig.suptitle(
         "Rolling Pairwise Net Return Correlations (60d / 126d / 252d)",
         fontsize=13,
@@ -255,4 +265,121 @@ def plot_regime_heatmap(reg_sh: pd.DataFrame, out_path: Path) -> Path:
             )
     fig.colorbar(im_r, ax=ax, fraction=0.03, pad=0.02, label="Net Sharpe @ 2bps")
     ax.set_title("Regime-Conditioned Net Sharpe (@ 2bps) Across All 24 Candidates")
+    return save_fig(fig, out_path, dpi=150)
+
+
+def plot_ic_and_decay_profile(
+    bundle: V7DataBundle, out_path: Path, ann_days: int = 252
+) -> Path:
+    """Plot Cumulative Daily Rank IC, Rolling 60d Mean IC, and Execution-Lag Alpha Decay."""
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(13, 11.5))
+    lags = [0, 1, 2, 3, 5, 10]
+    for exp in EXPERIMENTS_V7:
+        col = EXP_COLORS.get(exp, "#1f77b4")
+        sc = bundle.scores[exp]
+        act = sc.notna()
+        ic_ser = (
+            sc.rank(axis=1)
+            .corrwith(bundle.ret1d_df.where(act).rank(axis=1), axis=1)
+            .dropna()
+        )
+        mu_ic = float(ic_ser.mean())
+        sd_ic = float(ic_ser.std(ddof=1)) + 1e-12
+        t_st = mu_ic / (sd_ic / np.sqrt(max(len(ic_ser), 1)))
+        icir = mu_ic / sd_ic * np.sqrt(ann_days)
+
+        ax1.plot(
+            ic_ser.index,
+            ic_ser.cumsum(),
+            color=col,
+            lw=1.6,
+            label=f"{exp} (IC={mu_ic:+.4f}, t={t_st:+.2f}, ICIR={icir:+.2f})",
+        )
+        r60 = ic_ser.rolling(60, min_periods=20).mean()
+        ax2.plot(r60.index, r60, color=col, lw=1.2, label=exp)
+
+        lag_ics = [
+            float(
+                sc.rank(axis=1)
+                .corrwith(bundle.ret1d_df.shift(-lg).where(act).rank(axis=1), axis=1)
+                .dropna()
+                .mean()
+            )
+            for lg in lags
+        ]
+        ax3.plot(lags, lag_ics, marker="o", color=col, lw=1.8, label=exp)
+
+    ax1.axhline(0.0, color="black", ls="--", lw=0.8)
+    ax1.set_title("Cumulative Daily Spearman Rank IC (Pooled OOS)")
+    ax1.set_ylabel("Cumulative IC")
+    ax1.legend(loc="upper left", fontsize=8.5)
+    ax1.grid(alpha=0.25)
+    shade_crisis_eras(ax1, add_labels=True)
+
+    ax2.axhline(0.0, color="black", ls="--", lw=0.8)
+    ax2.set_title("Rolling 60-Day Mean Spearman Rank IC (Regime Stability)")
+    ax2.set_ylabel("60D Mean IC")
+    ax2.legend(loc="upper left", fontsize=8.5)
+    ax2.grid(alpha=0.25)
+    shade_crisis_eras(ax2)
+
+    ax3.axhline(0.0, color="black", ls="--", lw=0.8)
+    ax3.set_title("Alpha Decay Profile: Mean Rank IC vs Execution Lag (Trading Days)")
+    ax3.set_xlabel("Execution Lag (Trading Days)")
+    ax3.set_ylabel("Mean Spearman IC")
+    ax3.set_xticks(lags)
+    ax3.legend(loc="upper right", fontsize=8.5)
+    ax3.grid(alpha=0.25)
+    return save_fig(fig, out_path, dpi=150)
+
+
+def plot_decile_monotonicity(
+    bundle: V7DataBundle, out_path: Path, ann_days: int = 252
+) -> Path:
+    """Plot D1..D10 annualized return bars and Spearman/Kendall monotonicity across experiments."""
+    n_exp = len(EXPERIMENTS_V7)
+    fig, axes = plt.subplots(1, n_exp, figsize=(5.8 * n_exp, 5.2), sharey=True)
+    if n_exp == 1:
+        axes = [axes]
+    cmap = plt.get_cmap("coolwarm")
+    bar_cols = [cmap(i / 9.0) for i in range(10)]
+
+    for ax, exp in zip(axes, EXPERIMENTS_V7):
+        dec_df, st = compute_decile_monotonicity(
+            bundle.scores[exp], bundle.ret1d_df, ann_days=ann_days
+        )
+        vals = dec_df["AnnRet(%)"].to_numpy(dtype=float)
+        kt, _ = kendalltau(np.arange(1, 11), vals)
+        sp, _ = spearmanr(np.arange(1, 11), vals)
+        bars = ax.bar(
+            np.arange(1, 11),
+            vals,
+            color=bar_cols,
+            edgecolor="black",
+            linewidth=0.6,
+            alpha=0.92,
+        )
+        for b, v in zip(bars, vals):
+            ax.text(
+                b.get_x() + b.get_width() / 2.0,
+                v + (0.4 if v >= 0 else -1.2),
+                f"{v:+.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=7.5,
+            )
+        ax.axhline(0.0, color="black", lw=0.8)
+        ax.set_xticks(np.arange(1, 11))
+        ax.set_xlabel("Prediction Decile (1=Short, 10=Long)")
+        ax.set_title(
+            f"{exp}\nSp={sp:+.3f} | Kt={kt:+.3f} | Step={st['Adj_Step_Rate(%)']:.0f}%",
+            fontsize=9.5,
+        )
+        ax.grid(axis="y", alpha=0.25)
+    axes[0].set_ylabel("Mean Annualized Return (%)")
+    fig.suptitle(
+        "Decile Portfolio Monotonicity Spreads (OOS Daily Rebalance)",
+        fontsize=12,
+        fontweight="bold",
+    )
     return save_fig(fig, out_path, dpi=150)

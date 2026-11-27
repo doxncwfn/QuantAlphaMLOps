@@ -9,7 +9,12 @@ from typing import Any
 
 import yaml
 
-DEFAULT_CONFIG_PATH = Path(os.environ.get("V27_CONFIG", "config/v27.yaml"))
+DEFAULT_CONFIG_PATH = Path(
+    os.environ.get(
+        "V27_CONFIG",
+        str(Path(__file__).resolve().parent.parent / "config" / "v27.yaml"),
+    )
+)
 
 
 def _load_yaml(path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:

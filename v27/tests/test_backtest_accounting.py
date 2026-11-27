@@ -10,6 +10,7 @@ import pandas as pd
 from v27.backtest.metrics import compounded_dd_episodes, lo_hac_sharpe
 from v27.backtest.simulator import backtest_weights_daily
 from v27.backtest.statistics import circular_block_bootstrap, ledoit_wolf_sharpe_test
+from v27.signal_analysis.decile_monotonicity import compute_decile_monotonicity
 
 
 def test_backtest_daily_mtm_and_allin_accounting():
@@ -51,3 +52,19 @@ def test_drawdown_episodes_and_lw_test():
     boot = circular_block_bootstrap(a, n_boot=100, block_len=21, seed=7)
     assert boot["Sh_CI_Lo"] < boot["Sh_CI_Hi"]
     assert lo_hac_sharpe(pd.Series(a)) > 0.0
+
+
+def test_decile_monotonicity_detects_monotonic_signal():
+    dates = pd.date_range("2020-01-01", periods=10, freq="B")
+    cols = np.arange(50)
+    scores = pd.DataFrame(
+        np.tile(np.linspace(-1.0, 1.0, 50), (10, 1)), index=dates, columns=cols
+    )
+    ret1d = pd.DataFrame(
+        np.tile(np.linspace(-0.02, 0.02, 50), (10, 1)), index=dates, columns=cols
+    )
+    dec_df, st = compute_decile_monotonicity(scores, ret1d)
+    assert len(dec_df) == 10
+    assert st["Mono_Spearman"] > 0.99
+    assert st["Adj_Step_Rate(%)"] == 100.0
+    assert st["D10_Minus_D1_Ann(%)"] > 0.0
