@@ -59,22 +59,30 @@ class PeriodConfig(_Strict):
     end: dt.date
 
     @model_validator(mode="after")
-    def _ordered(self) -> "PeriodConfig":
+    def _ordered(self) -> PeriodConfig:
         if self.end <= self.start:
             raise ValueError("period.end must be after period.start")
         return self
 
 
 class DataSpec(_Strict):
-    dataset_name: str = Field(description="names the dataset file data_root/datasets/<dataset_name>.duckdb")
+    dataset_name: str = Field(
+        description="names the dataset file data_root/datasets/<dataset_name>.duckdb"
+    )
     source: Component
     period: PeriodConfig
-    warmup_days: int = Field(400, ge=0, description="calendar days loaded before period.start for feature warm-up")
+    warmup_days: int = Field(
+        400,
+        ge=0,
+        description="calendar days loaded before period.start for feature warm-up",
+    )
 
 
 class WindowSpec(_Strict):
     lookback: int = Field(60, gt=0)
-    max_missing: int = Field(2, ge=0, description="a slot with more incomplete days in the window is masked")
+    max_missing: int = Field(
+        2, ge=0, description="a slot with more incomplete days in the window is masked"
+    )
     fill: Literal["zero", "ffill"] = "zero"
     transforms: list[Component] = Field(default_factory=list)
 
@@ -88,7 +96,9 @@ class TrainSpec(_Strict):
     lr_factor: float = 0.5
     monitor: Literal["val_ic", "val_loss"] = "val_ic"
     early_stopping_patience: int | None = None
-    min_valid_slots: int = Field(20, ge=2, description="decision dates with fewer labelled slots are skipped")
+    min_valid_slots: int = Field(
+        20, ge=2, description="decision dates with fewer labelled slots are skipped"
+    )
     accelerator: str = "auto"
     num_workers: int = 0
     deterministic: bool = True
@@ -124,7 +134,9 @@ class RunConfig(_Strict):
     split_spec: Component
     train_spec: TrainSpec = Field(default_factory=TrainSpec)
     evaluation_spec: EvaluationSpec = Field(default_factory=EvaluationSpec)
-    backtest_spec: Component = Field(default_factory=lambda: Component(func="placeholder"))
+    backtest_spec: Component = Field(
+        default_factory=lambda: Component(func="placeholder")
+    )
     tracking_spec: TrackingSpec = Field(default_factory=TrackingSpec)
 
     def to_plain(self) -> dict[str, Any]:
@@ -156,7 +168,7 @@ def _read(path: Path) -> dict:
     with path.open() as fh:
         data = yaml.safe_load(fh) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"{path}: top level must be a mapping")
+        raise TypeError(f"{path}: top level must be a mapping")
     return data
 
 
@@ -167,10 +179,16 @@ def _apply_time(data: dict, flag: str, value: dt.date) -> None:
     for key in parents:
         node = node.setdefault(key, {})
         if not isinstance(node, dict):
-            raise ValueError(f"--{flag}: {key!r} in the spec is not a mapping")
+            raise TypeError(f"--{flag}: {key!r} in the spec is not a mapping")
     in_spec = node.get(leaf)
     if in_spec is not None and str(in_spec) != value.isoformat():
-        log.warning("--%s %s overrides %s = %s from the spec", flag, value, ".".join(CLI_TIME_KEYS[flag]), in_spec)
+        log.warning(
+            "--%s %s overrides %s = %s from the spec",
+            flag,
+            value,
+            ".".join(CLI_TIME_KEYS[flag]),
+            in_spec,
+        )
     node[leaf] = value
 
 
@@ -182,7 +200,11 @@ def find_project_root(start: Path) -> Path:
     return start
 
 
-def load_config(path: str | Path, env: str | None = "local", times: dict[str, dt.date | None] | None = None) -> RunConfig:
+def load_config(
+    path: str | Path,
+    env: str | None = "local",
+    times: dict[str, dt.date | None] | None = None,
+) -> RunConfig:
     """Load a spec. times: CLI time parameters (keys of CLI_TIME_KEYS); None values are ignored."""
     path = Path(path).resolve()
     root = find_project_root(path.parent)
@@ -193,11 +215,15 @@ def load_config(path: str | Path, env: str | None = "local", times: dict[str, dt
             raise FileNotFoundError(f"environment overlay not found: {env_file}")
         overlay = _read(env_file)
         if set(overlay) - {"paths"}:
-            raise ValueError(f"{env_file}: an environment file may only set `paths`; put parameters in the spec")
+            raise ValueError(
+                f"{env_file}: an environment file may only set `paths`; put parameters in the spec"
+            )
         data = _deep_merge(data, overlay)
     for flag, value in (times or {}).items():
         if flag not in CLI_TIME_KEYS:
-            raise ValueError(f"{flag!r} cannot be set from the command line; only {sorted(CLI_TIME_KEYS)}")
+            raise ValueError(
+                f"{flag!r} cannot be set from the command line; only {sorted(CLI_TIME_KEYS)}"
+            )
         if value is not None:
             _apply_time(data, flag, value)
 

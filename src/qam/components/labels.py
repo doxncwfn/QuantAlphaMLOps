@@ -36,7 +36,10 @@ def forward_return(
     ids = security_ids(panel)
     ret = dense(panel, "ret_total", calendar, ids)
     close = dense(panel, "close", calendar, ids)
-    present = dense(panel.with_columns(pl.lit(1.0).alias("_row")), "_row", calendar, ids) == 1.0
+    present = (
+        dense(panel.with_columns(pl.lit(1.0).alias("_row")), "_row", calendar, ids)
+        == 1.0
+    )
 
     bad = present & np.isnan(ret)
     log_ret = np.where(np.isnan(ret), 0.0, np.log1p(np.where(np.isnan(ret), 0.0, ret)))
@@ -55,7 +58,11 @@ def forward_return(
         lo, hi = i + offset, i + offset + h
         if hi <= len(calendar):
             value = np.expm1(cum_log[hi] - cum_log[lo])
-            ok = present[hi - 1] & ~np.isnan(ret[hi - 1]) & ((cum_bad[hi] - cum_bad[lo]) == 0)
+            ok = (
+                present[hi - 1]
+                & ~np.isnan(ret[hi - 1])
+                & ((cum_bad[hi] - cum_bad[lo]) == 0)
+            )
             value = np.where(ok, value, np.nan)
         else:
             value = np.full(len(ids), np.nan)
@@ -69,6 +76,10 @@ def forward_return(
             )
         )
     if not frames:
-        return pl.DataFrame(schema={"date": pl.Date, "security_id": pl.Int64, "label": pl.Float64})
+        return pl.DataFrame(
+            schema={"date": pl.Date, "security_id": pl.Int64, "label": pl.Float64}
+        )
     out = pl.concat(frames)
-    return out.with_columns(pl.col("date").cast(pl.Date), pl.col("security_id").cast(pl.Int64)).fill_nan(None)
+    return out.with_columns(
+        pl.col("date").cast(pl.Date), pl.col("security_id").cast(pl.Int64)
+    ).fill_nan(None)

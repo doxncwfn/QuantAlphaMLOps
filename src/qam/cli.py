@@ -17,10 +17,24 @@ from qam.config import load_config
 
 
 def _common(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("config", help="experiment spec, e.g. configs/experiments/baseline_hybrid.yaml")
-    parser.add_argument("--env", default="local", help="overlay configs/env/<env>.yaml (default: local)")
-    parser.add_argument("--start", type=dt.date.fromisoformat, metavar="YYYY-MM-DD", help="data_spec.period.start (wins over the spec)")
-    parser.add_argument("--end", type=dt.date.fromisoformat, metavar="YYYY-MM-DD", help="data_spec.period.end (wins over the spec)")
+    parser.add_argument(
+        "config", help="experiment spec, e.g. configs/experiments/baseline_hybrid.yaml"
+    )
+    parser.add_argument(
+        "--env", default="local", help="overlay configs/env/<env>.yaml (default: local)"
+    )
+    parser.add_argument(
+        "--start",
+        type=dt.date.fromisoformat,
+        metavar="YYYY-MM-DD",
+        help="data_spec.period.start (wins over the spec)",
+    )
+    parser.add_argument(
+        "--end",
+        type=dt.date.fromisoformat,
+        metavar="YYYY-MM-DD",
+        help="data_spec.period.end (wins over the spec)",
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,26 +49,36 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("train", help="new run: train all folds and write predictions")
     _common(p)
     for name in ("evaluate", "backtest"):
-        p = sub.add_parser(name, help=f"run the {name} stage on an existing run directory")
+        p = sub.add_parser(
+            name, help=f"run the {name} stage on an existing run directory"
+        )
         _common(p)
         p.add_argument("--run-dir", required=True, type=Path)
     p = sub.add_parser("run", help="new run: build -> train -> evaluate -> backtest")
     _common(p)
     p.add_argument("--force-build", action="store_true")
-    p = sub.add_parser("gc", help="list (or drop, with --yes) dataset table versions no run uses")
+    p = sub.add_parser(
+        "gc", help="list (or drop, with --yes) dataset table versions no run uses"
+    )
     _common(p)
-    p.add_argument("--yes", action="store_true", help="drop them instead of only listing")
+    p.add_argument(
+        "--yes", action="store_true", help="drop them instead of only listing"
+    )
     sub.add_parser("components", help="list registered components")
 
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
 
     if args.command == "components":
         for kind in registry.KINDS:
             print(f"{kind:10s} {', '.join(registry.names(kind)) or '-'}")
         return 0
 
-    cfg = load_config(args.config, env=args.env, times={"start": args.start, "end": args.end})
+    cfg = load_config(
+        args.config, env=args.env, times={"start": args.start, "end": args.end}
+    )
     from qam import pipeline
 
     if args.command == "validate":

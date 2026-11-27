@@ -49,7 +49,9 @@ def mean_ic(df: pd.DataFrame, min_stocks: int = 20) -> MetricResult:
 
 
 @register("metric", "icir")
-def icir(df: pd.DataFrame, min_stocks: int = 20, periods_per_year: float | None = None) -> MetricResult:
+def icir(
+    df: pd.DataFrame, min_stocks: int = 20, periods_per_year: float | None = None
+) -> MetricResult:
     """mean(IC) / std(IC), times sqrt(periods_per_year) when given."""
     ic = daily_ic(df, min_stocks)
     value = ic.mean() / ic.std() if len(ic) > 1 and ic.std() > 0 else np.nan
@@ -66,7 +68,9 @@ def ic_hit_rate(df: pd.DataFrame, min_stocks: int = 20) -> MetricResult:
 
 
 @register("metric", "decile_spread")
-def decile_spread(df: pd.DataFrame, n: int = 10, cost_bps: float = 0.0, min_stocks: int = 20) -> MetricResult:
+def decile_spread(
+    df: pd.DataFrame, n: int = 10, cost_bps: float = 0.0, min_stocks: int = 20
+) -> MetricResult:
     """Mean label of the top score bucket minus the bottom bucket, per date, net of cost_bps.
 
     Uses the forward label (the legacy version used the same-day return). This is a ranking
@@ -80,10 +84,14 @@ def decile_spread(df: pd.DataFrame, n: int = 10, cost_bps: float = 0.0, min_stoc
 
 
 @register("metric", "decile_monotonicity")
-def decile_monotonicity(df: pd.DataFrame, n: int = 10, min_stocks: int = 20) -> MetricResult:
+def decile_monotonicity(
+    df: pd.DataFrame, n: int = 10, min_stocks: int = 20
+) -> MetricResult:
     """Spearman correlation between bucket number and the average per-date bucket label."""
     counts = df.groupby("date")["score"].transform("size")
     data = df[counts >= min_stocks].assign(bucket=lambda d: _buckets(d, n))
     profile = data.groupby(["date", "bucket"])["label"].mean().groupby("bucket").mean()
-    value = pd.Series(profile.index.to_numpy(dtype=float)).corr(pd.Series(profile.to_numpy()), method="spearman")
+    value = pd.Series(profile.index.to_numpy(dtype=float)).corr(
+        pd.Series(profile.to_numpy()), method="spearman"
+    )
     return MetricResult(float(value))

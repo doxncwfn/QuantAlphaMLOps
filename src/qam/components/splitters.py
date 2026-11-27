@@ -35,10 +35,21 @@ class PurgedWalkForward:
     which is legitimate input, never a label.
     """
 
-    def __init__(self, n_folds: int = 5, purge: int = 5, embargo: int = 20, val_frac: float = 0.15):
+    def __init__(
+        self,
+        n_folds: int = 5,
+        purge: int = 5,
+        embargo: int = 20,
+        val_frac: float = 0.15,
+    ):
         if not 0 < val_frac < 1:
             raise ValueError("val_frac must be in (0, 1)")
-        self.n_folds, self.purge, self.embargo, self.val_frac = n_folds, purge, embargo, val_frac
+        self.n_folds, self.purge, self.embargo, self.val_frac = (
+            n_folds,
+            purge,
+            embargo,
+            val_frac,
+        )
 
     def split(self, dates: np.ndarray) -> list[Fold]:
         n = len(dates)
@@ -53,7 +64,9 @@ class PurgedWalkForward:
             val_start = history_end - int(history_end * self.val_frac)
             train_end = val_start - self.purge
             if train_end <= 0 or val_start >= history_end:
-                raise ValueError(f"fold {i + 1}: not enough history before the test block")
+                raise ValueError(
+                    f"fold {i + 1}: not enough history before the test block"
+                )
             folds.append(
                 Fold(
                     name=f"fold_{i + 1}",

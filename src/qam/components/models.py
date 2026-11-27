@@ -13,7 +13,7 @@ Stock slots carry no positional or identity encoding: reordering stocks must reo
 from __future__ import annotations
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from qam.registry import register
 
@@ -45,17 +45,33 @@ class HybridLstmTfm(nn.Module):
         if hidden_dim % heads:
             raise ValueError("hidden_dim must be divisible by heads")
         lstm_dropout = dropout if lstm_layers > 1 else 0.0
-        self.stock_lstm = nn.LSTM(n_features, hidden_dim, num_layers=lstm_layers, batch_first=True, dropout=lstm_dropout)
+        self.stock_lstm = nn.LSTM(
+            n_features,
+            hidden_dim,
+            num_layers=lstm_layers,
+            batch_first=True,
+            dropout=lstm_dropout,
+        )
         self.n_mkt_ts = n_mkt_ts
         self.n_mkt_static = n_mkt_static
         if n_mkt_ts:
-            self.mkt_lstm = nn.LSTM(1, hidden_dim, num_layers=lstm_layers, batch_first=True, dropout=lstm_dropout)
+            self.mkt_lstm = nn.LSTM(
+                1,
+                hidden_dim,
+                num_layers=lstm_layers,
+                batch_first=True,
+                dropout=lstm_dropout,
+            )
             self.mkt_ts_type = nn.Parameter(torch.zeros(n_mkt_ts, hidden_dim))
         if n_mkt_static:
             self.mkt_static_proj = nn.Linear(1, hidden_dim)
             self.mkt_static_type = nn.Parameter(torch.zeros(n_mkt_static, hidden_dim))
-        layer = nn.TransformerEncoderLayer(hidden_dim, heads, dim_feedforward=ff_dim, dropout=dropout, batch_first=True)
-        self.transformer = nn.TransformerEncoder(layer, num_layers=tfm_layers, enable_nested_tensor=False)
+        layer = nn.TransformerEncoderLayer(
+            hidden_dim, heads, dim_feedforward=ff_dim, dropout=dropout, batch_first=True
+        )
+        self.transformer = nn.TransformerEncoder(
+            layer, num_layers=tfm_layers, enable_nested_tensor=False
+        )
         self.scorer = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.GELU(),
@@ -74,11 +90,15 @@ class HybridLstmTfm(nn.Module):
             series = batch["x_mkt_ts"].permute(0, 2, 1).reshape(B * self.n_mkt_ts, L, 1)
             _, (hm, _) = self.mkt_lstm(series)
             tokens.append(hm[-1].reshape(B, self.n_mkt_ts, -1) + self.mkt_ts_type)
-            ignore.append(torch.zeros(B, self.n_mkt_ts, dtype=torch.bool, device=x.device))
+            ignore.append(
+                torch.zeros(B, self.n_mkt_ts, dtype=torch.bool, device=x.device)
+            )
         if self.n_mkt_static:
             values = batch["x_mkt_static"].unsqueeze(-1)
             tokens.append(self.mkt_static_proj(values) + self.mkt_static_type)
-            ignore.append(torch.zeros(B, self.n_mkt_static, dtype=torch.bool, device=x.device))
+            ignore.append(
+                torch.zeros(B, self.n_mkt_static, dtype=torch.bool, device=x.device)
+            )
 
         z = torch.cat(tokens, dim=1)
         padding = torch.cat(ignore, dim=1)

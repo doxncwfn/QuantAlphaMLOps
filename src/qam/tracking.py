@@ -20,7 +20,7 @@ import platform
 import subprocess
 from importlib import metadata
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import yaml
 
@@ -28,12 +28,23 @@ from qam.config import RunConfig
 
 log = logging.getLogger("qam")
 
-_PACKAGES = ("qam", "numpy", "pandas", "polars", "duckdb", "torch", "pytorch-lightning", "pydantic")
+_PACKAGES = (
+    "qam",
+    "numpy",
+    "pandas",
+    "polars",
+    "duckdb",
+    "torch",
+    "pytorch-lightning",
+    "pydantic",
+)
 
 
 def _git(root: Path, *args: str) -> str | None:
     try:
-        out = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True)
+        out = subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, check=True
+        )
     except (OSError, subprocess.CalledProcessError):
         return None
     return out.stdout.strip()
@@ -61,7 +72,7 @@ class RunContext:
     def __init__(self, cfg: RunConfig, run_dir: Path | None = None):
         self.cfg = cfg
         if run_dir is None:
-            stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
             base = cfg.paths.runs_root / f"{stamp}_{cfg.name}_{cfg.hash()[:6]}"
             run_dir, n = base, 1
             while run_dir.exists():  # two runs of the same config within one second
@@ -76,7 +87,7 @@ class RunContext:
 
     # ------------------------------------------------------------ lifecycle
 
-    def __enter__(self) -> "RunContext":
+    def __enter__(self) -> Self:
         self._attach_log_file()
         if not (self.run_dir / "config.resolved.yaml").exists():
             with (self.run_dir / "config.resolved.yaml").open("w") as fh:
@@ -88,7 +99,7 @@ class RunContext:
             git_sha=_git(root, "rev-parse", "HEAD"),
             git_dirty=bool(_git(root, "status", "--porcelain")),
             versions=_versions(),
-            started_at=dt.datetime.now(dt.timezone.utc).isoformat(),
+            started_at=dt.datetime.now(dt.UTC).isoformat(),
             status="running",
         )
         self._start_wandb()
@@ -99,7 +110,7 @@ class RunContext:
         status = "failed" if exc_type else "finished"
         if exc_type:
             log.error("run %s failed", self.run_id, exc_info=(exc_type, exc, tb))
-        self.update_meta(status=status, finished_at=dt.datetime.now(dt.timezone.utc).isoformat())
+        self.update_meta(status=status, finished_at=dt.datetime.now(dt.UTC).isoformat())
         if self._wandb is not None:
             self._wandb.finish(exit_code=1 if exc_type else 0)
         if self._handler is not None:
@@ -108,7 +119,11 @@ class RunContext:
 
     def _attach_log_file(self) -> None:
         handler = logging.FileHandler(self.run_dir / "run.log")
-        handler.setFormatter(logging.Formatter(f"%(asctime)s %(levelname)s [{self.run_id}] %(name)s: %(message)s"))
+        handler.setFormatter(
+            logging.Formatter(
+                f"%(asctime)s %(levelname)s [{self.run_id}] %(name)s: %(message)s"
+            )
+        )
         logging.getLogger().addHandler(handler)
         logging.getLogger().setLevel(logging.INFO)
         self._handler = handler
@@ -116,27 +131,41 @@ class RunContext:
     # ------------------------------------------------------------ recording
 
     def meta(self) -> dict[str, Any]:
-        return json.loads(self._meta_path.read_text()) if self._meta_path.exists() else {}
+        return (
+            json.loads(self._meta_path.read_text()) if self._meta_path.exists() else {}
+        )
 
     def update_meta(self, **fields: Any) -> None:
         meta = self.meta()
         meta.update(fields)
         self._meta_path.write_text(json.dumps(meta, indent=2, default=str))
 
-    def log_metrics(self, values: dict[str, Any], prefix: str = "", step: int | None = None) -> None:
+    def log_metrics(
+        self, values: dict[str, Any], prefix: str = "", step: int | None = None
+    ) -> None:
         scalars: dict[str, float] = {}
         for key, value in values.items():
             if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise TypeError(f"metric {key!r} must be a scalar number, got {type(value).__name__}")
+                raise TypeError(
+                    f"metric {key!r} must be a scalar number, got {type(value).__name__}"
+                )
             scalars[f"{prefix}/{key}" if prefix else key] = float(value)
-        stored = json.loads(self._metrics_path.read_text()) if self._metrics_path.exists() else {}
+        stored = (
+            json.loads(self._metrics_path.read_text())
+            if self._metrics_path.exists()
+            else {}
+        )
         stored.update(scalars)
         self._metrics_path.write_text(json.dumps(stored, indent=2, sort_keys=True))
         if self._wandb is not None:
             self._wandb.log(scalars, step=step)
 
     def metrics(self) -> dict[str, float]:
-        return json.loads(self._metrics_path.read_text()) if self._metrics_path.exists() else {}
+        return (
+            json.loads(self._metrics_path.read_text())
+            if self._metrics_path.exists()
+            else {}
+        )
 
     # ------------------------------------------------------------ W&B
 
@@ -163,9 +192,13 @@ class RunContext:
     def lightning_loggers(self, fold: str) -> list[Any]:
         from pytorch_lightning.loggers import CSVLogger
 
-        loggers: list[Any] = [CSVLogger(save_dir=str(self.run_dir), name="lightning", version=fold)]
+        loggers: list[Any] = [
+            CSVLogger(save_dir=str(self.run_dir), name="lightning", version=fold)
+        ]
         if self._wandb is not None:
             from pytorch_lightning.loggers import WandbLogger
 
-            loggers.append(WandbLogger(experiment=self._wandb, prefix=fold, log_model=False))
+            loggers.append(
+                WandbLogger(experiment=self._wandb, prefix=fold, log_model=False)
+            )
         return loggers

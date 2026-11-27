@@ -45,7 +45,9 @@ def log_dollar_volume(n: int = 1) -> pl.Expr:
     dollar = pl.col("close") * pl.col("volume")
     if n > 1:
         dollar = dollar.rolling_mean(window_size=n, min_samples=n)
-    return dollar.log1p().alias("log_dollar_volume" if n == 1 else f"log_dollar_volume_{n}")
+    return dollar.log1p().alias(
+        "log_dollar_volume" if n == 1 else f"log_dollar_volume_{n}"
+    )
 
 
 @register("feature", "raw")

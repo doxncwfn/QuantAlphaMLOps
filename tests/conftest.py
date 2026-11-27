@@ -20,7 +20,9 @@ NEW_LISTING = 28  # first record on day 200
 GAPPY = 27  # no records on days 250..259
 
 
-def make_panel(seed: int = 0, start: str = "2019-01-01", days: int = 520) -> pl.DataFrame:
+def make_panel(
+    seed: int = 0, start: str = "2019-01-01", days: int = 520
+) -> pl.DataFrame:
     rng = np.random.default_rng(seed)
     dates = pd.bdate_range(start, periods=days)
     rows = []
@@ -36,10 +38,24 @@ def make_panel(seed: int = 0, start: str = "2019-01-01", days: int = 520) -> pl.
                 continue
             if s == GAPPY and 250 <= d < 260:
                 continue
-            ret = rets[d] if d > 0 else None  # missing return is NULL, as in the warehouse
+            ret = (
+                rets[d] if d > 0 else None
+            )  # missing return is NULL, as in the warehouse
             if s == DELISTED and d == DELIST_DAY:
                 ret = -0.5
-            rows.append((sid, dates[d].date(), price[d], price[d], price[d], price[d], volume[d], price[d], ret))
+            rows.append(
+                (
+                    sid,
+                    dates[d].date(),
+                    price[d],
+                    price[d],
+                    price[d],
+                    price[d],
+                    volume[d],
+                    price[d],
+                    ret,
+                )
+            )
     return pl.DataFrame(
         rows,
         schema={
@@ -76,7 +92,11 @@ def experiment_dict(warehouse: Path, root: Path) -> dict:
     return {
         "name": "synthetic",
         "seed": 7,
-        "paths": {"warehouse": str(warehouse), "data_root": str(root / "data"), "runs_root": str(root / "runs")},
+        "paths": {
+            "warehouse": str(warehouse),
+            "data_root": str(root / "data"),
+            "runs_root": str(root / "runs"),
+        },
         "data_spec": {
             "dataset_name": "synthetic",
             "source": {"func": "warehouse_duckdb"},
@@ -88,21 +108,48 @@ def experiment_dict(warehouse: Path, root: Path) -> dict:
             {"func": "vol", "kwargs": {"n": 10}},
             {"func": "dist_sma", "kwargs": {"n": 10}},
         ],
-        "filter_spec": {"func": "topk_dollar_volume", "kwargs": {"k": 12, "buffer_ratio": 0.25, "x": 5, "y": 10, "ttl": 10}},
+        "filter_spec": {
+            "func": "topk_dollar_volume",
+            "kwargs": {"k": 12, "buffer_ratio": 0.25, "x": 5, "y": 10, "ttl": 10},
+        },
         "indicator_spec": [{"func": "equal_weight_return"}],
         "label_spec": {"func": "forward_return", "kwargs": {"h": 5}},
         "window_spec": {
             "lookback": 20,
             "max_missing": 2,
             "fill": "zero",
-            "transforms": [{"func": "cs_zscore"}, {"func": "clip", "kwargs": {"lo": -3, "hi": 3}}],
+            "transforms": [
+                {"func": "cs_zscore"},
+                {"func": "clip", "kwargs": {"lo": -3, "hi": 3}},
+            ],
         },
-        "model_spec": {"func": "hybrid_lstm_tfm", "kwargs": {"hidden_dim": 16, "lstm_layers": 1, "tfm_layers": 1, "heads": 2, "ff_dim": 16, "dropout": 0.0}},
+        "model_spec": {
+            "func": "hybrid_lstm_tfm",
+            "kwargs": {
+                "hidden_dim": 16,
+                "lstm_layers": 1,
+                "tfm_layers": 1,
+                "heads": 2,
+                "ff_dim": 16,
+                "dropout": 0.0,
+            },
+        },
         "loss_spec": {"func": "neg_pearson_rank"},
-        "split_spec": {"func": "purged_walk_forward", "kwargs": {"n_folds": 2, "purge": 5, "embargo": 5, "val_frac": 0.2}},
-        "train_spec": {"max_epochs": 1, "batch_dates": 16, "min_valid_slots": 5, "accelerator": "cpu"},
+        "split_spec": {
+            "func": "purged_walk_forward",
+            "kwargs": {"n_folds": 2, "purge": 5, "embargo": 5, "val_frac": 0.2},
+        },
+        "train_spec": {
+            "max_epochs": 1,
+            "batch_dates": 16,
+            "min_valid_slots": 5,
+            "accelerator": "cpu",
+        },
         "evaluation_spec": {
-            "metrics": [{"func": "mean_ic", "kwargs": {"min_stocks": 5}}, {"func": "decile_spread", "kwargs": {"n": 3, "min_stocks": 5}}]
+            "metrics": [
+                {"func": "mean_ic", "kwargs": {"min_stocks": 5}},
+                {"func": "decile_spread", "kwargs": {"n": 3, "min_stocks": 5}},
+            ]
         },
     }
 

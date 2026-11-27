@@ -29,7 +29,13 @@ app = modal.App("quant-model-training")
 data_vol = modal.Volume.from_name("quant-data-vol")
 
 
-@app.function(image=image, gpu="A10G", timeout=86400, volumes={"/mnt/data": data_vol}, secrets=[modal.Secret.from_name("wandb-secret")])
+@app.function(
+    image=image,
+    gpu="A10G",
+    timeout=86400,
+    volumes={"/mnt/data": data_vol},
+    secrets=[modal.Secret.from_name("wandb-secret")],
+)
 def run_pipeline(config: str, start: str = "", end: str = "") -> str:
     import datetime as dt
     import sys
@@ -38,7 +44,10 @@ def run_pipeline(config: str, start: str = "", end: str = "") -> str:
     from qam.config import load_config
     from qam.pipeline import run
 
-    times = {"start": dt.date.fromisoformat(start) if start else None, "end": dt.date.fromisoformat(end) if end else None}
+    times = {
+        "start": dt.date.fromisoformat(start) if start else None,
+        "end": dt.date.fromisoformat(end) if end else None,
+    }
     cfg = load_config(f"/root/{config}", env="modal", times=times)
     ctx = run(cfg)
     data_vol.commit()
@@ -46,5 +55,9 @@ def run_pipeline(config: str, start: str = "", end: str = "") -> str:
 
 
 @app.local_entrypoint()
-def main(config: str = "configs/experiments/baseline_hybrid.yaml", start: str = "", end: str = ""):
+def main(
+    config: str = "configs/experiments/baseline_hybrid.yaml",
+    start: str = "",
+    end: str = "",
+):
     print("run directory:", run_pipeline.remote(config, start, end))
