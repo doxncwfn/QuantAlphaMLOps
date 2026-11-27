@@ -1,0 +1,157 @@
+paths:
+  warehouse_path: "data/warehouse/russell1000.duckdb"
+  qh_v7_dir: "outputs/QH_v7"
+  output_dir: "outputs/v27"
+  cache_filename: "dataset_top1000_f34_cache.pt"
+  ff6_cache_path: "outputs/QH_v7/v7_ensemble/ff6_daily_cache.parquet"
+
+data:
+  start_date: "2000-07-01"
+  test_start: "2010-01-01"
+  test_end: "2024-12-31"
+  n_folds: 14
+  top_k: 1000
+  ttl_days: 60
+  buffer_ratio: 0.10
+  x_win: 20
+  y_win: 30
+  lookback: 60
+  max_missing: 2
+  feature_norm: "rankgauss"
+  feature_clip: 3.0
+  vol_floor: 0.005
+  mkt_windows: [1, 5, 20, 60]
+
+model:
+  hidden_dim: 64
+  lstm_layers: 2
+  tfm_layers: 2
+  heads: 4
+  dropout: 0.2
+  gate_temp: 5.0
+
+train:
+  seed: 42
+  batch_dates: 16
+  max_epochs: 20
+  patience: 4
+  lr: 0.0003
+  weight_decay: 0.0001
+  train_subsample: 1000
+  val_days: 400
+  embargo: 5
+  time_decay_halflife: 1500
+  min_stocks: 20
+  soft_tau: 0.1
+  tail_q: 0.05
+  tail_ic_lambda: 0.50
+  hit_q: 0.10
+
+portfolio:
+  book_size: 20000000.0
+  ann_days: 252
+  baseline_cost_bps: 2.0
+  cost_grid_bps: [0.0, 2.0, 5.0, 10.0, 15.0]
+  short_borrow_ann: 0.005
+  impact_coeff: 0.10
+  warmup_days: 252
+  purge_days: 6
+  buf_enter_q: 0.10
+  buf_exit_q: 0.20
+  hold_days: 5
+
+risk:
+  target_vol: 0.09
+  vol_scale_min: 0.35
+  vol_scale_max: 1.35
+  max_gross: 1.80
+  max_single_w: 0.025
+  max_abs_beta: 0.08
+  max_sector_net: 0.15
+  max_adv_frac: 0.05
+  dd_threshold: 0.08
+
+experiments:
+  raw_t1:
+    loss: "spearman"
+    target: "raw_1d"
+    eval_target: "raw_1d"
+    purge: 2
+    horizon: 1
+  risk_t1:
+    loss: "spearman"
+    target: "risk_1d"
+    eval_target: "raw_1d"
+    purge: 2
+    horizon: 1
+  risk_t5:
+    loss: "spearman"
+    target: "risk_5d"
+    eval_target: "raw_5d"
+    purge: 6
+    horizon: 5
+
+strategies:
+  - "rank_RAW"
+  - "top10_RAW"
+  - "top10_InvVol"
+  - "top10_Buf10_20"
+  - "top10_InvVol_Buf"
+  - "top10_BetaNeu_InvVol_Buf"
+  - "top10_HOLD5"
+  - "top10_InvVol_HOLD5"
+
+feature_clusters:
+  Price/ShortMom:
+    - "log_ret"
+    - "mom_5"
+    - "mom_10"
+    - "mom_20"
+    - "mom_60"
+    - "dist_sma_5"
+    - "dist_sma_10"
+    - "dist_sma_20"
+    - "dist_sma_60"
+    - "dist_high_20"
+    - "dist_low_20"
+    - "rsi_14"
+  Volatility:
+    - "vol_5"
+    - "vol_20"
+    - "vol_60"
+    - "vol_ratio_5_60"
+    - "parkinson_vol_20"
+  Price-Volume:
+    - "vol_ratio_20"
+    - "log_dollar_volume_20"
+    - "amihud_20"
+    - "corr_pv_20"
+    - "clv"
+    - "cmf_20"
+  SlowMom/Quality:
+    - "mom_120_20"
+    - "mom_252_20"
+    - "sharpe_60"
+  Risk/Tail/Micro:
+    - "beta_60"
+    - "idio_vol_20"
+    - "max_ret_20"
+    - "skew_20"
+    - "hl_range"
+    - "close_open"
+    - "gap"
+    - "overnight_vs_intraday_20"
+
+sector12_names:
+  - "Consumer_NonDurables"
+  - "Consumer_Durables"
+  - "Manufacturing_Ind"
+  - "Energy"
+  - "Chemicals_Materials"
+  - "Tech_BusinessEquip"
+  - "Telecom_Comm"
+  - "Utilities"
+  - "Retail_Wholesale"
+  - "Healthcare"
+  - "Financials_RealEstate"
+  - "Other_Services"
