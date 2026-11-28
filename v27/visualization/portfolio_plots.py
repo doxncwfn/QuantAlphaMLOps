@@ -112,6 +112,35 @@ def plot_portfolio_evaluation_suite(
     shade_crisis_eras(ax2)
     save_fig(fig, fig_dir / "fig08_02_rolling_sharpe_and_vol.png")
 
+    # Fig 08_08: Rolling 252d Sharpe & Daily Turnover Time Series (best strategy)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(13, 7.5), sharex=True)
+    bt_nm = all_entries[best_overall]["bt"]
+    r_s = bt_nm["net"].iloc[wu:]
+    to_s = bt_nm["traded"].iloc[wu:] * 100.0
+    ax1.plot(
+        oos_dates,
+        (r_s.rolling(252).mean() / r_s.rolling(252).std()) * math.sqrt(ann),
+        label=best_overall,
+        linewidth=0.8,
+    )
+    ax2.plot(
+        oos_dates,
+        to_s,
+        label=best_overall,
+        linewidth=0.6,
+        alpha=0.85,
+    )
+    ax1.axhline(0.0, color="black", linewidth=0.8, linestyle="--")
+    ax1.set_ylabel("Rolling 252d Net Sharpe")
+    ax1.set_title("Rolling Sharpe & Daily Turnover Time Series")
+    ax1.legend(loc="upper left", fontsize=8)
+    ax1.grid(alpha=0.25)
+    shade_crisis_eras(ax1, add_labels=True)
+    ax2.set_ylabel("Daily Turnover (%)")
+    ax2.grid(alpha=0.25)
+    shade_crisis_eras(ax2)
+    save_fig(fig, fig_dir / "fig08_08_sharpe_and_daily_turnover.png")
+
     # Fig 08_03: Frontier & Transaction Cost Decay
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
     ind_df = lb[lb["Group"] == "Individual_v7"]

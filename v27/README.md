@@ -21,7 +21,8 @@ Clean, single-responsibility refactor of the frozen Semester 261 research stack 
 | `v27/experiments/` | 24-candidate parity audit, Method A static, Method B score blends, Method E dynamic hysteresis, Method F hierarchical, Section 10 ablations |
 | `v27/backtest/` | Daily MTM + linear TC/borrow/financing/impact (`simulator.py`), equity/DD/BRAIN metrics (`metrics.py`), LW/bootstrap/table exporter (`statistics.py`) |
 | `v27/visualization/` | Explainability plots (`explainability_plots.py`), portfolio NAV/frontier/fold charts (`portfolio_plots.py`), `$20M` dollar PnL plots (`pnl_plots.py`) |
-| `v27/pipelines/` | Clean CLI entrypoints: `run_eda.py`, `run_alpha.py`, `run_portfolio_suite.py` |
+| `v27/cost_resilient/` | Turnover reduction & cost-resilient optimization: causal EMA/Kalman smoothing (`signals.py`), L1 NTB/GP/throttle & Woodbury-ADMM L1-QP (`optimizers.py`), Net-5bps ensembles (`pipeline.py`), diagnostics & report (`reporting.py`) |
+| `v27/pipelines/` | Clean CLI entrypoints: `run_eda.py`, `run_alpha.py`, `run_portfolio_suite.py`, `run_cost_resilient.py` |
 
 ## Commands
 
@@ -29,4 +30,5 @@ Clean, single-responsibility refactor of the frozen Semester 261 research stack 
 .venv/bin/pytest -v v27/tests
 .venv/bin/python -m v27.pipelines.run_eda --output-dir outputs/v27
 .venv/bin/python -m v27.pipelines.run_portfolio_suite --qh-dir outputs/QH_v7 --output-dir outputs/v27
+.venv/bin/python -m v27.pipelines.run_cost_resilient --qh-dir outputs/QH_v7 --output-dir outputs/QH_v7/v7_cost_resilient
 ```

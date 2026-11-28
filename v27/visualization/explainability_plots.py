@@ -34,7 +34,7 @@ def plot_master_gate_clusters(
         ax1.plot(roll.index, roll[c], label=c, lw=1.8, color=CLUSTER_COLORS.get(c))
     ax1.axhline(1.0, color="gray", ls="--", lw=0.8)
     ax1.set_title(f"[{name}] MASTER Gate 5-Cluster Feature Importance (21d MA)")
-    ax1.set_ylabel("Mean Multiplier (Neutral = 1.0)")
+    ax1.set_ylabel("Mean Multiplier")
     ax1.legend(fontsize=8.5)
     ax1.grid(alpha=0.25)
     shade_crisis_eras(ax1, add_labels=True)
@@ -324,7 +324,7 @@ def plot_ic_and_decay_profile(
     shade_crisis_eras(ax2)
 
     ax3.axhline(0.0, color="black", ls="--", lw=0.8)
-    ax3.set_title("Alpha Decay Profile: Mean Rank IC vs Execution Lag (Trading Days)")
+    ax3.set_title("Alpha Decay Profile: Mean Rank IC vs Execution Lag)")
     ax3.set_xlabel("Execution Lag (Trading Days)")
     ax3.set_ylabel("Mean Spearman IC")
     ax3.set_xticks(lags)
