@@ -16,7 +16,11 @@
 - **Lo (2002) HAC Sharpe (`lo_hac_sharpe`):** điều chỉnh tự tương quan bậc $q = 5$:
   $$\text{SR}_{\text{HAC}} = \dfrac{\text{SR}}{\sqrt{1 + 2\sum_{k=1}^{5}\left(1 - \dfrac{k}{6}\right)\hat{\rho}_k}}$$
 - **Sortino, Calmar, Omega, VaR/CVaR (95%/99%), Skew, ExKurt, Worst 5d/20d.**
-- **Turnover & Nồng độ:** `AnnTurn_1Way(%)` $= 0.5 \times \overline{\text{traded}_t} \times 252 \times 100$, `EffN_Stock` $= \dfrac{(\sum_i |w_i|)^2}{\sum_i w_i^2}$.
+- **Turnover & Nồng độ:** `AnnTurn_1Way(%)` $= 0.5 \times \overline{\text{traded}_t} \times 252 \times 100$, `Daily1Way(%)` $= 0.5 \times \overline{\text{traded}_t} \times 100$, `EffN_Stock` $= \dfrac{(\sum_i |w_i|)^2}{\sum_i w_i^2}$.
+- **Metric Kháng Chi phí ([reporting.py](../v27/cost_resilient/reporting.py)):**
+  - `Net5_Sharpe` & `AllIn5_Sharpe`: Sharpe trên lợi suất sau `5 bps/chiều` tuyến tính và sau toàn bộ phí + borrow + impact ở mức `5 bps`.
+  - `BreakEven_bps`: chi phí tuyến tính hòa vốn ước lượng từ độ dốc suy giảm giữa `0 bps` và `5 bps` ($\text{SR}_0 / \frac{\text{SR}_0 - \text{SR}_5}{5}$).
+  - `GoalPass`: cờ đạt đồng thời `Daily1Way(%) < 30.0`, `Net2_Sharpe > 1.50`, `Net5_Sharpe > 1.00`, và `Comp_MaxDD2(%) <= 15.0`.
 
 ## 3. Kiểm định Thống kê & Phân rã Nhân tố
 - **Ledoit-Wolf (2008) Sharpe Diff Test (`ledoit_wolf_sharpe_test`):** kiểm định $H_0: \text{SR}_A = \text{SR}_B$ bằng HAC sandwich trên 4 moment $(r_A, r_B, r_A^2, r_B^2)$, trả về $(\Delta\text{Sharpe}, z, p\text{-value})$.

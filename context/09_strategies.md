@@ -17,7 +17,7 @@ Hệ thống cơ sở gồm **3 mô hình dự báo** (`raw_t1`, `risk_t1`, `ris
 
 ## 2. 8 Quy tắc Xây dựng Danh mục
 
-| # | Strategy ID | Cơ chế toán học | Đặc tính chính |
+|   | Strategy ID | Cơ chế toán học | Đặc tính chính |
 |---|---|---|---|
 | 1 | `rank_RAW` | Trọng số tỷ lệ với $(\text{rank}(s_{i,t}) - \bar{r}_t)$, chuẩn hóa 2 chân | Phủ toàn bộ mặt cắt ngang, turnover thấp |
 | 2 | `top10_RAW` | Long top $10\%$, Short bottom $10\%$, trọng số đều | Tập trung alpha đuôi, biến động cao |
@@ -44,4 +44,4 @@ Mỗi ngày $t$, danh mục duy trì $H = 5$ tranche song song $T^{(0)}, \dots, 
   - **Nhóm `raw_t1` (8 sleeves):** Tín hiệu 1d mạnh nhất ở đầu kỳ nhưng turnover cao và nhạy cảm với chế độ thị trường; `raw_t1__top10_BetaNeu_InvVol_Buf` đạt `Net2 Sharpe = 0.784`.
   - **Nhóm `risk_t1` (8 sleeves):** Chuẩn hóa mục tiêu theo $\sigma_{\text{prev}}$ giúp ổn định xếp hạng; `risk_t1__top10_BetaNeu_InvVol_Buf` đạt `Net2 Sharpe = 1.276`.
   - **Nhóm `risk_t5` (8 sleeves):** Tín hiệu 5d bổ trợ cấu trúc rõ rệt (tương quan rank score chỉ `0.630`/`0.644` so với `1d`); **`risk_t5__top10_BetaNeu_InvVol_Buf`** là chiến lược đơn lẻ tốt nhất (`CAGR = 13.60%`, `Net2 Sharpe = 1.302`, `All-In Sharpe = 1.121`, `Comp MaxDD = 18.63%`, `1-Way Turn = 8,718.2%`).
-- **Tính nhất quán kế toán:** Toàn bộ 24 chiến lược tái tạo từ cache khớp với `grand_summary_v7.csv` trong sai số tối đa $|\Delta\text{NetSh@2bps}| = 0.0036$.
+- **Tính nhất quán kế toán:** Toàn bộ 24 chiến lược tái tạo từ cache khớp với [grand_summary_v7.csv](../outputs/QH_v7/grand_summary_v7.csv) trong sai số tối đa $|\Delta\text{NetSh@2bps}| = 0.0036$.

@@ -1,6 +1,6 @@
-# Context Hệ Thống (Semester 261 — `v27/`)
+# Context Hệ Thống (Semester 261 — [v27/](../v27/))
 
-Tài liệu ngữ cảnh kỹ thuật cho hệ thống **Cross-Sectional Stock Ranking & Portfolio Optimization** (phiên bản chốt Semester 261, codebase [v27/](../v27/__init__.py), cấu hình [v27.yaml](../config/v27.yaml)), sắp xếp theo đúng luồng dự án chuẩn:
+Tài liệu ngữ cảnh kỹ thuật cho hệ thống **Cross-Sectional Stock Ranking & Portfolio Optimization** (phiên bản chốt Semester 261, codebase [v27/](../v27/), cấu hình [v27.yaml](../config/v27.yaml)), sắp xếp theo đúng luồng dự án chuẩn:
 
 | # | File | Chủ đề |
 |---|---|---|
@@ -17,8 +17,9 @@ Tài liệu ngữ cảnh kỹ thuật cho hệ thống **Cross-Sectional Stock R
 | 11 | [11_backtest.md](11_backtest.md) | Mô phỏng Backtest MTM hàng ngày, netting & 3 tầng chi phí |
 | 12 | [12_metrics.md](12_metrics.md) | Hệ thống Metric (Signal, Decile Monotonicity, Portfolio, HAC, LW, FF6) |
 | 13 | [13_portfolio_results.md](13_portfolio_results.md) | Tổng kết kết quả OOS & khuyến nghị Flagship |
-| 14 | [14_codebase_v27.md](14_codebase_v27.md) | Kiến trúc module `v27/`, `visualization/` & lệnh chạy |
+| 14 | [14_codebase_v27.md](14_codebase_v27.md) | Kiến trúc module [v27/](../v27/), [visualization/](../v27/visualization/) & lệnh chạy |
 | 15 | [15_decisions_and_limitations.md](15_decisions_and_limitations.md) | Quyết định đã chốt & giới hạn thực nghiệm |
+| 16 | [16_cost_resilient.md](16_cost_resilient.md) | Giảm Turnover & Tối ưu Kháng Chi phí ([v27/cost_resilient/](../v27/cost_resilient/)) |
 
 ## Ký hiệu chuẩn
 - $t$: ngày ra quyết định (chỉ dùng thông tin đến hết đóng cửa $t - 1$).

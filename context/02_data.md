@@ -1,4 +1,4 @@
-# 02 · Dữ liệu, Cache & EDA (`data/` & `eda/`)
+# 02 · Dữ liệu, Cache & EDA ([data/](../v27/data/) & [eda/](../v27/eda/))
 
 **Code triển khai:** [warehouse_loader.py](../v27/data/warehouse_loader.py), [bundle.py](../v27/data/bundle.py), [universe_eda.py](../v27/eda/universe_eda.py), [run_eda.py](../v27/pipelines/run_eda.py)
 
@@ -7,7 +7,7 @@
 - **`silver.market_factor`:** Fama-French 5 factors + Momentum (`mktrf`, `smb`, `hml`, `rmw`, `cma`, `umd`, `rf`).
 - **`silver.security_history`:** ánh xạ mã `siccd` sang 12 nhóm ngành (`sic_to_sector12`).
 
-## 2. Tăng tốc nạp dữ liệu bằng Polars (`bundle.py`)
+## 2. Tăng tốc nạp dữ liệu bằng Polars ([bundle.py](../v27/data/bundle.py))
 Thay vì đọc parquet bằng pandas và gọi `pd.pivot()` 4 lần trên bảng 3.7M dòng, `load_v7_data_bundle` đọc trực tiếp bằng `polars.read_parquet` và scatter vào ma trận `(T, N)` qua `np.searchsorted`:
 
 ```python
