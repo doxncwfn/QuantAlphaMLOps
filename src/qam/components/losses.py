@@ -13,7 +13,9 @@ import torch.nn.functional as F
 from qam.registry import register
 
 
-def _rows(scores: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor, min_n: int = 2):
+def _rows(
+    scores: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor, min_n: int = 2
+):
     for b in range(scores.shape[0]):
         valid = mask[b]
         if int(valid.sum()) >= min_n:
@@ -35,12 +37,25 @@ class HybridHingeLoss:
     the legacy loss exactly when the labels are already z-scored.
     """
 
-    def __init__(self, margin: float = 0.1, decile: float = 0.1, lambda_mse: float = 1.0, target: str = "zscore"):
+    def __init__(
+        self,
+        margin: float = 0.1,
+        decile: float = 0.1,
+        lambda_mse: float = 1.0,
+        target: str = "zscore",
+    ):
         if target not in ("zscore", "raw"):
             raise ValueError("target must be 'zscore' or 'raw'")
-        self.margin, self.decile, self.lambda_mse, self.target = margin, decile, lambda_mse, target
+        self.margin, self.decile, self.lambda_mse, self.target = (
+            margin,
+            decile,
+            lambda_mse,
+            target,
+        )
 
-    def __call__(self, scores: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, scores: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor
+    ) -> torch.Tensor:
         losses = []
         for pred, y in _rows(scores, labels, mask):
             if self.target == "zscore":
@@ -48,7 +63,9 @@ class HybridHingeLoss:
             n_tail = max(1, int(len(y) * self.decile))
             order = torch.argsort(y)
             longs, shorts = pred[order[-n_tail:]], pred[order[:n_tail]]
-            rank = torch.clamp(self.margin - (longs.unsqueeze(1) - shorts.unsqueeze(0)), min=0.0).mean()
+            rank = torch.clamp(
+                self.margin - (longs.unsqueeze(1) - shorts.unsqueeze(0)), min=0.0
+            ).mean()
             losses.append(rank + self.lambda_mse * F.mse_loss(pred, y))
         return _mean(losses, scores)
 
@@ -57,7 +74,9 @@ class HybridHingeLoss:
 class NegPearsonRankLoss:
     """-Pearson(scores, rank(labels)) per date: a simple differentiable surrogate for Spearman IC."""
 
-    def __call__(self, scores: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, scores: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor
+    ) -> torch.Tensor:
         losses = []
         for pred, y in _rows(scores, labels, mask):
             rank = torch.argsort(torch.argsort(y)).to(pred.dtype)

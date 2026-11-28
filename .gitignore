@@ -1,6 +1,10 @@
 # Developer Environment
 .vscode/
 .venv/
+.agents/
+graphify-out/
+.DS_Store
+.ruff_cache
 
 # Secret Environment Variables
 .env
@@ -10,8 +14,7 @@ __pycache__/
 
 # Artifacts
 artifacts/
-db/
-factors/
+outputs/
 logs/
 metrics/
 notebooks/
@@ -21,38 +24,8 @@ wandb/
 refs/
 
 # LaTeX 
-*.aux
-*.out
-*.log
-*.bbl
-*.blg
-*.brf
-*.fdb_latexmk
-*.fls
-*.lol
-*.lof
-*.lot
-*.lox
-*.nav
-*.snm
 *.synctex.gz
-*.toc
-*.acn
-*.acr
-*.alg
-*.glg
-*.glo
-*.gls
-*.idx
-*.ilg
-*.ind
-*.ist
-*.maf
-*.mtc*
-*.bmc
-*.run.xml
-*.xdy
-# End of generated LaTeX auxiliary/output files
+
 # Platform outputs (never commit data: CRSP/WRDS is licensed). The data/ folders are kept
 # (README + .gitkeep) so the layout exists after a clone; their contents are ignored.
 data/*

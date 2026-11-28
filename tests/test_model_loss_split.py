@@ -23,7 +23,18 @@ def batch(B=2, K=8, L=10, F=3, m_ts=2, m_static=1, seed=0):
 
 def model(**kw):
     torch.manual_seed(0)
-    return Model(n_features=3, n_mkt_ts=2, n_mkt_static=1, hidden_dim=16, lstm_layers=1, tfm_layers=1, heads=2, ff_dim=16, dropout=0.0, **kw).eval()
+    return Model(
+        n_features=3,
+        n_mkt_ts=2,
+        n_mkt_static=1,
+        hidden_dim=16,
+        lstm_layers=1,
+        tfm_layers=1,
+        heads=2,
+        ff_dim=16,
+        dropout=0.0,
+        **kw,
+    ).eval()
 
 
 def test_shape_and_masked_scores_are_zero():
@@ -53,7 +64,15 @@ def test_stock_permutation_equivariance():
 def test_all_masked_date_gives_finite_output():
     b = batch(m_ts=0, m_static=0)
     b["mask"][0] = False
-    m = Model(n_features=3, hidden_dim=16, lstm_layers=1, tfm_layers=1, heads=2, ff_dim=16, dropout=0.0).eval()
+    m = Model(
+        n_features=3,
+        hidden_dim=16,
+        lstm_layers=1,
+        tfm_layers=1,
+        heads=2,
+        ff_dim=16,
+        dropout=0.0,
+    ).eval()
     assert torch.isfinite(m(b)).all()
 
 
@@ -74,13 +93,17 @@ def test_losses_ignore_masked_slots_and_backprop(name):
 
 def test_neg_pearson_rank_is_minus_one_for_perfect_ranking():
     labels = torch.randn(1, 30)
-    loss = registry.get("loss", "neg_pearson_rank")()(labels.argsort().argsort().float(), labels, torch.ones(1, 30, dtype=torch.bool))
+    loss = registry.get("loss", "neg_pearson_rank")()(
+        labels.argsort().argsort().float(), labels, torch.ones(1, 30, dtype=torch.bool)
+    )
     assert loss.item() == pytest.approx(-1.0, abs=1e-6)
 
 
 def test_splitter_segments_are_ordered_and_gapped():
     dates = np.arange(np.datetime64("2010-01-01"), np.datetime64("2014-01-01"))
-    folds = registry.get("splitter", "purged_walk_forward")(n_folds=3, purge=5, embargo=10, val_frac=0.2).split(dates)
+    folds = registry.get("splitter", "purged_walk_forward")(
+        n_folds=3, purge=5, embargo=10, val_frac=0.2
+    ).split(dates)
     for fold in folds:
         pos = lambda d: int(np.searchsorted(dates, d))
         assert pos(fold.val[0]) - pos(fold.train[-1]) - 1 == 5

@@ -1,4 +1,4 @@
-# Runtime dependencies for the Modal image (mirror of pyproject.toml [project.dependencies] + tracking).
+# Runtime dependencies for the Modal image and local v27 execution.
 numpy>=1.26
 pandas>=2.2
 polars>=1.21
@@ -6,6 +6,8 @@ pyarrow>=14
 duckdb>=1.1
 pydantic>=2.6
 pyyaml>=6
+scipy>=1.14
+matplotlib>=3.9
 torch>=2.2
 pytorch-lightning>=2.2
 wandb>=0.16

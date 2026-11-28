@@ -27,7 +27,9 @@ class BacktestResult:
 
 class BacktestEngine(ABC):
     @abstractmethod
-    def run(self, scores: pd.DataFrame, load_returns: Callable[[], pd.DataFrame]) -> BacktestResult: ...
+    def run(
+        self, scores: pd.DataFrame, load_returns: Callable[[], pd.DataFrame]
+    ) -> BacktestResult: ...
 
 
 @register("backtest", "placeholder")
@@ -35,5 +37,7 @@ class PlaceholderBacktest(BacktestEngine):
     def __init__(self, **params):
         self.params = params
 
-    def run(self, scores: pd.DataFrame, load_returns: Callable[[], pd.DataFrame]) -> BacktestResult:
+    def run(
+        self, scores: pd.DataFrame, load_returns: Callable[[], pd.DataFrame]
+    ) -> BacktestResult:
         raise NotImplementedError("backtest engine not implemented yet (placeholder)")

@@ -4,31 +4,85 @@ version = "0.1.0"
 description = "QuantAlphaMLOps: config-driven platform for cross-sectional equity ranking"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy>=1.26",
-    "pandas>=2.2",
-    "polars>=1.21",  # rolling_*(min_samples=...)
-    "pyarrow>=14",
-    "duckdb>=1.1",
-    "pydantic>=2.6",
-    "pyyaml>=6",
-    "torch>=2.2",
-    "pytorch-lightning>=2.2",
+    "numpy==2.4.6",
+    "pandas==3.1.0",
+    "polars==2.1.0",            # rolling_*(min_samples=...)
+    "pyarrow==26.0.1",
+    "duckdb==2.0.0",
+    "pydantic==2.14.2",
+    "pyyaml==6.0.3",
+    "torch==2.15.0",
+    "torchsort==0.1.10",
+    "pytorch-lightning==2.6.6",
+    "scipy==1.17.1",
+    "matplotlib==3.11.2",
+    "psutil==7.2.2",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "scipy>=1.12"]  # scipy: legacy parity tests
-tracking = ["wandb>=0.16"]
+dev = ["pytest==9.2.0", "ruff>=0.9", "scipy==1.17.1"] # scipy: legacy parity tests
+tracking = ["wandb==0.31.0"]
 modal = ["modal==1.5.3"]
 
 [project.scripts]
 qam = "qam.cli:main"
+v27-eda = "v27.pipelines.run_eda:main"
+v27-alpha = "v27.pipelines.run_alpha:main"
+v27-suite = "v27.pipelines.run_portfolio_suite:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/qam"]
+packages = ["src/qam", "v27"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+pythonpath = ["."]
+testpaths = ["tests", "v27/tests"]
+
+[tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+line-length = 88
+indent-width = 4
+
+[tool.ruff.lint]
+ignore = []
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[\\p{XID_Continue}]*[\\p{XID_Continue}--_]+?))$"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
+docstring-code-line-length = "dynamic"

@@ -18,7 +18,9 @@ from qam.registry import register
 
 
 @register("transform", "cs_zscore")
-def cs_zscore(x: np.ndarray, mask: np.ndarray, eps: float = 1e-8, ddof: int = 1) -> np.ndarray:
+def cs_zscore(
+    x: np.ndarray, mask: np.ndarray, eps: float = 1e-8, ddof: int = 1
+) -> np.ndarray:
     """(x - mean) / (std + eps) per day and feature over the values present. ddof=1 matches
     the legacy polars z-score. A day and feature with ddof or fewer values becomes NaN."""
     real = x[mask]
@@ -32,7 +34,9 @@ def cs_zscore(x: np.ndarray, mask: np.ndarray, eps: float = 1e-8, ddof: int = 1)
 
 
 @register("transform", "clip")
-def clip(x: np.ndarray, mask: np.ndarray, lo: float = -3.0, hi: float = 3.0) -> np.ndarray:
+def clip(
+    x: np.ndarray, mask: np.ndarray, lo: float = -3.0, hi: float = 3.0
+) -> np.ndarray:
     return np.clip(x, lo, hi)
 
 

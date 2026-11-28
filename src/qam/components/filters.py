@@ -60,7 +60,9 @@ def topk_dollar_volume(
     first = int(np.searchsorted(calendar, np.datetime64(start, "D")))
     last = int(np.searchsorted(calendar, np.datetime64(end, "D"), side="right")) - 1
     if first < y:
-        raise ValueError(f"filter needs {y} trading days before {start}; increase dataset.warmup_days")
+        raise ValueError(
+            f"filter needs {y} trading days before {start}; increase dataset.warmup_days"
+        )
     refresh = list(range(first, last + 1, ttl))
     b = int(k * buffer_ratio)
     aggregate = _AGG[agg]
@@ -74,7 +76,9 @@ def topk_dollar_volume(
             warnings.simplefilter("ignore", category=RuntimeWarning)
             score = aggregate(dollar[i - x : i][:, eligible], axis=0)
         score = np.where(np.isnan(score), -np.inf, score)
-        order = np.lexsort((candidates, -score))  # highest liquidity first, ties by security_id
+        order = np.lexsort(
+            (candidates, -score)
+        )  # highest liquidity first, ties by security_id
         top = candidates[order][: k + b]
         kept = [s for s in top if s in previous]
         kept_set = set(kept)

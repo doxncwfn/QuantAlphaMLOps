@@ -59,7 +59,13 @@ def trading_calendar(panel: pl.DataFrame) -> np.ndarray:
     return np.sort(panel["date"].unique().to_numpy()).astype("datetime64[D]")
 
 
-def dense(panel: pl.DataFrame, column: str, calendar: np.ndarray, ids: np.ndarray, dtype=np.float64) -> np.ndarray:
+def dense(
+    panel: pl.DataFrame,
+    column: str,
+    calendar: np.ndarray,
+    ids: np.ndarray,
+    dtype=np.float64,
+) -> np.ndarray:
     """Pivot one panel column to [len(calendar), len(ids)], NaN where a stock has no value."""
     out = np.full((len(calendar), len(ids)), np.nan, dtype=dtype)
     if panel.height == 0 or len(calendar) == 0 or len(ids) == 0:
@@ -69,7 +75,9 @@ def dense(panel: pl.DataFrame, column: str, calendar: np.ndarray, ids: np.ndarra
     values = panel[column].cast(pl.Float64).fill_null(np.nan).to_numpy()
     rows = np.minimum(np.searchsorted(calendar, dates), len(calendar) - 1)
     cols = np.minimum(np.searchsorted(ids, secs), len(ids) - 1)
-    ok = (calendar[rows] == dates) & (ids[cols] == secs)  # drop rows outside the calendar or id list
+    ok = (calendar[rows] == dates) & (
+        ids[cols] == secs
+    )  # drop rows outside the calendar or id list
     out[rows[ok], cols[ok]] = values[ok]
     return out
 
@@ -85,8 +93,13 @@ def code_fingerprint(obj: Any) -> str:
     module = sys.modules.get(getattr(obj, "__module__", ""))
     try:
         source = inspect.getsource(module)
-    except (OSError, TypeError):  # defined interactively: fall back to the qualified name
-        return stable_hash(f"{getattr(obj, '__module__', '?')}.{getattr(obj, '__qualname__', repr(obj))}")
+    except (
+        OSError,
+        TypeError,
+    ):  # defined interactively: fall back to the qualified name
+        return stable_hash(
+            f"{getattr(obj, '__module__', '?')}.{getattr(obj, '__qualname__', repr(obj))}"
+        )
     return stable_hash(component_source(source, obj.__name__))
 
 
@@ -103,7 +116,11 @@ def component_source(module_source: str, name: str) -> str:
 
 
 def _is_docstring(node: ast.stmt) -> bool:
-    return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
+    return (
+        isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    )
 
 
 def _is_component(node: ast.stmt) -> bool:
@@ -111,14 +128,20 @@ def _is_component(node: ast.stmt) -> bool:
         return False
     for dec in node.decorator_list:
         func = dec.func if isinstance(dec, ast.Call) else dec
-        if (isinstance(func, ast.Name) and func.id == "register") or (isinstance(func, ast.Attribute) and func.attr == "register"):
+        if (isinstance(func, ast.Name) and func.id == "register") or (
+            isinstance(func, ast.Attribute) and func.attr == "register"
+        ):
             return True
     return False
 
 
 def _strip_docstrings(tree: ast.AST) -> None:
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.body and _is_docstring(node.body[0]):
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and node.body
+            and _is_docstring(node.body[0])
+        ):
             node.body = node.body[1:] or [ast.Pass()]
 
 
@@ -127,20 +150,40 @@ def table_configs(cfg: RunConfig) -> dict[str, dict[str, Any]]:
     data = cfg.data_spec
     warehouse = Path(cfg.paths.warehouse)
     stat = warehouse.stat() if warehouse.exists() else None
-    code = lambda kind, c: code_fingerprint(registry.get(kind, c.func))  # noqa: E731
+    code = lambda kind, c: code_fingerprint(registry.get(kind, c.func))
     common = {
         "build_version": BUILD_VERSION,
         "source": data.source.model_dump(),
         "source_code": code("source", data.source),
         "period": data.period.model_dump(mode="json"),
         "warmup_days": data.warmup_days,
-        "warehouse": {"name": warehouse.name, "size": stat.st_size if stat else None, "mtime": stat.st_mtime if stat else None},
+        "warehouse": {
+            "name": warehouse.name,
+            "size": stat.st_size if stat else None,
+            "mtime": stat.st_mtime if stat else None,
+        },
     }
     return {
-        "features": {**common, "features": [c.model_dump() for c in cfg.feature_spec], "code": [code("feature", c) for c in cfg.feature_spec]},
-        "universe": {**common, "filter": cfg.filter_spec.model_dump(), "code": code("filter", cfg.filter_spec)},
-        "market": {**common, "indicators": [c.model_dump() for c in cfg.indicator_spec], "code": [code("indicator", c) for c in cfg.indicator_spec]},
-        "labels": {**common, "label": cfg.label_spec.model_dump(), "code": code("label", cfg.label_spec)},
+        "features": {
+            **common,
+            "features": [c.model_dump() for c in cfg.feature_spec],
+            "code": [code("feature", c) for c in cfg.feature_spec],
+        },
+        "universe": {
+            **common,
+            "filter": cfg.filter_spec.model_dump(),
+            "code": code("filter", cfg.filter_spec),
+        },
+        "market": {
+            **common,
+            "indicators": [c.model_dump() for c in cfg.indicator_spec],
+            "code": [code("indicator", c) for c in cfg.indicator_spec],
+        },
+        "labels": {
+            **common,
+            "label": cfg.label_spec.model_dump(),
+            "code": code("label", cfg.label_spec),
+        },
     }
 
 
@@ -149,10 +192,12 @@ def table_hashes(cfg: RunConfig) -> dict[str, str]:
 
 
 def _without_warehouse(spec: dict[str, Any]) -> str:
-    return json.dumps({k: v for k, v in spec.items() if k != "warehouse"}, sort_keys=True, default=str)
+    return json.dumps(
+        {k: v for k, v in spec.items() if k != "warehouse"}, sort_keys=True, default=str
+    )
 
 
-def resolve_tables(cfg: RunConfig, store: "DatasetStore") -> dict[str, str]:
+def resolve_tables(cfg: RunConfig, store: DatasetStore) -> dict[str, str]:
     """The table versions this config reads.
 
     With the warehouse present this is table_hashes(cfg). Without it (Modal, an inference
@@ -164,7 +209,11 @@ def resolve_tables(cfg: RunConfig, store: "DatasetStore") -> dict[str, str]:
     resolved = {}
     for table, spec in table_configs(cfg).items():
         want = _without_warehouse(spec)
-        matches = [v for v in store.versions(table) if _without_warehouse(json.loads(v["config_json"])) == want]
+        matches = [
+            v
+            for v in store.versions(table)
+            if _without_warehouse(json.loads(v["config_json"])) == want
+        ]
         if not matches:
             raise FileNotFoundError(
                 f"warehouse {cfg.paths.warehouse} not found and {store.path} has no {table} table built from this config"
@@ -184,8 +233,10 @@ class DatasetStore:
         self.path = Path(path)
 
     @classmethod
-    def for_config(cls, cfg: RunConfig) -> "DatasetStore":
-        return cls(cfg.paths.data_root / "datasets" / f"{cfg.data_spec.dataset_name}.duckdb")
+    def for_config(cls, cfg: RunConfig) -> DatasetStore:
+        return cls(
+            cfg.paths.data_root / "datasets" / f"{cfg.data_spec.dataset_name}.duckdb"
+        )
 
     @staticmethod
     def physical(table: str, config_hash: str) -> str:
@@ -213,16 +264,30 @@ class DatasetStore:
         if not self.path.exists():
             return []
         with self._connect(read_only=True) as con:
-            exists = con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name = '_manifest'").fetchone()[0]
+            exists = con.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = '_manifest'"
+            ).fetchone()[0]
             if not exists:
                 return []
-            rows = con.execute("SELECT * FROM _manifest ORDER BY built_at").pl().to_dicts()
+            rows = (
+                con.execute("SELECT * FROM _manifest ORDER BY built_at")
+                .fetchdf()
+                .pipe(pl.from_pandas)
+                .to_dicts()
+            )
         return [row for row in rows if table is None or row["table_name"] == table]
 
     def has(self, table: str, config_hash: str) -> bool:
         return any(v["config_hash"] == config_hash for v in self.versions(table))
 
-    def write(self, table: str, frame: pl.DataFrame, config_hash: str, config: dict[str, Any], date_col: str) -> None:
+    def write(
+        self,
+        table: str,
+        frame: pl.DataFrame,
+        config_hash: str,
+        config: dict[str, Any],
+        date_col: str,
+    ) -> None:
         """Store one table version and its manifest row in a single transaction."""
         name = self.physical(table, config_hash)
         dates = frame[date_col] if frame.height else None
@@ -232,7 +297,7 @@ class DatasetStore:
             "n_rows": frame.height,
             "min_date": dates.min() if dates is not None else None,
             "max_date": dates.max() if dates is not None else None,
-            "built_at": dt.datetime.now(dt.timezone.utc).replace(tzinfo=None),
+            "built_at": dt.datetime.now(dt.UTC).replace(tzinfo=None),
             "config_json": json.dumps(config, sort_keys=True, default=str),
         }
         with self._connect(read_only=False) as con:
@@ -245,9 +310,17 @@ class DatasetStore:
             con.register("frame_view", frame.to_arrow())
             con.execute("BEGIN TRANSACTION")
             try:
-                con.execute(f"CREATE OR REPLACE TABLE {name} AS SELECT * FROM frame_view")
-                con.execute("DELETE FROM _manifest WHERE table_name = ? AND config_hash = ?", [table, config_hash])
-                con.execute("INSERT INTO _manifest VALUES (?, ?, ?, ?, ?, ?, ?)", list(record.values()))
+                con.execute(
+                    f"CREATE OR REPLACE TABLE {name} AS SELECT * FROM frame_view"
+                )
+                con.execute(
+                    "DELETE FROM _manifest WHERE table_name = ? AND config_hash = ?",
+                    [table, config_hash],
+                )
+                con.execute(
+                    "INSERT INTO _manifest VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    list(record.values()),
+                )
                 con.execute("COMMIT")
             except Exception:
                 con.execute("ROLLBACK")
@@ -255,11 +328,13 @@ class DatasetStore:
             finally:
                 con.unregister("frame_view")
 
-    def read(self, table: str, config_hash: str, where: str | None = None) -> pl.DataFrame:
+    def read(
+        self, table: str, config_hash: str, where: str | None = None
+    ) -> pl.DataFrame:
         name = self.physical(table, config_hash)
         with self._connect(read_only=True) as con:
             sql = f"SELECT * FROM {name}" + (f" WHERE {where}" if where else "")
-            return con.execute(sql).pl()
+            return con.execute(sql).fetchdf().pipe(pl.from_pandas)
 
     def drop(self, table: str, config_hash: str) -> None:
         """Delete one version. DuckDB reuses the space but does not shrink the file."""
@@ -267,14 +342,19 @@ class DatasetStore:
         with self._connect(read_only=False) as con:
             con.execute("BEGIN TRANSACTION")
             con.execute(f"DROP TABLE IF EXISTS {name}")
-            con.execute("DELETE FROM _manifest WHERE table_name = ? AND config_hash = ?", [table, config_hash])
+            con.execute(
+                "DELETE FROM _manifest WHERE table_name = ? AND config_hash = ?",
+                [table, config_hash],
+            )
             con.execute("COMMIT")
 
 
 # ---------------------------------------------------------------- read path
 
 
-def apply_transforms(x: np.ndarray, mask: np.ndarray, transforms, feature_names: list[str]) -> np.ndarray:
+def apply_transforms(
+    x: np.ndarray, mask: np.ndarray, transforms, feature_names: list[str]
+) -> np.ndarray:
     """Run window_spec.transforms on one window. A transform may restrict itself to some
     features with kwargs.features: [...]; the framework handles that key."""
     for t in transforms:
@@ -307,36 +387,60 @@ class DatasetView:
     cfg: RunConfig
 
     @classmethod
-    def load(cls, store: DatasetStore, cfg: RunConfig, tables: dict[str, str], with_labels: bool = True) -> "DatasetView":
+    def load(
+        cls,
+        store: DatasetStore,
+        cfg: RunConfig,
+        tables: dict[str, str],
+        with_labels: bool = True,
+    ) -> DatasetView:
         """tables: table -> version hash, e.g. resolve_tables(cfg) or meta.json dataset_tables."""
         market = store.read("market", tables["market"]).sort("date")
         calendar = market["date"].to_numpy().astype("datetime64[D]")
         ts_names = [c for c in market.columns if c.startswith("ts__")]
         static_names = [c for c in market.columns if c.startswith("static__")]
 
-        universe = store.read("universe", tables["universe"]).sort(["refresh_date", "slot"])
-        ids = np.sort(universe.filter(~pl.col("is_pad"))["security_id"].unique().to_numpy()).astype(np.int64)
+        universe = store.read("universe", tables["universe"]).sort(
+            ["refresh_date", "slot"]
+        )
+        ids = np.sort(
+            universe.filter(~pl.col("is_pad"))["security_id"].unique().to_numpy()
+        ).astype(np.int64)
         k = int(universe["slot"].max()) + 1
 
         id_list = ",".join(map(str, ids.tolist())) or "NULL"
-        feats = store.read("features", tables["features"], where=f"security_id IN ({id_list})")
+        feats = store.read(
+            "features", tables["features"], where=f"security_id IN ({id_list})"
+        )
         names = [c for c in feats.columns if c not in ("date", "security_id")]
-        features = np.stack([dense(feats, n, calendar, ids, np.float32) for n in names], axis=-1) if names else np.zeros((len(calendar), len(ids), 0), np.float32)
+        features = (
+            np.stack(
+                [dense(feats, n, calendar, ids, np.float32) for n in names], axis=-1
+            )
+            if names
+            else np.zeros((len(calendar), len(ids), 0), np.float32)
+        )
 
         slots = np.full((len(calendar), k), -1, dtype=np.int64)
         covered = np.zeros(len(calendar), dtype=bool)
-        for (refresh, until), period in universe.group_by(["refresh_date", "valid_until"], maintain_order=True):
+        for (refresh, until), period in universe.group_by(
+            ["refresh_date", "valid_until"], maintain_order=True
+        ):
             lo = np.searchsorted(calendar, np.datetime64(refresh, "D"))
             hi = np.searchsorted(calendar, np.datetime64(until, "D"))
             col = np.full(k, -1, dtype=np.int64)
             real = period.filter(~pl.col("is_pad"))
-            col[real["slot"].to_numpy()] = np.searchsorted(ids, real["security_id"].to_numpy())
+            col[real["slot"].to_numpy()] = np.searchsorted(
+                ids, real["security_id"].to_numpy()
+            )
             slots[lo:hi] = col
             covered[lo:hi] = True
 
         labels = None
         if with_labels:
-            lab = store.read("labels", tables["labels"], where=f"security_id IN ({id_list})")
+            lab = store.read(
+                "labels", tables["labels"], where=f"security_id IN ({id_list})"
+            )
             labels = dense(lab, "label", calendar, ids, np.float32)
 
         def market_matrix(cols: list[str]) -> np.ndarray:
@@ -370,7 +474,12 @@ class DatasetView:
         start = np.datetime64(self.cfg.data_spec.period.start, "D")
         end = np.datetime64(self.cfg.data_spec.period.end, "D")
         idx = np.arange(len(self.calendar))
-        ok = self.covered & (idx >= L) & (self.calendar >= start) & (self.calendar <= end)
+        ok = (
+            self.covered
+            & (idx >= L)
+            & (self.calendar >= start)
+            & (self.calendar <= end)
+        )
         return idx[ok]
 
     def index_of(self, t: dt.date | np.datetime64) -> int:
@@ -386,7 +495,9 @@ class DatasetView:
         window = self.cfg.window_spec
         L = window.lookback
         if i < L:
-            raise ValueError(f"decision index {i} has fewer than {L} trading days of history")
+            raise ValueError(
+                f"decision index {i} has fewer than {L} trading days of history"
+            )
         cols = self.slots[i]
         real = cols >= 0
         k, F = self.k, self.features.shape[2]
@@ -421,7 +532,7 @@ class DatasetView:
 
 def _ffill_time(x: np.ndarray) -> np.ndarray:
     """Forward-fill NaNs along the lookback axis of [k, L, F]."""
-    k, L, F = x.shape
+    _k, L, _F = x.shape
     valid = ~np.isnan(x)
     pos = np.where(valid, np.arange(L)[None, :, None], 0)
     np.maximum.accumulate(pos, axis=1, out=pos)

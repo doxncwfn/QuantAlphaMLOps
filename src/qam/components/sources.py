@@ -16,16 +16,34 @@ import polars as pl
 
 from qam.registry import register
 
-PANEL_COLUMNS = ["security_id", "date", "open", "high", "low", "close", "volume", "adj_close", "ret_total"]
+PANEL_COLUMNS = [
+    "security_id",
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "adj_close",
+    "ret_total",
+]
 
 
 @register("source", "warehouse_duckdb")
-def warehouse_duckdb(warehouse: Path, start: dt.date, end: dt.date, view: str = "silver.v_prices") -> pl.DataFrame:
+def warehouse_duckdb(
+    warehouse: Path, start: dt.date, end: dt.date, view: str = "silver.v_prices"
+) -> pl.DataFrame:
     """Read silver.v_prices from the shared warehouse file (read-only)."""
     cols = ", ".join(PANEL_COLUMNS)
     with duckdb.connect(str(warehouse), read_only=True) as con:
-        frame = con.execute(
-            f"SELECT {cols} FROM {view} WHERE date BETWEEN ? AND ? ORDER BY security_id, date",
-            [start, end],
-        ).pl()
-    return frame.with_columns(pl.col("security_id").cast(pl.Int64), pl.col("date").cast(pl.Date))
+        frame = (
+            con.execute(
+                f"SELECT {cols} FROM {view} WHERE date BETWEEN ? AND ? ORDER BY security_id, date",
+                [start, end],
+            )
+            .fetchdf()
+            .pipe(pl.from_pandas)
+        )
+    return frame.with_columns(
+        pl.col("security_id").cast(pl.Int64), pl.col("date").cast(pl.Date)
+    )
